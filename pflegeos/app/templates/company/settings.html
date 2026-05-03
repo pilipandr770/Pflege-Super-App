@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item active">Einstellungen</li>
+{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4">Einrichtungseinstellungen</h4>
+
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold bg-primary text-white">🏥 Einrichtungsdaten</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Name der Einrichtung</label>
+              <input type="text" name="name" class="form-control" value="{{ company.name }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Rechtsform</label>
+              <input type="text" name="rechtsform" class="form-control" value="{{ company.rechtsform or '' }}" placeholder="GmbH, GbR...">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Straße</label>
+              <input type="text" name="strasse" class="form-control" value="{{ company.strasse }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Nr.</label>
+              <input type="text" name="hausnummer" class="form-control" value="{{ company.hausnummer }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">PLZ</label>
+              <input type="text" name="plz" class="form-control" value="{{ company.plz }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Ort</label>
+              <input type="text" name="ort" class="form-control" value="{{ company.ort }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Bundesland</label>
+              <input type="text" name="bundesland" class="form-control" value="{{ company.bundesland }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Telefon</label>
+              <input type="tel" name="telefon" class="form-control" value="{{ company.telefon or '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Website</label>
+              <input type="url" name="website" class="form-control" value="{{ company.website or '' }}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold">👔 Verantwortliche</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Geschäftsführer/in</label>
+              <input type="text" name="geschaeftsfuehrer_name" class="form-control" value="{{ company.geschaeftsfuehrer_name or '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Pflegedienstleitung (PDL)</label>
+              <input type="text" name="pdl_name" class="form-control" value="{{ company.pdl_name or '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">IK-Nummer</label>
+              <input type="text" name="ik_nummer" class="form-control" value="{{ company.ik_nummer or '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Datenschutzbeauftragter</label>
+              <input type="text" name="datenschutz_name" class="form-control" value="{{ company.datenschutz_name or '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Datenschutz E-Mail</label>
+              <input type="email" name="datenschutz_email" class="form-control" value="{{ company.datenschutz_email or '' }}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plan info (read-only) -->
+    <div class="col-12">
+      <div class="card border-info">
+        <div class="card-header fw-semibold bg-info bg-opacity-10">📦 Abonnement</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label small text-muted">Plan</label>
+              <div class="fw-bold fs-5">{{ company.plan }}</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small text-muted">Status</label>
+              <div><span class="badge bg-{% if company.status=='ACTIVE' %}success{% elif company.status=='PENDING' %}warning text-dark{% else %}secondary{% endif %} fs-6">{{ company.status }}</span></div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small text-muted">Testphase bis</label>
+              <div class="small">{{ company.trial_ends_at|datetimefmt if company.trial_ends_at else '—' }}</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small text-muted">Registriert</label>
+              <div class="small">{{ company.created_at|datefmt }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary fw-semibold">✓ Einstellungen speichern</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

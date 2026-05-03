@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}SIS — {{ patient.full_name }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.show', patient_id=patient.id) }}">{{ patient.full_name }}</a></li>
+<li class="breadcrumb-item active">SIS</li>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .sis-block { border-left: 4px solid #1a5f7a; }
+  .sis-block.required { border-left-color: #dc3545; background-color: #fff8f9; }
+  .sis-block.required .card-header { background-color: #ffe5e9 !important; }
+  .score-group .btn-check:checked + .btn { font-weight: 700; }
+  .score-0 + .btn { border-color: #198754; }
+  .score-1 + .btn { border-color: #0d6efd; }
+  .score-2 + .btn { border-color: #fd7e14; }
+  .score-3 + .btn { border-color: #dc3545; }
+  .required-indicator { color: #dc3545; font-weight: bold; }
+  .form-label.required::after { content: " *"; color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Strukturierte Informationssammlung (SIS)</h4>
+    <small class="text-muted">{{ patient.full_name }} · PG {{ patient.pflegegrad or '?' }}</small>
+  </div>
+</div>
+
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="geo_lat" id="geo_lat">
+  <input type="hidden" name="geo_lng" id="geo_lng">
+
+  <!-- Legende -->
+  <div class="alert alert-info py-2 small mb-3">
+    <strong>Bewertungsskala:</strong>
+    <span class="text-success fw-bold">0 = Selbständig</span> ·
+    <span class="text-primary fw-bold">1 = Überwiegend selbständig</span> ·
+    <span class="text-warning fw-bold">2 = Überwiegend unselbständig</span> ·
+    <span class="text-danger fw-bold">3 = Unselbständig</span>
+    <span id="geo-status" class="float-end geo-indicator"></span>
+  </div>
+
+  <!-- Block 1: Kognition -->
+  <div class="card mb-3 sis-block required">
+    <div class="card-header fw-semibold bg-light">
+      &#x1F9E0; Block 1 — Kognition und Kommunikation
+      <span class="required-indicator float-end" data-bs-toggle="tooltip" title="Erforderlich für Versicherungsabrechnung">Erforderlich</span>
+      <small class="text-muted fw-normal d-block">Orientierung, Gedächtnis, Verstehen, Verhalten</small>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% for field, label, hint in [
+          ('kb1_orientierung', 'Örtliche / zeitliche Orientierung', 'Erkennt der Bewohner seinen Aufenthaltsort und die aktuelle Zeit?'),
+          ('kb1_gedaechtnis', 'Episodisches Gedächtnis', 'Kann der Bewohner zurückliegende Ereignisse erinnern?'),
+          ('kb1_verstehen', 'Verstehen von Sachverhalten', 'Versteht der Bewohner einfache und komplexe Aussagen?'),
+          ('kb1_kommunikation', 'Kommunikationsvermögen', 'Kann der Bewohner eigene Bedürfnisse verständlich machen?'),
+          ('kb1_verhalten', 'Verhaltensauffälligkeiten', 'Treten motorische, verbale oder psychische Verhaltensauffälligkeiten auf?'),
+        ] %}
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">
+            {{ label }}
+            <i class="bi bi-question-circle text-muted tooltip-hint" data-bs-toggle="tooltip" title="{{ hint }}"></i>
+          </label>
+          <div class="btn-group score-group w-100" role="group">
+            {% for val in [0,1,2,3] %}
+            <input type="radio" class="btn-check score-{{ val }}" name="{{ field }}" id="{{ field }}_{{ val }}"
+                   value="{{ val }}"
+                   {% if sis and sis[field|replace('kb1_','')] == val %}checked{% endif %}>
+            <label class="btn btn-outline-secondary btn-sm" for="{{ field }}_{{ val }}">
+              {{ val }} — {{ score_labels[val] }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+        <div class="col-12">
+          <label class="form-label">Freitext / Besonderheiten</label>
+          <textarea name="kb1_freitext" class="form-control" rows="2"
+                    placeholder="Individuelle Besonderheiten..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Block 2: Mobilität -->
+  <div class="card mb-3 sis-block required">
+    <div class="card-header fw-semibold bg-light">
+      &#x1F9B5; Block 2 — Mobilität und Beweglichkeit
+      <span class="required-indicator float-end" data-bs-toggle="tooltip" title="Erforderlich für Versicherungsabrechnung">Erforderlich</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% for field, label in [
+          ('kb2_positionswechsel', 'Positionswechsel im Bett'),
+          ('kb2_transfer', 'Aufstehen, Umsetzen, Transfer'),
+          ('kb2_gehen', 'Fortbewegen innerhalb des Wohnbereichs'),
+          ('kb2_treppensteigen', 'Treppensteigen'),
+        ] %}
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">{{ label }}</label>
+          <div class="btn-group score-group w-100" role="group">
+            {% for val in [0,1,2,3] %}
+            <input type="radio" class="btn-check" name="{{ field }}" id="{{ field }}_{{ val }}" value="{{ val }}">
+            <label class="btn btn-outline-secondary btn-sm" for="{{ field }}_{{ val }}">{{ val }}</label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+        <div class="col-12">
+          <label class="form-label">Hilfsmittel</label>
+          <input type="text" name="kb2_hilfsmittel" class="form-control"
+                 placeholder="z.B. Rollator, Rollstuhl, Gehstock...">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Freitext</label>
+          <textarea name="kb2_freitext" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Block 3: Krankheitsbezogen -->
+  <div class="card mb-3 sis-block required">
+    <div class="card-header fw-semibold bg-light">
+      &#x1F48A; Block 3 — Krankheitsbezogene Anforderungen
+      <span class="required-indicator float-end" data-bs-toggle="tooltip" title="Erforderlich für Versicherungsabrechnung">Erforderlich</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Medikamente / Besonderheiten</label>
+          <textarea name="kb3_medikamente" class="form-control" rows="3"
+                    placeholder="Wichtige Hinweise zur Medikation..."></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Behandlungspflege erforderlich</label>
+          <div class="d-flex flex-wrap gap-2 mt-1">
+            {% for field, label in [
+              ('kb3_injektionen','Injektionen'),
+              ('kb3_verbandwechsel','Verbandwechsel'),
+              ('kb3_katheter','Katheter'),
+              ('kb3_sonde','Ernährungssonde'),
+              ('kb3_sauerstoff','Sauerstoffversorgung'),
+            ] %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="{{ field }}" id="{{ field }}">
+              <label class="form-check-label" for="{{ field }}">{{ label }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Freitext</label>
+          <textarea name="kb3_freitext" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Block 4: Selbstversorgung -->
+  <div class="card mb-3 sis-block required">
+    <div class="card-header fw-semibold bg-light">
+      &#x1F6C1; Block 4 — Selbstversorgung
+      <span class="required-indicator float-end" data-bs-toggle="tooltip" title="Erforderlich für Versicherungsabrechnung">Erforderlich</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% for field, label in [
+          ('kb4_koerperpflege', 'Körperpflege (Waschen, Duschen, Baden)'),
+          ('kb4_ernaehrung', 'Nahrungsaufnahme'),
+          ('kb4_trinken', 'Flüssigkeitsaufnahme'),
+          ('kb4_ausscheidung', 'Ausscheidung (Kontinenz)'),
+          ('kb4_ankleiden', 'An- und Auskleiden'),
+        ] %}
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">{{ label }}</label>
+          <div class="btn-group score-group w-100" role="group">
+            {% for val in [0,1,2,3] %}
+            <input type="radio" class="btn-check" name="{{ field }}" id="{{ field }}_{{ val }}" value="{{ val }}">
+            <label class="btn btn-outline-secondary btn-sm" for="{{ field }}_{{ val }}">{{ val }}</label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Kostform</label>
+          <select name="kb4_kostform" class="form-select">
+            <option value="">— Normale Kost —</option>
+            <option>Vollkost</option>
+            <option>Leichte Vollkost</option>
+            <option>Pürierte Kost</option>
+            <option>Flüssige Kost</option>
+            <option>Diabeteskost</option>
+            <option>Vegane Kost</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Freitext</label>
+          <textarea name="kb4_freitext" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Block 5: Soziales -->
+  <div class="card mb-3 sis-block">
+    <div class="card-header fw-semibold bg-light">
+      &#x1F91D; Block 5 — Leben in sozialen Beziehungen
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Soziale Kontakte</label>
+          <textarea name="kb5_soziale_kontakte" class="form-control" rows="3"
+                    placeholder="Familie, Freunde, Besucher..."></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Tagesstruktur</label>
+          <textarea name="kb5_tagesstruktur" class="form-control" rows="3"
+                    placeholder="Gewünschte Tagesstruktur, Routinen..."></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Interessen / Hobbys</label>
+          <textarea name="kb5_interessen" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Freitext</label>
+          <textarea name="kb5_freitext" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zusammenfassung -->
+  <div class="card mb-3">
+    <div class="card-header fw-semibold bg-primary text-white">&#x1F3AF; Zusammenfassung & Pflegeschwerpunkte</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label fw-semibold">Pflegeschwerpunkte</label>
+          <textarea name="pflegeschwerpunkte" class="form-control" rows="3"
+                    placeholder="Die wichtigsten identifizierten Pflegeziele und -probleme..."></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Pflegeziele</label>
+          <textarea name="ziele" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Besonderheiten / Hinweise</label>
+          <textarea name="besonderheiten" class="form-control" rows="3"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Verifikation -->
+  <div class="card mb-4 border-warning">
+    <div class="card-header fw-semibold bg-warning text-dark">&#x1F512; Verifikation (PIN + GPS)</div>
+    <div class="card-body">
+      <div class="row g-3 align-items-center">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">PIN bestätigen</label>
+          <input type="password" name="pin" class="form-control" placeholder="6-stelliger PIN"
+                 maxlength="6" inputmode="numeric">
+          <small class="text-muted">Dokumentation wird mit Ihrer PIN signiert</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Gerät MAC (optional)</label>
+          <input type="text" name="device_mac" class="form-control"
+                 placeholder="AA:BB:CC:DD:EE:FF">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">GPS-Status</label>
+          <div id="geo-status-box" class="form-control bg-light text-muted small">
+            Wird automatisch erfasst...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary fw-semibold px-4">
+      &#x2705; SIS speichern
+    </button>
+    <a href="{{ url_for('patients.show', patient_id=patient.id) }}" class="btn btn-outline-secondary">
+      Abbrechen
+    </a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tooltips
+const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
+
+// GPS update
+navigator.geolocation && navigator.geolocation.getCurrentPosition(pos => {
+  document.getElementById('geo_lat').value = pos.coords.latitude.toFixed(6);
+  document.getElementById('geo_lng').value = pos.coords.longitude.toFixed(6);
+  document.getElementById('geo-status-box').textContent =
+    `✓ GPS: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+  document.getElementById('geo-status-box').classList.replace('text-muted','text-success');
+});
+</script>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Wunden{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Wunddokumentation — {{ patient.full_name }}</h4>
+    <small class="text-muted">Aktive und abgeheilte Wunden</small>
+  </div>
+  <a href="{{ url_for('wounds.new_wound', patient_id=patient.id) }}" class="btn btn-danger">+ Neue Wunde</a>
+</div>
+
+{% if not patient.einwilligung_foto %}
+<div class="alert alert-warning py-2 small">
+  ⚠ <strong>Keine Fotoeinwilligung</strong> — Fotodokumentation für diesen Patienten nicht möglich.
+  Bitte in den Patientenstammdaten aktualisieren.
+</div>
+{% endif %}
+
+{% if wounds %}
+<div class="row g-3">
+  {% for w in wounds %}
+  <div class="col-md-6">
+    <div class="card {% if not w.is_active %}opacity-75{% endif %}">
+      <div class="card-header d-flex justify-content-between fw-semibold">
+        <span>{{ w.wunde_bezeichnung }}</span>
+        <span class="badge bg-{% if w.is_active %}danger{% else %}success{% endif %}">
+          {% if w.is_active %}Aktiv{% else %}Abgeheilt{% endif %}
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="row small">
+          <div class="col-6 text-muted">Lokalisation</div>
+          <div class="col-6">{{ w.lokalisation }}</div>
+          <div class="col-6 text-muted">Erstfeststellung</div>
+          <div class="col-6">{{ w.erstfeststellung|datefmt }}</div>
+          {% if w.stage %}
+          <div class="col-6 text-muted">Stadium</div>
+          <div class="col-6">{{ w.stage }}</div>
+          {% endif %}
+          <div class="col-6 text-muted">Assessments</div>
+          <div class="col-6">{{ w.assessments.count() }}</div>
+        </div>
+        <!-- Letzte Tendenz -->
+        {% set last = w.assessments.order_by_desc_date | first if w.assessments.count() > 0 %}
+        <div class="mt-2 d-flex gap-2">
+          <a href="{{ url_for('wounds.show_wound', wound_id=w.id) }}" class="btn btn-sm btn-outline-secondary">Verlauf</a>
+          {% if w.is_active %}
+          <a href="{{ url_for('wounds.new_assessment', wound_id=w.id) }}" class="btn btn-sm btn-danger">+ Befund</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <div class="fs-1">🩹</div>
+  <p>Keine Wunden dokumentiert.</p>
+  <a href="{{ url_for('wounds.new_wound', patient_id=patient.id) }}" class="btn btn-danger">Wunde anlegen</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}SIS Detail{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">SIS v{{ sis.version }} — {{ patient.full_name }}</h4>
+    <small class="text-muted">{{ sis.assessment_date|datefmt }} · {{ sis.status }}</small>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('exports.sis_assessment_pdf', sis_id=sis.id) }}" class="btn btn-outline-info btn-sm"
+       title="PDF-Export der SIS-Einschätzung" data-bs-toggle="tooltip">
+      <i class="bi bi-download"></i> PDF
+    </a>
+    {% if sis.status == 'COMPLETED' and current_user.can_approve_documents %}
+    <form method="POST" action="{{ url_for('sis.approve', sis_id=sis.id) }}" class="m-0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-success btn-sm">✓ Freigeben</button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('sis.patient_list', patient_id=patient.id) }}" class="btn btn-outline-secondary btn-sm">Zurück</a>
+  </div>
+</div>
+<div class="row g-3">
+  {% for block_title, fields in [
+    ('Block 1 — Kognition', [('Orientierung','kb1_orientierung'),('Gedächtnis','kb1_gedaechtnis'),('Verstehen','kb1_verstehen'),('Kommunikation','kb1_kommunikation'),('Verhalten','kb1_verhalten')]),
+    ('Block 2 — Mobilität', [('Positionswechsel','kb2_positionswechsel'),('Transfer','kb2_transfer'),('Gehen','kb2_gehen'),('Treppensteigen','kb2_treppensteigen')]),
+    ('Block 4 — Selbstversorgung', [('Körperpflege','kb4_koerperpflege'),('Ernährung','kb4_ernaehrung'),('Trinken','kb4_trinken'),('Ausscheidung','kb4_ausscheidung'),('Ankleiden','kb4_ankleiden')]),
+  ] %}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold bg-light small">{{ block_title }}</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          {% for label, attr in fields %}
+          <tr>
+            <td class="text-muted small">{{ label }}</td>
+            <td>
+              {% set val = sis|attr(attr) %}
+              {% if val is not none %}
+              <span class="fw-bold sis-score-{{ val }}">{{ val }} — {{ score_labels[val] }}</span>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header fw-semibold bg-primary text-white small">Pflegeschwerpunkte & Ziele</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4"><strong class="small">Schwerpunkte</strong><p>{{ sis.pflegeschwerpunkte or '—' }}</p></div>
+          <div class="col-md-4"><strong class="small">Ziele</strong><p>{{ sis.ziele or '—' }}</p></div>
+          <div class="col-md-4"><strong class="small">Besonderheiten</strong><p>{{ sis.besonderheiten or '—' }}</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

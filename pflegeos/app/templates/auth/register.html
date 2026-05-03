@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Einrichtung registrieren — PflegeOS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f0f7f8; }
+    .section-header { background: #1a5f7a; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-weight: 600; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<div class="container py-4" style="max-width:800px">
+  <div class="text-center mb-4">
+    <h1 class="h3 fw-bold">&#x1F493; PflegeOS</h1>
+    <p class="text-muted">Neue Pflegeeinrichtung registrieren — 30 Tage kostenlos testen</p>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      <form method="POST" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Einrichtungsdaten -->
+        <div class="section-header">🏥 Einrichtungsdaten</div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">Name der Einrichtung <span class="text-danger">*</span></label>
+            <input type="text" name="company_name" class="form-control {% if errors.company_name %}is-invalid{% endif %}"
+                   value="{{ form_data.get('company_name','') }}" required>
+            {% if errors.company_name %}<div class="invalid-feedback">{{ errors.company_name }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Rechtsform</label>
+            <input type="text" name="rechtsform" class="form-control"
+                   placeholder="GmbH, GbR, e.V."
+                   value="{{ form_data.get('rechtsform','') }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Einrichtungstyp <span class="text-danger">*</span></label>
+            <select name="company_type" class="form-select {% if errors.company_type %}is-invalid{% endif %}" required>
+              <option value="">— bitte wählen —</option>
+              <option value="STATIONAER" {% if form_data.get('company_type')=='STATIONAER' %}selected{% endif %}>Stationäre Pflege</option>
+              <option value="AMBULANT" {% if form_data.get('company_type')=='AMBULANT' %}selected{% endif %}>Ambulanter Dienst</option>
+              <option value="TEILSTATIONAER" {% if form_data.get('company_type')=='TEILSTATIONAER' %}selected{% endif %}>Tagespflege</option>
+              <option value="BETREUTES_WOHNEN" {% if form_data.get('company_type')=='BETREUTES_WOHNEN' %}selected{% endif %}>Betreutes Wohnen</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Anzahl Plätze</label>
+            <input type="number" name="plaetze_anzahl" class="form-control"
+                   value="{{ form_data.get('plaetze_anzahl','') }}" min="1">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Straße <span class="text-danger">*</span></label>
+            <input type="text" name="strasse" class="form-control {% if errors.strasse %}is-invalid{% endif %}"
+                   value="{{ form_data.get('strasse','') }}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold">Nr. <span class="text-danger">*</span></label>
+            <input type="text" name="hausnummer" class="form-control {% if errors.hausnummer %}is-invalid{% endif %}"
+                   value="{{ form_data.get('hausnummer','') }}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold">PLZ <span class="text-danger">*</span></label>
+            <input type="text" name="plz" class="form-control {% if errors.plz %}is-invalid{% endif %}"
+                   value="{{ form_data.get('plz','') }}" required maxlength="5">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Ort <span class="text-danger">*</span></label>
+            <input type="text" name="ort" class="form-control {% if errors.ort %}is-invalid{% endif %}"
+                   value="{{ form_data.get('ort','') }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Bundesland <span class="text-danger">*</span></label>
+            <select name="bundesland" class="form-select {% if errors.bundesland %}is-invalid{% endif %}" required>
+              <option value="">— bitte wählen —</option>
+              {% for bl in bundeslaender %}
+              <option value="{{ bl }}" {% if form_data.get('bundesland')==bl %}selected{% endif %}>{{ bl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Telefon</label>
+            <input type="tel" name="company_telefon" class="form-control"
+                   value="{{ form_data.get('company_telefon','') }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">E-Mail Einrichtung <span class="text-danger">*</span></label>
+            <input type="email" name="company_email" class="form-control {% if errors.company_email %}is-invalid{% endif %}"
+                   value="{{ form_data.get('company_email','') }}" required>
+            {% if errors.company_email %}<div class="invalid-feedback">{{ errors.company_email }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Handelsregister-Nr.</label>
+            <input type="text" name="handelsregister_nr" class="form-control"
+                   placeholder="HRB 12345" value="{{ form_data.get('handelsregister_nr','') }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">IK-Nummer (§301 SGB V)</label>
+            <input type="text" name="ik_nummer" class="form-control"
+                   value="{{ form_data.get('ik_nummer','') }}" maxlength="15">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Geschäftsführer/in</label>
+            <input type="text" name="geschaeftsfuehrer_name" class="form-control"
+                   value="{{ form_data.get('geschaeftsfuehrer_name','') }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Pflegedienstleitung (PDL)</label>
+            <input type="text" name="pdl_name" class="form-control"
+                   value="{{ form_data.get('pdl_name','') }}">
+          </div>
+        </div>
+
+        <!-- Admin-Konto -->
+        <div class="section-header">👤 Administrator-Konto</div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Vorname <span class="text-danger">*</span></label>
+            <input type="text" name="admin_vorname" class="form-control {% if errors.admin_vorname %}is-invalid{% endif %}"
+                   value="{{ form_data.get('admin_vorname','') }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Nachname <span class="text-danger">*</span></label>
+            <input type="text" name="admin_nachname" class="form-control {% if errors.admin_nachname %}is-invalid{% endif %}"
+                   value="{{ form_data.get('admin_nachname','') }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">E-Mail (Login) <span class="text-danger">*</span></label>
+            <input type="email" name="admin_email" class="form-control {% if errors.admin_email %}is-invalid{% endif %}"
+                   value="{{ form_data.get('admin_email','') }}" required>
+            {% if errors.admin_email %}<div class="invalid-feedback">{{ errors.admin_email }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Telefon</label>
+            <input type="tel" name="admin_telefon" class="form-control"
+                   value="{{ form_data.get('admin_telefon','') }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Passwort <span class="text-danger">*</span>
+              <small class="text-muted fw-normal">(min. 8 Zeichen)</small>
+            </label>
+            <input type="password" name="password" class="form-control {% if errors.password %}is-invalid{% endif %}"
+                   required minlength="8" autocomplete="new-password">
+            {% if errors.password %}<div class="invalid-feedback">{{ errors.password }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Passwort wiederholen <span class="text-danger">*</span></label>
+            <input type="password" name="password2" class="form-control {% if errors.password2 %}is-invalid{% endif %}"
+                   required autocomplete="new-password">
+            {% if errors.password2 %}<div class="invalid-feedback">{{ errors.password2 }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="alert alert-info py-2 small mb-3">
+          <strong>&#x2139;</strong> Mit der Registrierung starten Sie einen kostenlosen 30-Tage-Test.
+          Keine Kreditkarte erforderlich. Alle Daten werden auf deutschen Servern gespeichert (DSGVO-konform).
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 fw-semibold py-2">
+          Einrichtung registrieren & kostenlos starten
+        </button>
+      </form>
+    </div>
+  </div>
+  <div class="text-center mt-3">
+    <small class="text-muted">Bereits registriert? <a href="{{ url_for('auth.login') }}">Anmelden</a></small>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

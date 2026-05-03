@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Mitarbeiter{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item active">Mitarbeiter</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between mb-4">
+  <h4 class="fw-bold mb-0">Mitarbeiter</h4>
+  <a href="{{ url_for('company.new_employee') }}" class="btn btn-primary">
+    <i class="bi bi-person-plus"></i> Neuer Mitarbeiter
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Rolle</th>
+          <th>Qualifikation</th>
+          <th>E-Mail</th>
+          <th>Berechtigungen</th>
+          <th>Status</th>
+          <th>Letzter Login</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employees %}
+        <tr class="{% if not emp.is_active %}table-secondary opacity-75{% endif %}">
+          <td>
+            <strong>{{ emp.nachname }}, {{ emp.vorname }}</strong>
+            {% if emp.personalnummer %}<div class="text-muted small">Nr. {{ emp.personalnummer }}</div>{% endif %}
+          </td>
+          <td>
+            <span class="badge bg-{% if emp.role == 'ADMIN' %}danger{% elif emp.role == 'PFLEGEFACHKRAFT' %}primary{% else %}secondary{% endif %}">
+              {{ emp.role }}
+            </span>
+          </td>
+          <td class="small text-muted">{{ emp.qualification or '—' }}</td>
+          <td class="small">{{ emp.email or '—' }}</td>
+          <td>
+            {% if emp.can_administer_btm %}<span class="badge bg-warning text-dark me-1" style="font-size:0.65rem">BtM</span>{% endif %}
+            {% if emp.can_wound_care %}<span class="badge bg-info me-1" style="font-size:0.65rem">Wunde</span>{% endif %}
+            {% if emp.can_approve_documents %}<span class="badge bg-success" style="font-size:0.65rem">Freigabe</span>{% endif %}
+          </td>
+          <td>
+            <span class="badge bg-{% if emp.is_active %}success{% else %}secondary{% endif %}">
+              {% if emp.is_active %}Aktiv{% else %}Inaktiv{% endif %}
+            </span>
+          </td>
+          <td class="small text-muted">{{ emp.last_login_at|datetimefmt if emp.last_login_at else 'Noch nie' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">Keine Mitarbeiter angelegt</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

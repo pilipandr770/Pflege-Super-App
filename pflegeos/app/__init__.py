@@ -1,0 +1,65 @@
+import os
+from flask import Flask
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from app.config import config
+from app.extensions import db, login_manager, migrate, bcrypt, csrf, mail
+
+
+def create_app(config_name=None):
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'development')
+
+    app = Flask(__name__, template_folder='templates', static_folder='static')
+    app.config.from_object(config.get(config_name, config['default']))
+
+    # Расширения
+    db.init_app(app)
+    login_manager.init_app(app)
+    migrate.init_app(app, db)
+    bcrypt.init_app(app)
+    csrf.init_app(app)
+    mail.init_app(app)
+
+    # Создаём папку для загрузок
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+    # Регистрируем blueprints
+    from app.routes.auth import auth_bp
+    from app.routes.dashboard import dashboard_bp
+    from app.routes.patients import patients_bp
+    from app.routes.sis import sis_bp
+    from app.routes.medications import medications_bp
+    from app.routes.leistung import leistung_bp
+    from app.routes.wounds import wounds_bp
+    from app.routes.company import company_bp
+    from app.routes.exports import export_bp
+    from app.routes.alerts import alerts_bp
+
+    app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(dashboard_bp, url_prefix='/')
+    app.register_blueprint(patients_bp, url_prefix='/patients')
+    app.register_blueprint(sis_bp, url_prefix='/sis')
+    app.register_blueprint(medications_bp, url_prefix='/medications')
+    app.register_blueprint(leistung_bp, url_prefix='/leistung')
+    app.register_blueprint(wounds_bp, url_prefix='/wounds')
+    app.register_blueprint(company_bp, url_prefix='/company')
+    app.register_blueprint(alerts_bp, url_prefix='/alerts')
+    app.register_blueprint(export_bp)
+
+    # Глобальные template filters
+    @app.template_filter('datefmt')
+    def datefmt(value, fmt='%d.%m.%Y'):
+        if value is None:
+            return '—'
+        return value.strftime(fmt)
+
+    @app.template_filter('datetimefmt')
+    def datetimefmt(value, fmt='%d.%m.%Y %H:%M'):
+        if value is None:
+            return '—'
+        return value.strftime(fmt)
+
+    return app

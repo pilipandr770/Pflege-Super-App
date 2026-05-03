@@ -1,0 +1,31 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h2>✓ Neuer Patient aufgenommen</h2>
+
+<p>Hallo {{ employee_name }},</p>
+
+<p>ein neuer Patient wurde in das System aufgenommen und wartet auf die initiale Dokumentation.</p>
+
+<div class="info">
+    <strong>Patienteninformation:</strong><br>
+    <strong>Name:</strong> {{ patient_name }}<br>
+    <strong>Aufnahmedatum:</strong> {{ admission_date }}<br>
+    <strong>Pflegegrad:</strong> {{ pflegegrad or 'Noch nicht eingestuft' }}
+</div>
+
+<h3>Nächste Schritte:</h3>
+<ol>
+    <li><strong>SIS-Einschätzung erstellen</strong> — Erforderlich für die Pflegeplanung und Versicherungsabrechnung</li>
+    <li><strong>Persönliche Daten vervollständigen</strong> — Kontaktperson, Hausarzt, Allergien, etc.</li>
+    <li><strong>Medikationsplan anlegen</strong> — Falls der Patient Medikamente benötigt</li>
+    <li><strong>Risiken dokumentieren</strong> — Sturz-, Dekubitus-, Ernährungsrisiken</li>
+</ol>
+
+<p style="text-align: center; margin-top: 30px;">
+    <a href="{{ system_url }}/patients/{{ patient_id }}" class="button">Zum Patientenprofil</a>
+</p>
+
+<div class="info">
+    💡 <strong>Tipp:</strong> Die SIS-Einschätzung ist die Grundlage aller weiteren Pflegeplanning und sollte innerhalb von 48 Stunden nach Aufnahme abgeschlossen sein.
+</div>
+{% endblock %}

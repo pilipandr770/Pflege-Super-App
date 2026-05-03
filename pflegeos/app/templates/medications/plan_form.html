@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Medikationsplan{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Neuer Medikationsplan — {{ patient.full_name }}</h4>
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="meds_count" id="meds_count" value="1">
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Verordnender Arzt</label>
+          <input type="text" name="prescribed_by" class="form-control">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Gültig ab</label>
+          <input type="date" name="valid_from" class="form-control">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="meds-container">
+    <div class="card mb-2 med-row" id="med-row-0">
+      <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <span class="small fw-semibold med-title">Medikament 1</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-md-3">
+            <label class="form-label small fw-semibold">Handelsname <span class="text-danger">*</span></label>
+            <input type="text" name="med_0_handelsname" class="form-control form-control-sm" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Wirkstoff</label>
+            <input type="text" name="med_0_wirkstoff" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small">Stärke</label>
+            <input type="text" name="med_0_staerke" class="form-control form-control-sm" placeholder="100mg">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small">Form</label>
+            <input type="text" name="med_0_form" class="form-control form-control-sm" placeholder="Tabl.">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small text-success fw-bold" data-bs-toggle="tooltip" title="Morgendosis">Mo</label>
+            <input type="text" name="med_0_morgens" class="form-control form-control-sm text-center" placeholder="1">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small text-primary fw-bold" data-bs-toggle="tooltip" title="Mittagsdosis">Mi</label>
+            <input type="text" name="med_0_mittags" class="form-control form-control-sm text-center" placeholder="0">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small text-warning fw-bold" data-bs-toggle="tooltip" title="Abenddosis">Ab</label>
+            <input type="text" name="med_0_abends" class="form-control form-control-sm text-center" placeholder="1">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small fw-bold" data-bs-toggle="tooltip" title="Nachtdosis">Na</label>
+            <input type="text" name="med_0_nachts" class="form-control form-control-sm text-center" placeholder="0">
+          </div>
+          <div class="col-md-1 d-flex align-items-end pb-1">
+            <div class="form-check">
+              <input class="form-check-input btm-checkbox" type="checkbox" name="med_0_btm" id="med_0_btm">
+              <label class="form-check-label small text-danger fw-bold" for="med_0_btm">BtM</label>
+            </div>
+          </div>
+        </div>
+        <div class="btm-fields d-none mt-2 p-2 bg-warning bg-opacity-10 rounded">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <label class="form-label small text-danger fw-semibold">Anfangsbestand (Stück/ml)</label>
+              <input type="number" name="med_0_btm_bestand" class="form-control form-control-sm border-danger" step="0.5" min="0">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small text-danger fw-semibold">BtM-Nummer / Rezeptnummer</label>
+              <input type="text" name="med_0_btm_nr" class="form-control form-control-sm border-danger">
+            </div>
+          </div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label small">Einnahmehinweis</label>
+          <input type="text" name="med_0_hinweis" class="form-control form-control-sm" placeholder="z.B. zum Essen, nüchtern, bei Bedarf max. 3x täglich...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" class="btn btn-outline-secondary btn-sm mb-3" onclick="addMed()">
+    + Weiteres Medikament hinzufügen
+  </button>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary fw-semibold">Plan speichern</button>
+    <a href="{{ url_for('medications.patient_overview', patient_id=patient.id) }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let medIdx = 1;
+
+function addMed() {
+  const tpl = document.getElementById('med-row-0').cloneNode(true);
+  tpl.id = 'med-row-' + medIdx;
+  tpl.querySelector('.med-title').textContent = 'Medikament ' + (medIdx + 1);
+
+  tpl.querySelectorAll('[name]').forEach(el => {
+    el.name = el.name.replace(/med_0_/, 'med_' + medIdx + '_');
+    if (el.type !== 'checkbox') el.value = '';
+    if (el.type === 'checkbox') el.checked = false;
+  });
+  tpl.querySelectorAll('[id]').forEach(el => {
+    el.id = el.id.replace(/med_0_/, 'med_' + medIdx + '_');
+  });
+  tpl.querySelectorAll('[for]').forEach(el => {
+    el.htmlFor = el.htmlFor.replace(/med_0_/, 'med_' + medIdx + '_');
+  });
+  tpl.querySelectorAll('.btm-fields').forEach(d => d.classList.add('d-none'));
+
+  document.getElementById('meds-container').appendChild(tpl);
+  document.getElementById('meds_count').value = ++medIdx;
+  attachBtmToRow(tpl);
+}
+
+function attachBtmToRow(container) {
+  container.querySelectorAll('.btm-checkbox').forEach(cb => {
+    cb.addEventListener('change', function() {
+      const fields = this.closest('.card-body').querySelector('.btm-fields');
+      if (fields) fields.classList.toggle('d-none', !this.checked);
+    });
+  });
+}
+
+attachBtmToRow(document);
+
+// Tooltips
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+</script>
+{% endblock %}

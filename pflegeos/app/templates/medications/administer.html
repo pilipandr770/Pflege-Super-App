@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Verabreichen{% endblock %}
+{% block extra_head %}
+<style>
+  .required-field { color: #dc3545; font-weight: bold; }
+  .form-label .required-field::after { content: " *"; }
+  .btm-form-section { background-color: #fff8f9; }
+  .form-control.btm-required { border-color: #dc3545; }
+  .form-control.btm-required:focus { border-color: #dc3545; box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25); }
+</style>
+{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Medikament verabreichen</h4>
+
+<div class="card mb-3 {% if medication.is_btm %}border-danger border-2{% endif %}">
+  <div class="card-body">
+    <div class="d-flex justify-content-between">
+      <div>
+        <strong class="fs-5">{{ medication.handelsname }}</strong>
+        {% if medication.staerke %}<span class="text-muted"> {{ medication.staerke }}</span>{% endif %}
+        {% if medication.darreichungsform %}<span class="badge bg-light text-dark border ms-1">{{ medication.darreichungsform }}</span>{% endif %}
+        {% if medication.wirkstoff %}<div class="text-muted small mt-1">Wirkstoff: {{ medication.wirkstoff }}</div>{% endif %}
+        {% if medication.einnahmehinweis %}
+        <div class="alert alert-info py-1 px-2 mt-2 small mb-0">
+          💡 {{ medication.einnahmehinweis }}
+        </div>
+        {% endif %}
+      </div>
+      {% if medication.is_btm %}
+      <div class="text-end">
+        <span class="badge bg-danger fs-6 p-2">⚠ BtM</span>
+        <div class="mt-1 small text-danger fw-bold">Bestand: {{ medication.btm_bestand }}</div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="mt-2 text-muted small">
+      Dosierung: <strong class="text-dark font-monospace">
+        M:{{ medication.morgens or '0' }} / Mi:{{ medication.mittags or '0' }} / A:{{ medication.abends or '0' }} / N:{{ medication.nachts or '0' }}
+      </strong>
+      {% if medication.bei_bedarf %}<span class="badge bg-warning text-dark ms-2">Bei Bedarf</span>{% endif %}
+    </div>
+    <div class="text-muted small mt-1">Patient: <strong class="text-dark">{{ patient.full_name }}</strong></div>
+  </div>
+</div>
+
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="geo_lat" id="geo_lat">
+  <input type="hidden" name="geo_lng" id="geo_lng">
+
+  <div class="card mb-3">
+    <div class="card-header fw-semibold bg-light">Dokumentation</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Tatsächliche Dosis <span class="text-danger">*</span></label>
+          <input type="text" name="dosis" class="form-control" placeholder="z.B. 1 Tablette, 5ml" required>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="bestaetigt" name="bestaetigt" checked>
+            <label class="form-check-label fw-semibold" for="bestaetigt">
+              Patient hat eingenommen ✓
+            </label>
+          </div>
+        </div>
+        <div class="col-12 ablehnung-div d-none">
+          <label class="form-label fw-semibold text-danger">Grund der Ablehnung / Besonderheit</label>
+          <input type="text" name="ablehnung_grund" class="form-control border-danger" placeholder="z.B. Patient verweigerte Einnahme, geschluckt?">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">MAC-Adresse Gerät</label>
+          <input type="text" name="device_mac" class="form-control" placeholder="AA:BB:CC:DD:EE:FF">
+          <div class="form-text">Zur Verifikation des Standorts</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Bemerkungen</label>
+          <textarea name="bemerkungen" class="form-control" rows="2" placeholder="Optionale Notizen..."></textarea>
+        </div>
+        <div class="col-12">
+          <small id="geo-status" class="geo-indicator">📍 GPS wird automatisch erfasst...</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if medication.is_btm %}
+  <div class="card mb-3 border-danger border-2 btm-form-section">
+    <div class="card-header fw-semibold bg-danger text-white">
+      ⚠ BtM-Pflichtprotokoll (§13 BtMG) — Vier-Augen-Prinzip
+    </div>
+    <div class="card-body">
+      <div class="alert alert-warning py-2 small mb-3">
+        <strong>Alle Felder erforderlich.</strong> Betäubungsmittel-Verabreichungen erfordern zwei Mitarbeiter. Beide müssen anwesend sein. Dies ist unveränderlich und wird 3 Jahre aufbewahrt.
+      </div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Restmenge nach Verabreichung <span class="required-field">*</span></label>
+          <input type="number" name="restmenge_nach" class="form-control btm-required" step="0.5" min="0" required>
+          <div class="form-text text-danger">Aktueller Bestand: <strong>{{ medication.btm_bestand }}</strong></div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">2. Mitarbeiter (Zeuge) <span class="required-field">*</span></label>
+          <select name="verifier_id" class="form-select btm-required" required>
+            <option value="">— Mitarbeiter wählen —</option>
+            {% for emp in colleagues %}
+            <option value="{{ emp.id }}">{{ emp.full_name }} ({{ emp.role }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold text-danger">PIN des 2. Mitarbeiters <span class="text-danger">*</span></label>
+          <input type="password" name="pin2" class="form-control border-danger"
+                 maxlength="6" inputmode="numeric" required
+                 placeholder="6-stelliger PIN" autocomplete="off">
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-success fw-semibold px-4">
+      ✓ Verabreichung dokumentieren
+    </button>
+    <a href="{{ url_for('medications.patient_overview', patient_id=patient.id) }}" class="btn btn-outline-secondary">
+      Abbrechen
+    </a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('bestaetigt').addEventListener('change', function() {
+  document.querySelector('.ablehnung-div').classList.toggle('d-none', this.checked);
+});
+</script>
+{% endblock %}

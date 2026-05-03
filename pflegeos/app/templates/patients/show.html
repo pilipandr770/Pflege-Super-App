@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.full_name }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item active">{{ patient.full_name }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">{{ patient.full_name }}</h4>
+    <div class="d-flex gap-2 align-items-center">
+      {% if patient.pflegegrad %}<span class="badge bg-primary">PG {{ patient.pflegegrad }}</span>{% endif %}
+      <span class="badge bg-{% if patient.status=='AKTIV' %}success{% else %}secondary{% endif %}">{{ patient.status }}</span>
+      {% if patient.sturzrisiko %}<span class="badge bg-warning text-dark">Sturzrisiko</span>{% endif %}
+      {% if patient.dekubitusrisiko %}<span class="badge bg-danger">Dekubitusrisiko</span>{% endif %}
+      {% if patient.zimmer_nr %}<span class="badge bg-light text-dark border">Zi. {{ patient.zimmer_nr }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('exports.patient_summary_pdf', patient_id=patient.id) }}" class="btn btn-outline-info btn-sm"
+       title="PDF-Export der Patientenübersicht" data-bs-toggle="tooltip">
+      <i class="bi bi-download"></i> PDF
+    </a>
+    <a href="{{ url_for('patients.edit', patient_id=patient.id) }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil"></i> Bearbeiten
+    </a>
+  </div>
+</div>
+
+<!-- Schnellzugriff Dokumentation -->
+<div class="row g-2 mb-4">
+  <div class="col">
+    <a href="{{ url_for('sis.patient_list', patient_id=patient.id) }}"
+       class="btn btn-outline-primary w-100">&#x1F4CB; SIS</a>
+  </div>
+  <div class="col">
+    <a href="{{ url_for('medications.patient_overview', patient_id=patient.id) }}"
+       class="btn btn-outline-success w-100">&#x1F48A; Medikamente</a>
+  </div>
+  <div class="col">
+    <a href="{{ url_for('wounds.patient_list', patient_id=patient.id) }}"
+       class="btn btn-outline-danger w-100">&#x1FA79; Wunden</a>
+  </div>
+  <div class="col">
+    <a href="{{ url_for('leistung.patient_list', patient_id=patient.id) }}"
+       class="btn btn-outline-info w-100">&#x2705; Leistungen</a>
+  </div>
+  <div class="col">
+    <a href="{{ url_for('leistung.new') }}?patient_id={{ patient.id }}"
+       class="btn btn-primary w-100">+ Leistung</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Stammdaten -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header fw-semibold">&#x1F9D1; Stammdaten</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted" style="width:45%">Geburtsdatum</td><td>{{ patient.geburtsdatum|datefmt }}{% if patient.age %} ({{ patient.age }} Jahre){% endif %}</td></tr>
+          <tr><td class="text-muted">Geschlecht</td><td>{{ {'M':'Männlich','F':'Weiblich','D':'Divers'}.get(patient.gender,'—') }}</td></tr>
+          <tr><td class="text-muted">Nationalität</td><td>{{ patient.nationalitaet or '—' }}</td></tr>
+          <tr><td class="text-muted">Muttersprache</td><td>{{ patient.sprache_muttersprache or '—' }}</td></tr>
+          <tr><td class="text-muted">Religion</td><td>{{ patient.religion or '—' }}</td></tr>
+          <tr><td class="text-muted">Blutgruppe</td><td>{{ patient.blutgruppe or '—' }}</td></tr>
+          <tr><td class="text-muted">Allergien</td><td>{{ patient.allergien or '—' }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pflegedaten -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header fw-semibold">&#x1FA7A; Pflegedaten</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted" style="width:45%">Pflegegrad</td><td><strong>{{ patient.pflegegrad or '—' }}</strong></td></tr>
+          <tr><td class="text-muted">PG seit</td><td>{{ patient.pflegegrad_seit|datefmt }}</td></tr>
+          <tr><td class="text-muted">Zimmer/Bett</td><td>{{ patient.zimmer_nr or '—' }}{% if patient.bett_nr %}/{{ patient.bett_nr }}{% endif %}</td></tr>
+          <tr><td class="text-muted">Aufnahme</td><td>{{ patient.aufnahmedatum|datefmt }}</td></tr>
+          <tr><td class="text-muted">Krankenk.</td><td>{{ patient.krankenversicherung or '—' }}</td></tr>
+          <tr><td class="text-muted">Einwilligung Foto</td>
+            <td>{% if patient.einwilligung_foto %}<span class="text-success">&#x2714; Ja</span>{% else %}<span class="text-danger">&#x2718; Nein</span>{% endif %}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kontakte -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header fw-semibold">&#x260E; Kontakte</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted" style="width:45%">Betreuer</td><td>{{ patient.betreuer_name or '—' }}</td></tr>
+          <tr><td class="text-muted">Betreuer Tel.</td><td>{{ patient.betreuer_telefon or '—' }}</td></tr>
+          <tr><td class="text-muted">Verhältnis</td><td>{{ patient.betreuer_verhaeltnis or '—' }}</td></tr>
+          <tr><td class="text-muted">Hausarzt</td><td>{{ patient.hausarzt_name or '—' }}</td></tr>
+          <tr><td class="text-muted">Hausarzt Tel.</td><td>{{ patient.hausarzt_telefon or '—' }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Aktuelle SIS -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header fw-semibold d-flex justify-content-between">
+        &#x1F4CB; Aktuelle SIS
+        <a href="{{ url_for('sis.new', patient_id=patient.id) }}" class="btn btn-sm btn-outline-primary">
+          + Neu
+        </a>
+      </div>
+      <div class="card-body">
+        {% set current_sis = patient.sis_assessments|selectattr('is_current')|first %}
+        {% if current_sis %}
+        <div class="small">
+          <div class="text-muted">Erstellt: {{ current_sis.created_at|datetimefmt }}</div>
+          <div class="text-muted">Version: {{ current_sis.version }}</div>
+          <div class="mt-2">
+            <span class="badge bg-{% if current_sis.status=='VERIFIED' %}success{% elif current_sis.status=='COMPLETED' %}primary{% else %}warning text-dark{% endif %}">
+              {{ current_sis.status }}
+            </span>
+          </div>
+          <a href="{{ url_for('sis.show', sis_id=current_sis.id) }}" class="btn btn-sm btn-outline-secondary mt-2">
+            Öffnen
+          </a>
+        </div>
+        {% else %}
+        <div class="text-muted small">Noch kein SIS vorhanden.</div>
+        <a href="{{ url_for('sis.new', patient_id=patient.id) }}" class="btn btn-sm btn-primary mt-2">
+          SIS erstellen
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

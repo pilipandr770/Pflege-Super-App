@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Medikamente{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.show', patient_id=patient.id) }}">{{ patient.full_name }}</a></li>
+<li class="breadcrumb-item active">Medikamente</li>
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h4 class="fw-bold">Medikamente — {{ patient.full_name }}</h4>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('medications.btm_buch') }}" class="btn btn-outline-danger btn-sm">BtM-Buch</a>
+    <a href="{{ url_for('medications.new_plan', patient_id=patient.id) }}" class="btn btn-primary">+ Plan</a>
+  </div>
+</div>
+{% if plan %}
+<div class="card mb-3">
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+    <div>
+      Aktueller Medikationsplan
+      <small class="text-muted">Verordnet: {{ plan.prescribed_by or '—' }} · Gültig ab: {{ plan.valid_from|datefmt }}</small>
+    </div>
+    <a href="{{ url_for('exports.medication_plan_pdf', plan_id=plan.id) }}" class="btn btn-outline-info btn-sm"
+       title="PDF-Export des Medikationsplans" data-bs-toggle="tooltip">
+      <i class="bi bi-download"></i> PDF
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead class="table-light">
+        <tr><th>Medikament</th><th>Stärke</th><th>M–M–A–N</th><th>Hinweis</th><th>BtM</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for med in plan.medications if med.is_active %}
+        <tr class="{% if med.is_btm %}btm-row{% endif %}">
+          <td><strong>{{ med.handelsname }}</strong><div class="text-muted small">{{ med.wirkstoff or '' }}</div></td>
+          <td>{{ med.staerke or '—' }}</td>
+          <td class="font-monospace">{{ med.morgens or '0' }}–{{ med.mittags or '0' }}–{{ med.abends or '0' }}–{{ med.nachts or '0' }}</td>
+          <td class="small text-muted">{{ med.einnahmehinweis or '—' }}</td>
+          <td>{% if med.is_btm %}<span class="badge bg-danger">BtM</span> <strong>{{ med.btm_bestand }}</strong>{% endif %}</td>
+          <td><a href="{{ url_for('medications.administer', medication_id=med.id) }}" class="btn btn-sm btn-success">Verabreichen</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted text-center py-3">Keine Medikamente im Plan</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header fw-semibold">Verabreichungen heute</div>
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead class="table-light"><tr><th>Zeit</th><th>Medikament</th><th>Dosis</th><th>Eingenommen</th><th>Mitarbeiter</th></tr></thead>
+      <tbody>
+        {% for a in today_administrations %}
+        <tr>
+          <td class="small font-monospace">{{ a.administered_at|datetimefmt }}</td>
+          <td>{{ a.medication.handelsname }}</td>
+          <td>{{ a.tatsaechliche_dosis or '—' }}</td>
+          <td>{% if a.einnahme_bestaetigt %}<span class="text-success fw-bold">✓ Ja</span>{% else %}<span class="text-danger">✗ {{ a.ablehnung_grund or 'Abgelehnt' }}</span>{% endif %}</td>
+          <td class="small">{{ a.administrator.full_name if a.administrator else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-3">Noch keine Verabreichungen heute</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <div class="fs-1">💊</div>
+  <p>Kein Medikationsplan vorhanden.</p>
+  <a href="{{ url_for('medications.new_plan', patient_id=patient.id) }}" class="btn btn-primary">Plan erstellen</a>
+</div>
+{% endif %}
+{% endblock %}

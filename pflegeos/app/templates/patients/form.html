@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item active">{{ title }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">{{ title }}</h4>
+</div>
+
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-3">
+    <!-- Stammdaten -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold bg-primary text-white">&#x1F9D1; Stammdaten</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Vorname <span class="text-danger">*</span></label>
+              <input type="text" name="vorname" class="form-control {% if errors.vorname %}is-invalid{% endif %}"
+                     value="{{ form_data.get('vorname','') }}" required>
+              {% if errors.vorname %}<div class="invalid-feedback">{{ errors.vorname }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Nachname <span class="text-danger">*</span></label>
+              <input type="text" name="nachname" class="form-control {% if errors.nachname %}is-invalid{% endif %}"
+                     value="{{ form_data.get('nachname','') }}" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Geschlecht</label>
+              <select name="gender" class="form-select">
+                <option value="">—</option>
+                <option value="M" {% if form_data.get('gender')=='M' %}selected{% endif %}>Männlich</option>
+                <option value="F" {% if form_data.get('gender')=='F' %}selected{% endif %}>Weiblich</option>
+                <option value="D" {% if form_data.get('gender')=='D' %}selected{% endif %}>Divers</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Geburtsdatum</label>
+              <input type="date" name="geburtsdatum" class="form-control"
+                     value="{{ form_data.get('geburtsdatum','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Nationalität</label>
+              <input type="text" name="nationalitaet" class="form-control"
+                     value="{{ form_data.get('nationalitaet','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Muttersprache</label>
+              <input type="text" name="sprache_muttersprache" class="form-control"
+                     value="{{ form_data.get('sprache_muttersprache','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Religion</label>
+              <input type="text" name="religion" class="form-control"
+                     value="{{ form_data.get('religion','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Blutgruppe</label>
+              <select name="blutgruppe" class="form-select">
+                <option value="">—</option>
+                {% for bg in ['A+','A-','B+','B-','AB+','AB-','0+','0-'] %}
+                <option value="{{ bg }}" {% if form_data.get('blutgruppe')==bg %}selected{% endif %}>{{ bg }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pflege -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold bg-success text-white">&#x1FA7A; Pflegedaten</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Pflegegrad <span class="text-danger">*</span></label>
+              <select name="pflegegrad" class="form-select {% if errors.pflegegrad %}is-invalid{% endif %}" required>
+                <option value="">—</option>
+                {% for pg in ['1','2','3','4','5'] %}
+                <option value="{{ pg }}" {% if form_data.get('pflegegrad')==pg %}selected{% endif %}>PG {{ pg }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">PG seit</label>
+              <input type="date" name="pflegegrad_seit" class="form-control"
+                     value="{{ form_data.get('pflegegrad_seit','') }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Zimmer</label>
+              <input type="text" name="zimmer_nr" class="form-control"
+                     value="{{ form_data.get('zimmer_nr','') }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Bett</label>
+              <input type="text" name="bett_nr" class="form-control"
+                     value="{{ form_data.get('bett_nr','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Aufnahmedatum <span class="text-danger">*</span></label>
+              <input type="date" name="aufnahmedatum" class="form-control {% if errors.aufnahmedatum %}is-invalid{% endif %}"
+                     value="{{ form_data.get('aufnahmedatum','') }}" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Krankenversicherung</label>
+              <input type="text" name="krankenversicherung" class="form-control"
+                     value="{{ form_data.get('krankenversicherung','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Versicherungsnummer</label>
+              <input type="text" name="versicherungsnummer" class="form-control"
+                     value="{{ form_data.get('versicherungsnummer','') }}">
+            </div>
+            {% if patient %}
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Status</label>
+              <select name="status" class="form-select">
+                <option value="AKTIV" {% if form_data.get('status')=='AKTIV' %}selected{% endif %}>Aktiv</option>
+                <option value="BEURLAUBT" {% if form_data.get('status')=='BEURLAUBT' %}selected{% endif %}>Beurlaubt</option>
+                <option value="AUSGEZOGEN" {% if form_data.get('status')=='AUSGEZOGEN' %}selected{% endif %}>Ausgezogen</option>
+                <option value="VERSTORBEN" {% if form_data.get('status')=='VERSTORBEN' %}selected{% endif %}>Verstorben</option>
+              </select>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risiken -->
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header fw-semibold bg-warning text-dark">&#x26A0; Risiken & Allergien</div>
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="form-check form-switch mb-2">
+              <input type="checkbox" name="sturzrisiko" class="form-check-input" id="sturzrisiko"
+                     {% if form_data.get('sturzrisiko') %}checked{% endif %}>
+              <label class="form-check-label" for="sturzrisiko">&#x1F9B5; Sturzrisiko erhöht</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input type="checkbox" name="dekubitusrisiko" class="form-check-input" id="dekubitusrisiko"
+                     {% if form_data.get('dekubitusrisiko') %}checked{% endif %}>
+              <label class="form-check-label" for="dekubitusrisiko">&#x1F6CF; Dekubitusrisiko</label>
+            </div>
+            <div class="form-check form-switch">
+              <input type="checkbox" name="ernaehrungsrisiko" class="form-check-input" id="ernaehrungsrisiko"
+                     {% if form_data.get('ernaehrungsrisiko') %}checked{% endif %}>
+              <label class="form-check-label" for="ernaehrungsrisiko">&#x1F96C; Ernährungsrisiko</label>
+            </div>
+          </div>
+          <div>
+            <label class="form-label fw-semibold">Allergien / Unverträglichkeiten</label>
+            <textarea name="allergien" class="form-control" rows="2"
+                      placeholder="z.B. Penicillin, Latex...">{{ form_data.get('allergien','') }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kontakte -->
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header fw-semibold">&#x260E; Kontakte</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Betreuer/Angehörige</label>
+              <input type="text" name="betreuer_name" class="form-control form-control-sm"
+                     placeholder="Name" value="{{ form_data.get('betreuer_name','') }}">
+            </div>
+            <div class="col-6">
+              <input type="tel" name="betreuer_telefon" class="form-control form-control-sm"
+                     placeholder="Telefon" value="{{ form_data.get('betreuer_telefon','') }}">
+            </div>
+            <div class="col-6">
+              <input type="text" name="betreuer_verhaeltnis" class="form-control form-control-sm"
+                     placeholder="Verhältnis (Sohn, etc.)" value="{{ form_data.get('betreuer_verhaeltnis','') }}">
+            </div>
+            <div class="col-12 mt-2">
+              <label class="form-label small fw-semibold">Hausarzt</label>
+              <input type="text" name="hausarzt_name" class="form-control form-control-sm"
+                     placeholder="Name" value="{{ form_data.get('hausarzt_name','') }}">
+            </div>
+            <div class="col-12">
+              <input type="tel" name="hausarzt_telefon" class="form-control form-control-sm"
+                     placeholder="Telefon" value="{{ form_data.get('hausarzt_telefon','') }}">
+            </div>
+          </div>
+          <div class="form-check form-switch mt-3">
+            <input type="checkbox" name="einwilligung_foto" class="form-check-input" id="einwilligung_foto"
+                   {% if form_data.get('einwilligung_foto') %}checked{% endif %}>
+            <label class="form-check-label" for="einwilligung_foto">
+              &#x1F4F7; Einwilligung zur Fotodokumentation erteilt
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="col-12">
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary fw-semibold">
+          <i class="bi bi-check-circle"></i>
+          {% if patient %}Änderungen speichern{% else %}Patient anlegen{% endif %}
+        </button>
+        <a href="{{ url_for('patients.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

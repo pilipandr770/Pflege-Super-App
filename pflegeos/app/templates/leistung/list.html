@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Leistungsnachweise{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Leistungsnachweise — {{ patient.full_name }}</h4>
+    <small class="text-muted">Monat: {{ month }}</small>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('leistung.new') }}?patient_id={{ patient.id }}" class="btn btn-primary">+ Leistung</a>
+  </div>
+</div>
+
+<form method="GET" class="d-flex gap-2 mb-3">
+  <input type="hidden" name="patient_id" value="{{ patient.id }}">
+  <input type="month" name="month" class="form-control form-control-sm" value="{{ month }}" style="max-width:180px">
+  <button class="btn btn-sm btn-outline-secondary">Filter</button>
+</form>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead class="table-light">
+        <tr><th>Datum</th><th>Uhrzeit</th><th>Leistung</th><th>Dauer</th><th>Mitarbeiter</th><th>Verifizierung</th></tr>
+      </thead>
+      <tbody>
+        {% for n in nachweise %}
+        <tr>
+          <td class="small">{{ n.durchgefuehrt_am|datefmt }}</td>
+          <td class="small font-monospace">{{ n.durchgefuehrt_um.strftime('%H:%M') if n.durchgefuehrt_um else '—' }}</td>
+          <td>
+            <strong class="small">{{ n.leistung.bezeichnung }}</strong>
+            <div class="text-muted" style="font-size:0.75rem">{{ n.leistung.kategorie or '' }}</div>
+          </td>
+          <td class="small">{{ n.dauer_minuten or n.leistung.dauer_minuten or '—' }} min</td>
+          <td class="small">{{ n.employee.full_name if n.employee else '—' }}</td>
+          <td>
+            <span class="badge bg-light text-dark border" style="font-size:0.7rem">
+              {{ n.verification_method }}
+            </span>
+            {% if n.geo_lat %}<i class="bi bi-geo-alt-fill text-success" title="GPS bestätigt"></i>{% endif %}
+            {% if n.nfc_tag_id %}<i class="bi bi-broadcast text-primary" title="NFC: {{ n.nfc_tag_id }}"></i>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-5">Keine Leistungen in diesem Monat</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

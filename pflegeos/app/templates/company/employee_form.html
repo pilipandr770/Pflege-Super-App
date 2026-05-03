@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Mitarbeiter anlegen{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('company.employees') }}">Mitarbeiter</a></li>
+<li class="breadcrumb-item active">Neu</li>
+{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4">Neuer Mitarbeiter</h4>
+
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold bg-primary text-white">👤 Stammdaten</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Vorname <span class="text-danger">*</span></label>
+              <input type="text" name="vorname" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Nachname <span class="text-danger">*</span></label>
+              <input type="text" name="nachname" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Telefon</label>
+              <input type="tel" name="telefon" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                E-Mail (Login) <span class="text-danger">*</span>
+              </label>
+              <input type="email" name="email" class="form-control {% if errors.email %}is-invalid{% endif %}" required>
+              {% if errors.email %}<div class="invalid-feedback">{{ errors.email }}</div>{% endif %}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Rolle <span class="text-danger">*</span></label>
+              <select name="role" class="form-select" required>
+                <option value="PFLEGEHILFSKRAFT">Pflegehilfskraft</option>
+                <option value="PFLEGEFACHKRAFT">Pflegefachkraft</option>
+                <option value="BEHANDLUNGSPFLEGE">Behandlungspflege</option>
+                <option value="HAUSWIRTSCHAFT">Hauswirtschaft</option>
+                <option value="FAHRER">Fahrer</option>
+                <option value="VERWALTUNG">Verwaltung</option>
+                <option value="ADMIN">Administrator</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Qualifikation</label>
+              <select name="qualification" class="form-select">
+                <option value="">—</option>
+                <option value="Exam_AP">Exam. Altenpfleger/in</option>
+                <option value="Exam_KP">Exam. Krankenpfleger/in</option>
+                <option value="Exam_GKP">Exam. Gesundheits- u. Krankenpfleger/in</option>
+                <option value="AP_Hilfe">Altenpflegehilfe</option>
+                <option value="KP_Hilfe">Krankenpflegehilfe</option>
+                <option value="Arzthelferin">Arzthelferin</option>
+                <option value="Quereinsteiger">Quereinsteiger</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auth -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold">🔑 Zugangsdaten</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                Passwort
+                <small class="text-muted fw-normal">(min. 8 Zeichen)</small>
+              </label>
+              <input type="password" name="password" class="form-control"
+                     minlength="8" autocomplete="new-password" placeholder="Initialpasswort">
+              <div class="form-text">Standard: changeme123 (bitte nach erstem Login ändern)</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                PIN
+                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip"
+                   title="6-stelliger PIN für BtM-Verifikation und Dokumentensignierung"></i>
+                <small class="text-muted fw-normal">(6-stellig)</small>
+              </label>
+              <input type="password" name="pin" class="form-control"
+                     maxlength="6" inputmode="numeric" autocomplete="new-password" placeholder="123456">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Berechtigungen -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold">🛡️ Berechtigungen</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="can_btm" id="can_btm">
+                <label class="form-check-label" for="can_btm">
+                  <span class="fw-semibold">BtM-Berechtigung</span><br>
+                  <small class="text-muted">Darf Betäubungsmittel verabreichen und im BtM-Buch signieren</small>
+                </label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="can_wound" id="can_wound">
+                <label class="form-check-label" for="can_wound">
+                  <span class="fw-semibold">Wundversorgung</span><br>
+                  <small class="text-muted">Darf Wundbefunde erfassen und Verbandwechsel dokumentieren</small>
+                </label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="can_approve" id="can_approve">
+                <label class="form-check-label" for="can_approve">
+                  <span class="fw-semibold">Dokumentenfreigabe</span><br>
+                  <small class="text-muted">Darf SIS und Pflegedokumente freigeben (PDL-Funktion)</small>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary fw-semibold">
+          <i class="bi bi-person-check"></i> Mitarbeiter anlegen
+        </button>
+        <a href="{{ url_for('company.employees') }}" class="btn btn-outline-secondary">Abbrechen</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}SIS Liste{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h4 class="fw-bold">SIS — {{ patient.full_name }}</h4>
+  <a href="{{ url_for('sis.new', patient_id=patient.id) }}" class="btn btn-primary">+ Neue SIS</a>
+</div>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead class="table-light"><tr><th>Datum</th><th>Version</th><th>Erstellt von</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for s in assessments %}
+        <tr>
+          <td>{{ s.assessment_date|datefmt }}</td>
+          <td>v{{ s.version }}{% if s.is_current %} <span class="badge bg-success">Aktuell</span>{% endif %}</td>
+          <td>{{ s.creator.full_name if s.creator else '—' }}</td>
+          <td><span class="badge bg-{% if s.status=='VERIFIED' %}success{% elif s.status=='COMPLETED' %}primary{% else %}warning text-dark{% endif %}">{{ s.status }}</span></td>
+          <td><a href="{{ url_for('sis.show', sis_id=s.id) }}" class="btn btn-sm btn-outline-secondary">Öffnen</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

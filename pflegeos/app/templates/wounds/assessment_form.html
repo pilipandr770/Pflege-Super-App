@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Wundbefund{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Wundbefund — {{ wound.wunde_bezeichnung }}</h4>
+<div class="alert alert-light border small py-2 mb-3">
+  Patient: <strong>{{ patient.full_name }}</strong> ·
+  Lokalisation: <strong>{{ wound.lokalisation }}</strong> ·
+  Seit: {{ wound.erstfeststellung|datefmt }}
+</div>
+
+<form method="POST" enctype="multipart/form-data" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="geo_lat" id="geo_lat">
+  <input type="hidden" name="geo_lng" id="geo_lng">
+
+  <div class="row g-3">
+    <!-- Maße -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold bg-light">📏 Wundmaße & Stadium</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Datum</label>
+              <input type="date" name="datum" class="form-control" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">
+                Länge (cm)
+                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" title="Längster Durchmesser in cm"></i>
+              </label>
+              <input type="number" name="laenge" class="form-control" step="0.1" min="0">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Breite (cm)</label>
+              <input type="number" name="breite" class="form-control" step="0.1" min="0">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Tiefe (cm)</label>
+              <input type="number" name="tiefe" class="form-control" step="0.1" min="0">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Stadium (aktuell)</label>
+              <select name="stage" class="form-select">
+                <option value="">— Unverändert —</option>
+                <optgroup label="Dekubitus">
+                  <option>Dekubitus Grad 1</option><option>Dekubitus Grad 2</option>
+                  <option>Dekubitus Grad 3</option><option>Dekubitus Grad 4</option>
+                </optgroup>
+                <option value="Abheilung">In Abheilung</option>
+                <option value="Sonstige">Sonstige</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                Tendenz
+                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip"
+                   title="Wird automatisch berechnet wenn Maße vorhanden"></i>
+              </label>
+              <div id="tendenz-auto" class="form-control bg-light text-muted">Wird aus Maßen berechnet...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wundzustand -->
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header fw-semibold bg-light">🔬 Wundzustand</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label small fw-semibold">
+                Wundgrund
+                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip"
+                   title="z.B. granulierend (rot), fibrinös (gelb), nekrotisch (schwarz/braun)"></i>
+              </label>
+              <select name="wundgrund" class="form-select form-select-sm">
+                <option value="">—</option>
+                <option>Granulierend (rot)</option>
+                <option>Fibrinös (gelb)</option>
+                <option>Nekrotisch (schwarz)</option>
+                <option>Gemischt granulierend/fibrinös</option>
+                <option>Epithelisierend (rosa)</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Wundrand</label>
+              <select name="wundrand" class="form-select form-select-sm">
+                <option value="">—</option>
+                <option>Scharf begrenzt</option>
+                <option>Unregelmäßig</option>
+                <option>Unterminiert</option>
+                <option>Mazeriert</option>
+                <option>Entzündet/gerötet</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Exsudat Menge</label>
+              <select name="exsudat_menge" class="form-select form-select-sm">
+                <option value="">—</option>
+                <option>Kein</option><option>Wenig</option>
+                <option>Mittel</option><option>Viel</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Exsudat Art</label>
+              <select name="exsudat_art" class="form-select form-select-sm">
+                <option value="">—</option>
+                <option>Serös (klar)</option>
+                <option>Serös-blutig</option>
+                <option>Eitrig (purulent)</option>
+                <option>Hämorrhagisch</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">
+                Geruch
+                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip"
+                   title="Geruch kann Hinweis auf Infektionen geben"></i>
+              </label>
+              <select name="geruch" class="form-select form-select-sm">
+                <option value="">—</option>
+                <option>Kein Geruch</option>
+                <option>Leicht unangenehm</option>
+                <option>Stark unangenehm / faulig</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Therapie -->
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header fw-semibold bg-light">💊 Therapie</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Wundauflage</label>
+              <input type="text" name="wundauflage" class="form-control form-control-sm"
+                     list="auflage-list" placeholder="z.B. Mepore Pro, Mepilex Border...">
+              <datalist id="auflage-list">
+                <option value="Hydrokolloid">
+                <option value="Alginate">
+                <option value="Schaumverband">
+                <option value="Hydropolymer">
+                <option value="Kompresse trocken">
+                <option value="Kompresse feucht NaCl">
+                <option value="VAC-Verband">
+              </datalist>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Wundspülung</label>
+              <input type="text" name="wundspuelung" class="form-control form-control-sm"
+                     placeholder="z.B. NaCl 0,9%, Prontosan...">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Verbandwechsel-Intervall</label>
+              <select name="intervall" class="form-select form-select-sm">
+                <option value="">—</option>
+                <option>Täglich</option>
+                <option>Alle 2 Tage</option>
+                <option>Alle 3 Tage</option>
+                <option>2x wöchentlich</option>
+                <option>Wöchentlich</option>
+                <option>Bei Durchfeuchtung</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Bemerkungen</label>
+              <textarea name="bemerkungen" class="form-control form-control-sm" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Foto-Upload -->
+    {% if patient.einwilligung_foto %}
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold bg-light">
+          📷 Fotodokumentation
+          <small class="text-muted fw-normal">(Einwilligung vorhanden)</small>
+        </div>
+        <div class="card-body">
+          <label class="form-label small fw-semibold">Fotos aufnehmen/hochladen</label>
+          <input type="file" name="fotos" class="form-control form-control-sm"
+                 accept="image/jpeg,image/png" multiple capture="environment">
+          <div class="form-text">
+            Mehrere Fotos möglich. Nur JPG/PNG. Max. 16MB gesamt.<br>
+            📍 GPS-Koordinaten und Zeitstempel werden automatisch erfasst.
+          </div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+      <div class="alert alert-warning py-2 small">
+        ⚠ Fotodokumentation nicht möglich — keine Einwilligung.
+        <a href="{{ url_for('patients.edit', patient_id=patient.id) }}">Einwilligung eintragen</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Verifikation -->
+    <div class="col-12">
+      <div class="card border-warning">
+        <div class="card-header fw-semibold bg-warning bg-opacity-25">🔒 Verifikation</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">PIN</label>
+              <input type="password" name="pin" class="form-control form-control-sm"
+                     maxlength="6" inputmode="numeric" placeholder="6-stellig">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">MAC-Gerät</label>
+              <input type="text" name="device_mac" class="form-control form-control-sm" placeholder="AA:BB:CC:DD:EE:FF">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">GPS-Status</label>
+              <div id="geo-status" class="form-control form-control-sm bg-light text-muted small">Wird erfasst...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-danger fw-semibold px-4">✓ Befund speichern</button>
+      <a href="{{ url_for('wounds.patient_list', patient_id=patient.id) }}" class="btn btn-outline-secondary ms-2">Abbrechen</a>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+// GPS update into status box too
+navigator.geolocation && navigator.geolocation.getCurrentPosition(pos => {
+  document.getElementById('geo_lat').value = pos.coords.latitude.toFixed(6);
+  document.getElementById('geo_lng').value = pos.coords.longitude.toFixed(6);
+  const box = document.getElementById('geo-status');
+  box.textContent = '✓ ' + pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4);
+  box.classList.remove('text-muted');
+  box.classList.add('text-success');
+});
+</script>
+{% endblock %}

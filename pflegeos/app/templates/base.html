@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="de" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>{% block title %}PflegeOS{% endblock %} — PflegeOS</title>
+
+  <!-- Bootstrap 5.3 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+        crossorigin="anonymous">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+
+  <style>
+    :root {
+      --pflege-blue: #1a5f7a;
+      --pflege-teal: #159895;
+      --pflege-light: #f0f7f8;
+      --pflege-danger: #dc3545;
+      --pflege-warn: #ffc107;
+    }
+    body { background: var(--pflege-light); font-size: 0.925rem; }
+    .sidebar { width: 240px; min-height: 100vh; background: var(--pflege-blue); }
+    .sidebar .nav-link { color: rgba(255,255,255,0.8); padding: 0.5rem 1.25rem; border-radius: 6px; margin: 1px 8px; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active { background: rgba(255,255,255,0.15); color: #fff; }
+    .sidebar .nav-link i { width: 20px; }
+    .main-content { flex: 1; overflow-x: hidden; }
+    .navbar-top { background: #fff; border-bottom: 1px solid #dee2e6; height: 56px; }
+    .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .badge-pflegegrad { font-size: 0.75rem; }
+    .risk-badge { font-size: 0.7rem; }
+    .table th { font-weight: 600; font-size: 0.85rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.04em; }
+    .sis-score-0 { color: #198754; }
+    .sis-score-1 { color: #0d6efd; }
+    .sis-score-2 { color: #fd7e14; }
+    .sis-score-3 { color: #dc3545; }
+    .tooltip-hint { cursor: help; border-bottom: 1px dashed #6c757d; }
+    .geo-indicator { font-size: 0.75rem; color: #6c757d; }
+    .btm-row { background: #fff3cd; }
+    .wound-tendenz-Verbesserung { color: #198754; }
+    .wound-tendenz-Stagnation { color: #6c757d; }
+    .wound-tendenz-Verschlechterung { color: #dc3545; }
+    @media print {
+      .sidebar, .navbar-top, .btn, .no-print { display: none !important; }
+      .main-content { margin: 0 !important; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="d-flex">
+
+  {% if current_user.is_authenticated %}
+  <!-- Sidebar -->
+  <nav class="sidebar d-flex flex-column py-3 flex-shrink-0">
+    <div class="px-3 mb-3">
+      <div class="text-white fw-bold fs-5">
+        <i class="bi bi-heart-pulse-fill text-danger"></i> PflegeOS
+      </div>
+      <small class="text-white-50">{{ current_user.company.name }}</small>
+    </div>
+    <hr class="text-white-50 my-1">
+    <ul class="nav flex-column flex-grow-1">
+      <li class="nav-item">
+        <a href="{{ url_for('dashboard.index') }}"
+           class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
+          <i class="bi bi-grid-fill"></i> Dashboard
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('patients.index') }}"
+           class="nav-link {% if 'patients' in request.endpoint %}active{% endif %}">
+          <i class="bi bi-people-fill"></i> Patienten
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('leistung.new') }}"
+           class="nav-link {% if 'leistung' in request.endpoint %}active{% endif %}">
+          <i class="bi bi-clipboard2-check-fill"></i> Leistungsnachweis
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('medications.btm_buch') }}"
+           class="nav-link {% if 'medications' in request.endpoint %}active{% endif %}">
+          <i class="bi bi-capsule-pill"></i> BtM-Buch
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('leistung.katalog_manage') }}"
+           class="nav-link {% if request.endpoint == 'leistung.katalog_manage' %}active{% endif %}">
+          <i class="bi bi-list-check"></i> Leistungskatalog
+        </a>
+      </li>
+      {% if current_user.is_admin %}
+      <hr class="text-white-50 my-1">
+      <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Administration</small></li>
+      <li class="nav-item">
+        <a href="{{ url_for('company.employees') }}"
+           class="nav-link {% if 'employees' in request.endpoint %}active{% endif %}">
+          <i class="bi bi-person-badge"></i> Mitarbeiter
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('company.settings') }}"
+           class="nav-link {% if request.endpoint == 'company.settings' %}active{% endif %}">
+          <i class="bi bi-gear-fill"></i> Einstellungen
+        </a>
+      </li>
+      {% endif %}
+    </ul>
+    <div class="px-3 mt-auto">
+      <small class="text-white-50 d-block">{{ current_user.full_name }}</small>
+      <small class="text-white-50">{{ current_user.role }}</small>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-light mt-2 w-100">
+        <i class="bi bi-box-arrow-right"></i> Abmelden
+      </a>
+    </div>
+  </nav>
+  {% endif %}
+
+  <!-- Main -->
+  <div class="main-content">
+    {% if current_user.is_authenticated %}
+    <nav class="navbar-top d-flex align-items-center px-4">
+      <nav aria-label="breadcrumb" class="me-auto">
+        <ol class="breadcrumb mb-0 small">
+          {% block breadcrumb %}
+          <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+          {% endblock %}
+        </ol>
+      </nav>
+      <div class="d-flex align-items-center gap-3">
+        <span class="badge bg-{% if current_user.company.plan == 'TRIAL' %}warning text-dark{% else %}success{% endif %}">
+          {{ current_user.company.plan }}
+        </span>
+        <small class="text-muted">{{ current_user.full_name }}</small>
+      </div>
+    </nav>
+    {% endif %}
+
+    <div class="p-4">
+      <!-- Flash-сообщения -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        crossorigin="anonymous"></script>
+
+<!-- Geo автоопределение (для верификации) -->
+<script>
+function getGeoLocation(latField, lngField) {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      const lat = document.getElementById(latField);
+      const lng = document.getElementById(lngField);
+      if (lat) lat.value = pos.coords.latitude.toFixed(6);
+      if (lng) lng.value = pos.coords.longitude.toFixed(6);
+      const indicator = document.getElementById('geo-status');
+      if (indicator) indicator.textContent = '✓ GPS erfasst';
+    }, function() {
+      const indicator = document.getElementById('geo-status');
+      if (indicator) indicator.textContent = '⚠ GPS nicht verfügbar';
+    });
+  }
+}
+// Автозапуск на страницах с geo-полями
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('geo_lat')) {
+    getGeoLocation('geo_lat', 'geo_lng');
+  }
+});
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

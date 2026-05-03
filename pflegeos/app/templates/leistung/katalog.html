@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Leistungskatalog{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h4 class="fw-bold">Leistungskatalog</h4>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">+ Hinzufügen</button>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead class="table-light">
+        <tr><th>Nr.</th><th>Bezeichnung</th><th>Kategorie</th><th>Dauer</th><th>Preis</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% set current_kat = namespace(val='') %}
+        {% for item in items %}
+          {% if item.kategorie != current_kat.val %}
+          <tr class="table-secondary">
+            <td colspan="6" class="small fw-bold text-uppercase py-1 px-3">{{ item.kategorie or 'Allgemein' }}</td>
+          </tr>
+          {% set current_kat.val = item.kategorie %}
+          {% endif %}
+          <tr>
+            <td class="small font-monospace">{{ item.leistung_nr or '—' }}</td>
+            <td>
+              <strong class="small">{{ item.bezeichnung }}</strong>
+              {% if item.beschreibung %}<div class="text-muted" style="font-size:0.75rem">{{ item.beschreibung[:80] }}{% if item.beschreibung|length > 80 %}…{% endif %}</div>{% endif %}
+            </td>
+            <td class="small">{{ item.kategorie or '—' }}</td>
+            <td class="small">{{ item.dauer_minuten or '—' }} min</td>
+            <td class="small">{% if item.preis %}{{ "%.2f"|format(item.preis) }} €{% else %}—{% endif %}</td>
+            <td><span class="badge bg-{% if item.is_active %}success{% else %}secondary{% endif %}">{% if item.is_active %}Aktiv{% else %}Inaktiv{% endif %}</span></td>
+          </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-5">Kein Leistungskatalog — bitte Leistungen hinzufügen</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal hinzufügen -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" class="modal-content">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-header">
+        <h5 class="modal-title">Leistung hinzufügen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Nr.</label>
+            <input type="text" name="leistung_nr" class="form-control form-control-sm" placeholder="LK01">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label small fw-semibold">Bezeichnung <span class="text-danger">*</span></label>
+            <input type="text" name="bezeichnung" class="form-control form-control-sm" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-semibold">Kategorie</label>
+            <input type="text" name="kategorie" class="form-control form-control-sm"
+                   list="kategorie-list" placeholder="z.B. Körperpflege, Mobilisation...">
+            <datalist id="kategorie-list">
+              <option value="Körperpflege">
+              <option value="Mobilisation">
+              <option value="Ernährung">
+              <option value="Medikamente">
+              <option value="Behandlungspflege">
+              <option value="Soziale Betreuung">
+              <option value="Hauswirtschaft">
+            </datalist>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-semibold">Beschreibung</label>
+            <textarea name="beschreibung" class="form-control form-control-sm" rows="2"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Standarddauer (min)</label>
+            <input type="number" name="dauer_minuten" class="form-control form-control-sm" min="1">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Preis (€)</label>
+            <input type="number" name="preis" class="form-control form-control-sm" step="0.01" min="0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="submit" class="btn btn-primary btn-sm">Hinzufügen</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

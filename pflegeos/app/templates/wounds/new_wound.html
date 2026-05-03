@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Neue Wunde{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Neue Wunde anlegen — {{ patient.full_name }}</h4>
+
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Wundbezeichnung <span class="text-danger">*</span></label>
+          <input type="text" name="bezeichnung" class="form-control" required
+                 placeholder="z.B. Dekubitus Sacrum, Ulcus Unterschenkel links">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">
+            Lokalisation <span class="text-danger">*</span>
+            <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip"
+               title="Genaue Körperstelle der Wunde"></i>
+          </label>
+          <input type="text" name="lokalisation" class="form-control" required
+                 list="lokalisation-list" placeholder="z.B. Sacrum, Ferse links, Unterschenkel re.">
+          <datalist id="lokalisation-list">
+            <option value="Sacrum (Steißbein)">
+            <option value="Trochanter links">
+            <option value="Trochanter rechts">
+            <option value="Ferse links">
+            <option value="Ferse rechts">
+            <option value="Unterschenkel links">
+            <option value="Unterschenkel rechts">
+            <option value="Ellenbogen links">
+            <option value="Ellenbogen rechts">
+            <option value="Malleolus lateralis links">
+            <option value="Malleolus lateralis rechts">
+          </datalist>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">
+            Stadium / Klassifikation
+            <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip"
+               title="Dekubitus: NPUAP Grad 1-4. Ulcus: Wagner 0-5"></i>
+          </label>
+          <select name="stage" class="form-select">
+            <option value="">— Nicht klassifiziert —</option>
+            <optgroup label="Dekubitus (NPUAP/EPUAP)">
+              <option>Dekubitus Grad 1</option>
+              <option>Dekubitus Grad 2</option>
+              <option>Dekubitus Grad 3</option>
+              <option>Dekubitus Grad 4</option>
+            </optgroup>
+            <optgroup label="Ulcus cruris">
+              <option>Ulcus cruris venosum</option>
+              <option>Ulcus cruris arteriosum</option>
+              <option>Ulcus cruris mixtum</option>
+            </optgroup>
+            <optgroup label="Diabetischer Fuß (Wagner)">
+              <option>Wagner 0</option><option>Wagner 1</option>
+              <option>Wagner 2</option><option>Wagner 3</option>
+            </optgroup>
+            <option value="Sonstige">Sonstige</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Erstfeststellung <span class="text-danger">*</span></label>
+          <input type="date" name="erstfeststellung" class="form-control" required>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Ursache / Entstehungsmechanismus</label>
+          <textarea name="ursache" class="form-control" rows="2"
+                    placeholder="z.B. Druckentlastung mangelhaft, arterielle Durchblutungsstörung..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-danger fw-semibold">Anlegen & Ersten Befund erfassen</button>
+    <a href="{{ url_for('wounds.patient_list', patient_id=patient.id) }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+</script>
+{% endblock %}

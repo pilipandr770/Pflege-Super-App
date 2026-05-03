@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Leistung erfassen{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Leistung erfassen</h4>
+
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="geo_lat" id="geo_lat">
+  <input type="hidden" name="geo_lng" id="geo_lng">
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <!-- Patient -->
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Patient <span class="text-danger">*</span></label>
+          {% if patient %}
+          <input type="hidden" name="patient_id" value="{{ patient.id }}">
+          <input type="text" class="form-control" value="{{ patient.full_name }}" readonly>
+          {% else %}
+          <select name="patient_id" class="form-select" required>
+            <option value="">— Patient wählen —</option>
+            {% for p in patients %}
+            <option value="{{ p.id }}">{{ p.nachname }}, {{ p.vorname }} — Zi. {{ p.zimmer_nr or '?' }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+        </div>
+
+        <!-- Datum / Zeit -->
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Datum <span class="text-danger">*</span></label>
+          <input type="date" name="datum" class="form-control" value="{{ today.strftime('%Y-%m-%d') }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Uhrzeit <span class="text-danger">*</span></label>
+          <input type="time" name="uhrzeit" class="form-control" required>
+        </div>
+
+        <!-- Leistung Katalog -->
+        <div class="col-12">
+          <label class="form-label fw-semibold">Leistung <span class="text-danger">*</span></label>
+          <select name="leistung_id" class="form-select" required onchange="updateDauer(this)">
+            <option value="">— Leistung wählen —</option>
+            {% set current_kat = namespace(val='') %}
+            {% for item in katalog %}
+              {% if item.kategorie != current_kat.val %}
+                {% if current_kat.val != '' %}</optgroup>{% endif %}
+                <optgroup label="{{ item.kategorie or 'Allgemein' }}">
+                {% set current_kat.val = item.kategorie %}
+              {% endif %}
+              <option value="{{ item.id }}"
+                      data-dauer="{{ item.dauer_minuten or '' }}"
+                      data-beschreibung="{{ item.beschreibung or '' }}">
+                {{ item.leistung_nr or '' }}{% if item.leistung_nr %} — {% endif %}{{ item.bezeichnung }}
+                {% if item.dauer_minuten %} ({{ item.dauer_minuten }} min){% endif %}
+              </option>
+            {% endfor %}
+            {% if katalog %}</optgroup>{% endif %}
+          </select>
+          <div id="leistung-beschreibung" class="form-text text-info mt-1"></div>
+        </div>
+
+        <!-- Dauer -->
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Dauer (Minuten)</label>
+          <input type="number" name="dauer" id="dauer-field" class="form-control" min="1" max="480">
+        </div>
+
+        <!-- Verifikation -->
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">
+            Verifikationsmethode
+            <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip"
+               title="MAC+GPS: automatisch via Gerät. NFC: Raumtag scannen."></i>
+          </label>
+          <select name="verification_method" class="form-select" id="verif-method" onchange="toggleNfc(this)">
+            <option value="MAC_GPS">MAC + GPS</option>
+            <option value="MAC_GPS_NFC">MAC + GPS + NFC-Tag</option>
+            <option value="PIN_MAC_GPS">PIN + MAC + GPS</option>
+            <option value="MANUAL_SIGNATURE">Manuelle Signatur</option>
+          </select>
+        </div>
+
+        <!-- NFC Tag (versteckt) -->
+        <div class="col-md-3 nfc-field d-none">
+          <label class="form-label fw-semibold">NFC-Tag ID</label>
+          <input type="text" name="nfc_tag_id" class="form-control" placeholder="Zimmer-Tag scannen...">
+          <div class="form-text">Tag an Zimmertür oder Bett scannen</div>
+        </div>
+
+        <!-- Bemerkungen -->
+        <div class="col-12">
+          <label class="form-label">Bemerkungen</label>
+          <textarea name="bemerkungen" class="form-control" rows="2" placeholder="Optionale Notizen..."></textarea>
+        </div>
+
+        <!-- GPS Status -->
+        <div class="col-12">
+          <small id="geo-status" class="geo-indicator text-muted">📍 GPS wird automatisch erfasst...</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary fw-semibold px-4">✓ Leistung dokumentieren</button>
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tooltips
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+function updateDauer(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const dauer = opt.dataset.dauer;
+  const beschr = opt.dataset.beschreibung;
+  if (dauer) document.getElementById('dauer-field').value = dauer;
+  const info = document.getElementById('leistung-beschreibung');
+  info.textContent = beschr || '';
+}
+
+function toggleNfc(sel) {
+  document.querySelectorAll('.nfc-field').forEach(el => {
+    el.classList.toggle('d-none', !sel.value.includes('NFC'));
+  });
+}
+</script>
+{% endblock %}

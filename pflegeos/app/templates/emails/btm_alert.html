@@ -1,0 +1,45 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h2>⚠️ BtM-Dokumentation erforderlich</h2>
+
+<p>Hallo {{ employee_name }},</p>
+
+<p>eine <strong>Betäubungsmittel-Verabreichung (BtM)</strong> erfordert sofortige Dokumentation gemäß §13 BtMG.</p>
+
+<div class="alert">
+    <strong>Wichtig:</strong> Das BtM-Buch ist unveränderlich. Jeder Eintrag muss von zwei Mitarbeitern (Vier-Augen-Prinzip) verifiziert werden. Aufbewahrungspflicht: 3 Jahre.
+</div>
+
+<h3>Offene BtM-Dokumentationen:</h3>
+<table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+    <tr style="background-color: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <th style="padding: 10px; text-align: left;">Medikament</th>
+        <th style="padding: 10px; text-align: left;">Patient</th>
+        <th style="padding: 10px; text-align: left;">Uhrzeit</th>
+    </tr>
+{% for entry in pending_entries %}
+    <tr style="border-bottom: 1px solid #ddd;">
+        <td style="padding: 10px;">{{ entry.medication_name }}</td>
+        <td style="padding: 10px;">{{ entry.patient_name }}</td>
+        <td style="padding: 10px;">{{ entry.time }}</td>
+    </tr>
+{% endfor %}
+</table>
+
+<h3>Checkliste für BtM-Eintrag:</h3>
+<ul>
+    <li>☐ Restmenge nach Verabreichung dokumentiert</li>
+    <li>☐ Zweiter Mitarbeiter (Zeuge) ausgewählt</li>
+    <li>☐ GPS-Standort erfasst</li>
+    <li>☐ Gerät-Verifikation abgeschlossen</li>
+    <li>☐ PIN bestätigt</li>
+</ul>
+
+<p style="text-align: center; margin-top: 30px;">
+    <a href="{{ system_url }}/medications/btm_buch" class="button">Zum BtM-Buch</a>
+</p>
+
+<div class="info">
+    ⚖️ <strong>Rechtlicher Hinweis:</strong> Unvollständige oder fehlerhafte BtM-Dokumentation kann zu Bußgeldern und strafrechtlichen Konsequenzen führen.
+</div>
+{% endblock %}

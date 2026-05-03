@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Patienten{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item active">Patienten</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Patienten</h4>
+  <a href="{{ url_for('patients.new') }}" class="btn btn-primary">
+    <i class="bi bi-person-plus"></i> Neuer Patient
+  </a>
+</div>
+
+<!-- Filter -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="GET" class="d-flex gap-2 flex-wrap align-items-end">
+      <div>
+        <input type="text" name="q" class="form-control form-control-sm"
+               placeholder="Name oder Zimmer..." value="{{ search }}">
+      </div>
+      <div>
+        <select name="status" class="form-select form-select-sm">
+          <option value="AKTIV" {% if status_filter=='AKTIV' %}selected{% endif %}>Aktiv</option>
+          <option value="BEURLAUBT" {% if status_filter=='BEURLAUBT' %}selected{% endif %}>Beurlaubt</option>
+          <option value="VERSTORBEN" {% if status_filter=='VERSTORBEN' %}selected{% endif %}>Verstorben</option>
+          <option value="AUSGEZOGEN" {% if status_filter=='AUSGEZOGEN' %}selected{% endif %}>Ausgezogen</option>
+          <option value="" {% if not status_filter %}selected{% endif %}>Alle</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Suchen</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if patients %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Patient</th>
+            <th>Zimmer</th>
+            <th>Pflegegrad</th>
+            <th>Aufnahme</th>
+            <th>Risiken</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in patients %}
+          <tr>
+            <td>
+              <a href="{{ url_for('patients.show', patient_id=p.id) }}" class="fw-semibold text-decoration-none">
+                {{ p.nachname }}, {{ p.vorname }}
+              </a>
+              {% if p.geburtsdatum %}
+              <div class="text-muted small">*{{ p.geburtsdatum|datefmt }} ({{ p.age }} J.)</div>
+              {% endif %}
+            </td>
+            <td>{{ p.zimmer_nr or '—' }}{% if p.bett_nr %}/{{ p.bett_nr }}{% endif %}</td>
+            <td>
+              {% if p.pflegegrad %}
+              <span class="badge bg-primary badge-pflegegrad">PG {{ p.pflegegrad }}</span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="small">{{ p.aufnahmedatum|datefmt }}</td>
+            <td>
+              {% if p.sturzrisiko %}<span class="badge bg-warning text-dark risk-badge me-1">Sturz</span>{% endif %}
+              {% if p.dekubitusrisiko %}<span class="badge bg-danger risk-badge me-1">Deku</span>{% endif %}
+              {% if p.ernaehrungsrisiko %}<span class="badge bg-info risk-badge">Ern.</span>{% endif %}
+            </td>
+            <td>
+              <span class="badge bg-{% if p.status=='AKTIV' %}success{% elif p.status=='BEURLAUBT' %}warning text-dark{% else %}secondary{% endif %}">
+                {{ p.status }}
+              </span>
+            </td>
+            <td>
+              <div class="dropdown">
+                <button class="btn btn-sm btn-light" data-bs-toggle="dropdown">&#x22EE;</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="{{ url_for('patients.show', patient_id=p.id) }}">&#x1F441; Anzeigen</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('patients.edit', patient_id=p.id) }}">&#x270F;&#xFE0F; Bearbeiten</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="{{ url_for('sis.patient_list', patient_id=p.id) }}">&#x1F4CB; SIS</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('medications.patient_overview', patient_id=p.id) }}">&#x1F48A; Medikamente</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('wounds.patient_list', patient_id=p.id) }}">&#x1FA79; Wunden</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('leistung.patient_list', patient_id=p.id) }}">&#x2705; Leistungen</a></li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <div class="fs-1">&#x1F9D1;</div>
+      <p>Keine Patienten gefunden.</p>
+      <a href="{{ url_for('patients.new') }}" class="btn btn-primary">Ersten Patienten anlegen</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

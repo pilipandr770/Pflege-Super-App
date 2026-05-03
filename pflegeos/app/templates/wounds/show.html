@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Wundverlauf{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">{{ wound.wunde_bezeichnung }}</h4>
+    <small class="text-muted">{{ patient.full_name }} · {{ wound.lokalisation }} · Seit {{ wound.erstfeststellung|datefmt }}</small>
+  </div>
+  <div class="d-flex gap-2">
+    {% if wound.is_active %}
+    <a href="{{ url_for('wounds.new_assessment', wound_id=wound.id) }}" class="btn btn-danger btn-sm">+ Befund</a>
+    {% endif %}
+    <a href="{{ url_for('wounds.patient_list', patient_id=patient.id) }}" class="btn btn-outline-secondary btn-sm">← Zurück</a>
+  </div>
+</div>
+
+{% for a in assessments %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-semibold small">{{ a.assessment_date|datefmt }}</span>
+    <div class="d-flex gap-2 align-items-center">
+      {% if a.tendenz %}
+      <span class="wound-tendenz-{{ a.tendenz }} fw-bold small">
+        {% if a.tendenz == 'Verbesserung' %}↗ Verbesserung
+        {% elif a.tendenz == 'Verschlechterung' %}↘ Verschlechterung
+        {% else %}→ Stagnation{% endif %}
+      </span>
+      {% endif %}
+      <span class="badge bg-light text-dark border small">{{ a.assessor.full_name if a.assessor else '—' }}</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted small">Größe</td>
+            <td class="small">
+              {% if a.groesse_laenge_cm and a.groesse_breite_cm %}
+              {{ a.groesse_laenge_cm }} × {{ a.groesse_breite_cm }} cm
+              {% if a.tiefe_cm %} × {{ a.tiefe_cm }} cm tief{% endif %}
+              <br><strong>= {{ "%.1f"|format(a.groesse_laenge_cm * a.groesse_breite_cm) }} cm²</strong>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr><td class="text-muted small">Wundgrund</td><td class="small">{{ a.wundgrund or '—' }}</td></tr>
+          <tr><td class="text-muted small">Exsudat</td><td class="small">{{ a.exsudat_menge or '—' }} {{ a.exsudat_art or '' }}</td></tr>
+          <tr><td class="text-muted small">Geruch</td><td class="small">{{ a.geruch or '—' }}</td></tr>
+        </table>
+      </div>
+      <div class="col-md-4">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted small">Auflage</td><td class="small">{{ a.wundauflage or '—' }}</td></tr>
+          <tr><td class="text-muted small">Spülung</td><td class="small">{{ a.wundspuelung or '—' }}</td></tr>
+          <tr><td class="text-muted small">VW-Intervall</td><td class="small">{{ a.verbandwechsel_interval or '—' }}</td></tr>
+          {% if a.bemerkungen %}
+          <tr><td class="text-muted small">Bemerkungen</td><td class="small">{{ a.bemerkungen }}</td></tr>
+          {% endif %}
+        </table>
+      </div>
+      {% if a.foto_list %}
+      <div class="col-md-4">
+        <div class="d-flex flex-wrap gap-1">
+          {% for foto in a.foto_list %}
+          <a href="/uploads/{{ foto }}" target="_blank">
+            <img src="/uploads/{{ foto }}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;"
+                 alt="Wundfoto" class="border">
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <p>Noch keine Befunde erfasst.</p>
+  <a href="{{ url_for('wounds.new_assessment', wound_id=wound.id) }}" class="btn btn-danger">Ersten Befund erfassen</a>
+</div>
+{% endfor %}
+{% endblock %}
