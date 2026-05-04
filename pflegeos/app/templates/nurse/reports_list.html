@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Meine Berichte{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('nurse.dashboard') }}">Mein Plan</a></li>
+<li class="breadcrumb-item active">Meine Berichte</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <h2><i class="bi bi-file-text"></i> Meine Berichte</h2>
+      <small class="text-muted">Übersicht aller eingereichten Visitenberichte</small>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <select class="form-select form-select-sm" id="statusFilter" onchange="applyFilters()">
+                <option value="">Alle Status</option>
+                <option value="DRAFT">Entwurf</option>
+                <option value="SUBMITTED">Eingereicht</option>
+                <option value="VERIFIED">Genehmigt</option>
+                <option value="LOCKED">Gesperrt</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <input type="date" class="form-control form-control-sm" id="dateFrom" onchange="applyFilters()">
+            </div>
+            <div class="col-md-3">
+              <input type="date" class="form-control form-control-sm" id="dateTo" onchange="applyFilters()">
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetFilters()">
+                <i class="bi bi-arrow-clockwise"></i> Zurücksetzen
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Таблица отчетов -->
+  <div class="row">
+    <div class="col-md-12">
+      {% if reports.items %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Datum</th>
+                <th>Patient</th>
+                <th>Dauer</th>
+                <th>Zustand</th>
+                <th>Status</th>
+                <th>Billable</th>
+                <th>Aktion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for report in reports.items %}
+              <tr>
+                <td>
+                  <strong>{{ report.visit_date|dateformat('%d.%m.%Y') }}</strong><br>
+                  <small class="text-muted">{{ report.visit_start_time|dateformat('%H:%M') }}</small>
+                </td>
+                <td>
+                  <strong>{{ report.patient.full_name }}</strong><br>
+                  {% if report.patient.care_type == 'HOME_CARE' %}
+                    <small class="text-muted"><i class="bi bi-geo-alt"></i> {{ report.patient.ort or '—' }}</small>
+                  {% else %}
+                    <small class="text-muted"><i class="bi bi-building"></i> Zimmer {{ report.patient.zimmer_nr or '—' }}</small>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if report.visit_end_time and report.visit_start_time %}
+                    {{ ((report.visit_end_time - report.visit_start_time).total_seconds() / 60)|int }} min
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>
+                  {% if report.patient_condition == 'STABLE' %}
+                    <span class="badge bg-success">Stabil</span>
+                  {% elif report.patient_condition == 'IMPROVED' %}
+                    <span class="badge bg-success">Verbessert</span>
+                  {% elif report.patient_condition == 'DETERIORATED' %}
+                    <span class="badge bg-danger">Verschlechtert</span>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>
+                  {% if report.status == 'VERIFIED' %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Genehmigt</span>
+                  {% elif report.status == 'SUBMITTED' %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Eingereicht</span>
+                  {% elif report.status == 'DRAFT' %}
+                    <span class="badge bg-secondary">Entwurf</span>
+                  {% elif report.status == 'LOCKED' %}
+                    <span class="badge bg-info">Gesperrt</span>
+                  {% else %}
+                    <span class="badge bg-light text-dark">{{ report.status }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if report.billable_minutes %}
+                    <strong>{{ report.billable_minutes }} min</strong>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="{{ url_for('nurse.view_report', report_id=report.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye"></i> Anschauen
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Пагинация -->
+        {% if reports.pages > 1 %}
+        <nav aria-label="Page navigation">
+          <ul class="pagination justify-content-center">
+            {% if reports.has_prev %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('nurse.my_reports', page=reports.prev_num) }}">← Vorherige</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">← Vorherige</span>
+              </li>
+            {% endif %}
+
+            {% for page_num in reports.iter_pages() %}
+              {% if page_num %}
+                {% if page_num == reports.page %}
+                  <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                  </li>
+                {% else %}
+                  <li class="page-item">
+                    <a class="page-link" href="{{ url_for('nurse.my_reports', page=page_num) }}">{{ page_num }}</a>
+                  </li>
+                {% endif %}
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">…</span>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if reports.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('nurse.my_reports', page=reports.next_num) }}">Nächste →</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">Nächste →</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+
+        <!-- Статистика -->
+        <div class="row mt-4">
+          <div class="col-md-3">
+            <div class="card text-center">
+              <div class="card-body">
+                <div class="display-6 text-primary">{{ reports.total }}</div>
+                <small class="text-muted">Berichte insgesamt</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card text-center">
+              <div class="card-body">
+                <div class="display-6 text-success">{{ reports.items|selectattr('status', 'equalto', 'VERIFIED')|list|length }}</div>
+                <small class="text-muted">Genehmigt</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card text-center">
+              <div class="card-body">
+                <div class="display-6 text-warning">{{ reports.items|selectattr('status', 'equalto', 'SUBMITTED')|list|length }}</div>
+                <small class="text-muted">Eingereicht</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card text-center">
+              <div class="card-body">
+                <div class="display-6 text-secondary">{{ reports.items|selectattr('status', 'equalto', 'DRAFT')|list|length }}</div>
+                <small class="text-muted">Entwurf</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Keine Berichte vorhanden. Starten Sie einen Besuch von Ihrem Dashboard aus.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+function applyFilters() {
+  const status = document.getElementById('statusFilter').value;
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+
+  let url = '{{ url_for("nurse.my_reports") }}?';
+  const params = [];
+
+  if (status) params.push(`status=${encodeURIComponent(status)}`);
+  if (dateFrom) params.push(`date_from=${encodeURIComponent(dateFrom)}`);
+  if (dateTo) params.push(`date_to=${encodeURIComponent(dateTo)}`);
+
+  if (params.length > 0) {
+    url += params.join('&');
+  }
+
+  window.location.href = url;
+}
+
+function resetFilters() {
+  document.getElementById('statusFilter').value = '';
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+
+  window.location.href = '{{ url_for("nurse.my_reports") }}';
+}
+</script>
+{% endblock %}

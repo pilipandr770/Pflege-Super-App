@@ -26,6 +26,10 @@ def create_app(config_name=None):
     # Создаём папку для загрузок
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+    # Инициализируем сигналы для автоматизации
+    from app.signals import init_signals
+    init_signals(app)
+
     # Регистрируем blueprints
     from app.routes.auth import auth_bp
     from app.routes.dashboard import dashboard_bp
@@ -37,6 +41,11 @@ def create_app(config_name=None):
     from app.routes.company import company_bp
     from app.routes.exports import export_bp
     from app.routes.alerts import alerts_bp
+    from app.routes.assignments import assignments_bp
+    from app.routes.photos import photos_bp
+    from app.routes.tracking import tracking_bp
+    from app.routes.admin import admin_bp
+    from app.routes.nurse import nurse_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/')
@@ -47,6 +56,11 @@ def create_app(config_name=None):
     app.register_blueprint(wounds_bp, url_prefix='/wounds')
     app.register_blueprint(company_bp, url_prefix='/company')
     app.register_blueprint(alerts_bp, url_prefix='/alerts')
+    app.register_blueprint(assignments_bp, url_prefix='/assignments')
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(photos_bp, url_prefix='/photos')
+    app.register_blueprint(tracking_bp, url_prefix='/tracking')
+    app.register_blueprint(nurse_bp, url_prefix='/nurse')
     app.register_blueprint(export_bp)
 
     # Глобальные template filters

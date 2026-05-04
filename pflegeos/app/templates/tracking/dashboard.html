@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Dienst-Routenverfolgung{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet for maps -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  #map {
+    height: 600px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .location-marker {
+    width: 30px;
+    height: 30px;
+    background-color: #1a5f7a;
+    border: 3px solid white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  .employee-list {
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .employee-item {
+    padding: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  .employee-item:hover {
+    background-color: #f5f5f5;
+  }
+  .employee-item.active {
+    background-color: #e3f2fd;
+    border-left: 4px solid #1a5f7a;
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .status-online {
+    background-color: #4caf50;
+    color: white;
+  }
+  .status-stale {
+    background-color: #ff9800;
+    color: white;
+  }
+  .status-offline {
+    background-color: #757575;
+    color: white;
+  }
+  .accuracy-circle {
+    fill: none;
+    stroke: #2196f3;
+    stroke-width: 1;
+    stroke-dasharray: 4, 4;
+    opacity: 0.4;
+  }
+  .speed-indicator {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+  }
+  .route-path {
+    stroke: #2196f3;
+    stroke-width: 2;
+    fill: none;
+    opacity: 0.6;
+  }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item active">Dienst-Routenverfolgung</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">Dienst-Routenverfolgung</h4>
+    <small class="text-muted">Live GPS-Verfolgung und Routengeschichte</small>
+  </div>
+  <div>
+    <button class="btn btn-sm btn-outline-secondary" id="refreshBtn">
+      <i class="bi bi-arrow-clockwise"></i> Aktualisieren
+    </button>
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm btn-secondary">
+      <i class="bi bi-arrow-left"></i> Zurück
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Map -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-map"></i> Echtzeit-Standortkarte</h6>
+      </div>
+      <div class="card-body p-2">
+        <div id="map"></div>
+        <div class="mt-2 small text-muted">
+          <p class="mb-1"><i class="bi bi-info-circle"></i> Aktualisiert automatisch alle 5 Sekunden</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Employee List -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-people"></i> Mitarbeiter (<span id="onlineCount">0</span>)</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="employee-list" id="employeeList">
+          <div class="text-center text-muted p-3">
+            <i class="bi bi-hourglass-split"></i> Laden...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-graph-up"></i> Statistiken</h6>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="text-center">
+              <h4 id="totalEmployees" class="fw-bold">—</h4>
+              <small class="text-muted">Mitarbeiter gesamt</small>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="text-center">
+              <h4 id="activeEmployees" class="fw-bold text-success">—</h4>
+              <small class="text-muted">Aktiv (letzte 5 Min)</small>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="text-center">
+              <h4 id="stalLocations" class="fw-bold text-warning">—</h4>
+              <small class="text-muted">Veraltet (5-15 Min)</small>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="text-center">
+              <h4 id="offlineEmployees" class="fw-bold text-secondary">—</h4>
+              <small class="text-muted">Offline (&gt;15 Min)</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle"></i> Legende</h6>
+      </div>
+      <div class="card-body small">
+        <div class="mb-2">
+          <span class="status-badge status-online">● Online</span>
+          <span class="ms-2">Aktualisierung letzte 5 Min</span>
+        </div>
+        <div class="mb-2">
+          <span class="status-badge status-stale">● Veraltet</span>
+          <span class="ms-2">Aktualisierung 5-15 Min</span>
+        </div>
+        <div>
+          <span class="status-badge status-offline">● Offline</span>
+          <span class="ms-2">Keine Aktualisierung &gt;15 Min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let map = null;
+let markers = {};
+let routePaths = {};
+let selectedEmployeeId = null;
+
+// Initialize map
+function initMap() {
+  if (!map) {
+    map = L.map('map').setView([52.52, 13.405], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+  }
+}
+
+// Get status badge class
+function getStatusClass(minutesAgo) {
+  if (minutesAgo <= 5) return 'status-online';
+  if (minutesAgo <= 15) return 'status-stale';
+  return 'status-offline';
+}
+
+// Get status text
+function getStatusText(minutesAgo) {
+  if (minutesAgo <= 5) return 'Online';
+  if (minutesAgo <= 15) return 'Veraltet';
+  return 'Offline';
+}
+
+// Fetch and update locations
+async function updateLocations() {
+  try {
+    const response = await fetch('{{ url_for("tracking.get_active_locations") }}');
+    if (!response.ok) return;
+
+    const locations = await response.json();
+
+    // Update statistics
+    const online = locations.filter(l => l.minutes_ago <= 5).length;
+    const stale = locations.filter(l => l.minutes_ago > 5 && l.minutes_ago <= 15).length;
+    const offline = locations.filter(l => l.minutes_ago > 15).length;
+
+    document.getElementById('totalEmployees').textContent = '{{ employees|length }}';
+    document.getElementById('activeEmployees').textContent = online;
+    document.getElementById('stalLocations').textContent = stale;
+    document.getElementById('offlineEmployees').textContent = offline;
+    document.getElementById('onlineCount').textContent = online;
+
+    // Update map markers
+    locations.forEach(loc => {
+      const markerColor = loc.minutes_ago <= 5 ? '#4caf50' : (loc.minutes_ago <= 15 ? '#ff9800' : '#757575');
+
+      if (markers[loc.employee_id]) {
+        markers[loc.employee_id].setLatLng([loc.geo_lat, loc.geo_lng]);
+        markers[loc.employee_id].setPopupContent(`
+          <strong>${loc.employee_name}</strong><br>
+          ${loc.employee_role}<br>
+          <small class="text-muted">${loc.minutes_ago > 0 ? loc.minutes_ago + ' Minuten' : 'gerade eben'}</small>
+        `);
+      } else {
+        const marker = L.circleMarker([loc.geo_lat, loc.geo_lng], {
+          radius: 8,
+          fillColor: markerColor,
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8
+        })
+          .bindPopup(`<strong>${loc.employee_name}</strong><br>${loc.employee_role}<br><small class="text-muted">${loc.minutes_ago > 0 ? loc.minutes_ago + ' Minuten' : 'gerade eben'}</small>`)
+          .addTo(map);
+
+        marker.on('click', () => selectEmployee(loc.employee_id));
+        markers[loc.employee_id] = marker;
+      }
+
+      // Draw accuracy circle if available
+      if (loc.geo_accuracy && !routePaths[loc.employee_id + '_accuracy']) {
+        L.circle([loc.geo_lat, loc.geo_lng], {
+          radius: loc.geo_accuracy,
+          color: '#2196f3',
+          fillOpacity: 0.1,
+          weight: 1,
+          dashArray: '5, 5'
+        }).addTo(map);
+        routePaths[loc.employee_id + '_accuracy'] = true;
+      }
+    });
+
+    // Update employee list
+    updateEmployeeList(locations);
+
+    // Auto-fit bounds to all markers
+    if (Object.keys(markers).length > 0) {
+      const group = new L.featureGroup(Object.values(markers));
+      map.fitBounds(group.getBounds().pad(0.1), { maxZoom: 15 });
+    }
+  } catch (error) {
+    console.error('Error updating locations:', error);
+  }
+}
+
+// Update employee list
+function updateEmployeeList(locations) {
+  const list = document.getElementById('employeeList');
+
+  if (locations.length === 0) {
+    list.innerHTML = '<div class="text-center text-muted p-3"><i class="bi bi-inbox"></i> Keine Positionen verfügbar</div>';
+    return;
+  }
+
+  list.innerHTML = locations.map(loc => `
+    <div class="employee-item ${selectedEmployeeId === loc.employee_id ? 'active' : ''}" onclick="selectEmployee('${loc.employee_id}')">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <strong>${loc.employee_name}</strong><br>
+          <small class="text-muted">${loc.employee_role}</small>
+        </div>
+        <span class="status-badge ${getStatusClass(loc.minutes_ago)}">${getStatusText(loc.minutes_ago)}</span>
+      </div>
+      <div class="mt-2 small">
+        <div><i class="bi bi-geo-alt"></i> ${loc.geo_lat.toFixed(4)}, ${loc.geo_lng.toFixed(4)}</div>
+        ${loc.geo_accuracy ? `<div><i class="bi bi-bullseye"></i> ±${Math.round(loc.geo_accuracy)}m Genauigkeit</div>` : ''}
+        ${loc.speed ? `<div><i class="bi bi-speedometer"></i> ${(loc.speed * 3.6).toFixed(1)} km/h</div>` : ''}
+        <div><i class="bi bi-clock"></i> ${loc.minutes_ago > 0 ? loc.minutes_ago + ' Minuten' : 'gerade eben'} aktualisiert</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Select employee and show route
+async function selectEmployee(employeeId) {
+  selectedEmployeeId = employeeId;
+
+  // Reload to update selection
+  updateLocations();
+
+  // Load and display route
+  try {
+    const response = await fetch(`{{ url_for("tracking.get_employee_route", employee_id="EMPID") }}`.replace('EMPID', employeeId));
+    if (!response.ok) return;
+
+    const data = await response.json();
+
+    // Draw route path
+    const routeCoords = data.route.map(p => [p.lat, p.lng]);
+    if (routeCoords.length > 1) {
+      if (routePaths[employeeId]) {
+        map.removeLayer(routePaths[employeeId]);
+      }
+      routePaths[employeeId] = L.polyline(routeCoords, {
+        color: '#2196f3',
+        weight: 3,
+        opacity: 0.6,
+        dashArray: '5, 5'
+      }).addTo(map);
+    }
+  } catch (error) {
+    console.error('Error loading route:', error);
+  }
+}
+
+// Refresh button
+document.getElementById('refreshBtn').addEventListener('click', updateLocations);
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  updateLocations();
+  setInterval(updateLocations, 5000); // Update every 5 seconds
+});
+</script>
+{% endblock %}

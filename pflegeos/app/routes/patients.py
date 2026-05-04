@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import Patient, Employee
-from app.utils.auth import log_action
+from app.models import Patient, Employee, EmployeePatientAssignment
+from app.utils.auth import log_action, patient_access_required
 from app.utils.email import send_patient_admission_email
 from datetime import datetime, date
 
@@ -17,6 +17,23 @@ def index():
     search = request.args.get('q', '').strip()
 
     q = Patient.query.filter_by(company_id=cid, deleted_at=None)
+
+    # Если пользователь не админ, показываем только назначенных пациентов
+    if not current_user.is_admin:
+        assigned_patient_ids = db.session.query(EmployeePatientAssignment.patient_id).filter_by(
+            employee_id=current_user.id,
+            is_active=True
+        ).all()
+        assigned_ids = [p[0] for p in assigned_patient_ids]
+
+        if assigned_ids:
+            q = q.filter(Patient.id.in_(assigned_ids))
+        else:
+            # Если нет назначенных пациентов, вернуть пусто
+            patients = []
+            return render_template('patients/index.html', patients=patients,
+                                 status_filter=status_filter, search=search)
+
     if status_filter:
         q = q.filter_by(status=status_filter)
     if search:
@@ -61,6 +78,12 @@ def new():
                 hausarzt_telefon=form_data.get('hausarzt_telefon', '').strip(),
                 pflegegrad=form_data.get('pflegegrad'),
                 pflegegrad_seit=_parse_date(form_data.get('pflegegrad_seit')),
+                care_type=form_data.get('care_type', 'HOME_CARE'),
+                strasse=form_data.get('strasse', '').strip(),
+                hausnummer=form_data.get('hausnummer', '').strip(),
+                plz=form_data.get('plz', '').strip(),
+                ort=form_data.get('ort', '').strip(),
+                bundesland=form_data.get('bundesland', '').strip(),
                 zimmer_nr=form_data.get('zimmer_nr', '').strip(),
                 bett_nr=form_data.get('bett_nr', '').strip(),
                 aufnahmedatum=_parse_date(form_data.get('aufnahmedatum')),
@@ -102,6 +125,7 @@ def new():
 
 @patients_bp.route('/<patient_id>')
 @login_required
+@patient_access_required()
 def show(patient_id):
     p = _get_patient(patient_id)
     return render_template('patients/show.html', patient=p)
@@ -109,6 +133,7 @@ def show(patient_id):
 
 @patients_bp.route('/<patient_id>/edit', methods=['GET', 'POST'])
 @login_required
+@patient_access_required()
 def edit(patient_id):
     p = _get_patient(patient_id)
     errors = {}
@@ -122,6 +147,12 @@ def edit(patient_id):
         p.gender = form_data.get('gender')
         p.pflegegrad = form_data.get('pflegegrad')
         p.pflegegrad_seit = _parse_date(form_data.get('pflegegrad_seit'))
+        p.care_type = form_data.get('care_type', 'HOME_CARE')
+        p.strasse = form_data.get('strasse', '').strip()
+        p.hausnummer = form_data.get('hausnummer', '').strip()
+        p.plz = form_data.get('plz', '').strip()
+        p.ort = form_data.get('ort', '').strip()
+        p.bundesland = form_data.get('bundesland', '').strip()
         p.zimmer_nr = form_data.get('zimmer_nr', '').strip()
         p.bett_nr = form_data.get('bett_nr', '').strip()
         p.betreuer_name = form_data.get('betreuer_name', '').strip()
@@ -144,6 +175,9 @@ def edit(patient_id):
         'geburtsdatum': p.geburtsdatum.strftime('%Y-%m-%d') if p.geburtsdatum else '',
         'gender': p.gender, 'pflegegrad': p.pflegegrad,
         'pflegegrad_seit': p.pflegegrad_seit.strftime('%Y-%m-%d') if p.pflegegrad_seit else '',
+        'care_type': p.care_type or 'HOME_CARE',
+        'strasse': p.strasse or '', 'hausnummer': p.hausnummer or '',
+        'plz': p.plz or '', 'ort': p.ort or '', 'bundesland': p.bundesland or '',
         'zimmer_nr': p.zimmer_nr or '', 'bett_nr': p.bett_nr or '',
         'betreuer_name': p.betreuer_name or '', 'betreuer_telefon': p.betreuer_telefon or '',
         'hausarzt_name': p.hausarzt_name or '', 'hausarzt_telefon': p.hausarzt_telefon or '',

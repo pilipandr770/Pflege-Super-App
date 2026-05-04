@@ -75,6 +75,60 @@
       </div>
     </div>
 
+    <!-- Pflegeart -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold bg-info text-white">&#x1F3E0; Pflegeart</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Betreuungstyp <span class="text-danger">*</span></label>
+              <select id="care_type_select" name="care_type" class="form-select" required>
+                <option value="HOME_CARE" {% if form_data.get('care_type','HOME_CARE')=='HOME_CARE' %}selected{% endif %}>Häusliche Pflege (Home Care)</option>
+                <option value="INPATIENT" {% if form_data.get('care_type','HOME_CARE')=='INPATIENT' %}selected{% endif %}>Stationäre Pflege</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Adresse (HOME_CARE) -->
+    <div class="col-12" id="address_section" style="{% if form_data.get('care_type','HOME_CARE')!='HOME_CARE' %}display:none;{% endif %}">
+      <div class="card">
+        <div class="card-header fw-semibold bg-secondary text-white">📍 Adresse</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">Straße <span class="text-danger">*</span></label>
+              <input type="text" name="strasse" class="form-control"
+                     placeholder="z.B. Hauptstraße" value="{{ form_data.get('strasse','') }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Hausnummer <span class="text-danger">*</span></label>
+              <input type="text" name="hausnummer" class="form-control"
+                     placeholder="z.B. 42a" value="{{ form_data.get('hausnummer','') }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">PLZ <span class="text-danger">*</span></label>
+              <input type="text" name="plz" class="form-control"
+                     placeholder="z.B. 10115" value="{{ form_data.get('plz','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Ort <span class="text-danger">*</span></label>
+              <input type="text" name="ort" class="form-control"
+                     placeholder="z.B. Berlin" value="{{ form_data.get('ort','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Bundesland</label>
+              <input type="text" name="bundesland" class="form-control"
+                     placeholder="z.B. Berlin" value="{{ form_data.get('bundesland','') }}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Pflege -->
     <div class="col-12">
       <div class="card">
@@ -95,12 +149,12 @@
               <input type="date" name="pflegegrad_seit" class="form-control"
                      value="{{ form_data.get('pflegegrad_seit','') }}">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2" id="zimmer_section" style="{% if form_data.get('care_type','HOME_CARE')=='HOME_CARE' %}display:none;{% endif %}">
               <label class="form-label fw-semibold">Zimmer</label>
               <input type="text" name="zimmer_nr" class="form-control"
                      value="{{ form_data.get('zimmer_nr','') }}">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2" id="bett_section" style="{% if form_data.get('care_type','HOME_CARE')=='HOME_CARE' %}display:none;{% endif %}">
               <label class="form-label fw-semibold">Bett</label>
               <input type="text" name="bett_nr" class="form-control"
                      value="{{ form_data.get('bett_nr','') }}">
@@ -219,4 +273,26 @@
     </div>
   </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const careTypeSelect = document.getElementById('care_type_select');
+  const addressSection = document.getElementById('address_section');
+  const zimmerSection = document.getElementById('zimmer_section');
+  const bettSection = document.getElementById('bett_section');
+
+  function updateFieldVisibility() {
+    const isHomeCare = careTypeSelect.value === 'HOME_CARE';
+
+    // Show address fields for home care
+    addressSection.style.display = isHomeCare ? 'block' : 'none';
+
+    // Show zimmer/bett fields for inpatient care
+    zimmerSection.style.display = isHomeCare ? 'none' : 'block';
+    bettSection.style.display = isHomeCare ? 'none' : 'block';
+  }
+
+  careTypeSelect.addEventListener('change', updateFieldVisibility);
+});
+</script>
 {% endblock %}

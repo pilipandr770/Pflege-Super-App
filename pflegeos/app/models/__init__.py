@@ -184,6 +184,13 @@ class Patient(db.Model):
     religion = db.Column(db.String(100))
     sprache_muttersprache = db.Column(db.String(100))
 
+    # Адрес (для домашнего ухода)
+    strasse = db.Column(db.String(255))
+    hausnummer = db.Column(db.String(20))
+    plz = db.Column(db.String(10))
+    ort = db.Column(db.String(100))
+    bundesland = db.Column(db.String(50))
+
     # Контакты
     betreuer_name = db.Column(db.String(255))
     betreuer_telefon = db.Column(db.String(50))
@@ -191,11 +198,14 @@ class Patient(db.Model):
     hausarzt_name = db.Column(db.String(255))
     hausarzt_telefon = db.Column(db.String(50))
 
+    # Тип обслуживания (домашний уход или стационар)
+    care_type = db.Column(db.String(30), default='HOME_CARE')  # HOME_CARE | INPATIENT
+
     # Pflege
     pflegegrad = db.Column(db.String(1))
     pflegegrad_seit = db.Column(db.Date)
-    zimmer_nr = db.Column(db.String(20))
-    bett_nr = db.Column(db.String(20))
+    zimmer_nr = db.Column(db.String(20))  # Только для стационара
+    bett_nr = db.Column(db.String(20))    # Только для стационара
     aufnahmedatum = db.Column(db.Date)
     entlassungsdatum = db.Column(db.Date)
     status = db.Column(db.String(20), default='AKTIV')
@@ -237,6 +247,42 @@ class Patient(db.Model):
 
     def __repr__(self):
         return f'<Patient {self.full_name}>'
+
+
+# ============================================================
+# EMPLOYEE PATIENT ASSIGNMENT
+# ============================================================
+class EmployeePatientAssignment(db.Model):
+    __tablename__ = 'employee_patient_assignments'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+
+    # Роль в уходе за пациентом
+    role = db.Column(db.String(50), default='PRIMARY_NURSE')  # PRIMARY_NURSE, SECONDARY_NURSE, CAREGIVER
+
+    # Когда назначена
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    assigned_by = db.Column(db.String(36), db.ForeignKey('employees.id'))
+
+    # Отзыв
+    unassigned_at = db.Column(db.DateTime)
+    unassigned_by = db.Column(db.String(36), db.ForeignKey('employees.id'))
+
+    is_active = db.Column(db.Boolean, default=True)
+    notes = db.Column(db.Text)
+
+    # Relations
+    employee = db.relationship('Employee', foreign_keys=[employee_id], backref='patient_assignments')
+    patient = db.relationship('Patient', backref='employee_assignments')
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Assignment {self.employee.full_name} → {self.patient.full_name}>'
 
 
 # ============================================================
@@ -344,6 +390,7 @@ class MedicationPlan(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     patient = db.relationship('Patient', backref='medication_plans')
+    creator = db.relationship('Employee', foreign_keys=[created_by])
     medications = db.relationship('Medication', backref='plan', lazy='dynamic')
 
 
@@ -433,6 +480,53 @@ class BtmBuch(db.Model):
     bemerkungen = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ============================================================
+# MEDICATION DOCUMENTS (Автоматически генерируемые документы медикаментов)
+# ============================================================
+class MedicationDocument(db.Model):
+    __tablename__ = 'medication_documents'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+    medication_plan_id = db.Column(db.String(36), db.ForeignKey('medication_plans.id'), nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    # Тип документа: MEDICATION_PLAN, MEDICATION_SCHEDULE, MEDICATION_REMINDER
+    document_type = db.Column(db.String(50), nullable=False, default='MEDICATION_PLAN')
+
+    # Заголовок и содержание
+    title = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text, nullable=False)  # HTML content
+
+    # Статус документа
+    status = db.Column(db.String(50), nullable=False, default='ACTIVE')  # ACTIVE, ARCHIVED, SUPERSEDED
+
+    # Когда документ стал невактуальным (если план обновлён)
+    superseded_at = db.Column(db.DateTime)
+    superseded_by = db.Column(db.String(36), db.ForeignKey('medication_documents.id'))
+
+    # Временные метки
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Отношения
+    patient = db.relationship('Patient', backref='medication_documents')
+    medication_plan = db.relationship('MedicationPlan', backref='documents')
+    creator = db.relationship('Employee', foreign_keys=[created_by])
+    company = db.relationship('Company')
+
+    __table_args__ = (
+        db.Index('ix_medication_documents_patient_id', 'patient_id'),
+        db.Index('ix_medication_documents_company_id', 'company_id'),
+        db.Index('ix_medication_documents_status', 'status'),
+        db.Index('ix_medication_documents_created_at', 'created_at'),
+    )
+
+    def __repr__(self):
+        return f"<MedicationDocument {self.id} - {self.title}>"
 
 
 # ============================================================
@@ -601,3 +695,327 @@ class AuditLog(db.Model):
     geo_lng = db.Column(db.Float)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+# ============================================================
+# PATIENT PHOTOS (Phase 3: Photo + GPS Capture)
+# ============================================================
+class PatientPhoto(db.Model):
+    __tablename__ = 'patient_photos'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    # File path relative to UPLOAD_FOLDER
+    file_path = db.Column(db.String(500), nullable=False)
+    file_size = db.Column(db.Integer)
+    mime_type = db.Column(db.String(50), default='image/jpeg')
+
+    # GPS coordinates
+    geo_lat = db.Column(db.Float)
+    geo_lng = db.Column(db.Float)
+    geo_accuracy = db.Column(db.Float)
+
+    # Device information
+    device_mac = db.Column(db.String(17))
+    device_model = db.Column(db.String(255))
+
+    # Photo metadata
+    photo_type = db.Column(db.String(50), default='GENERAL')  # GENERAL, WOUND, PRESSURE_ULCER, INSPECTION
+    description = db.Column(db.Text)
+    tags = db.Column(db.String(500))
+
+    # Verification
+    verified_by = db.Column(db.String(36), db.ForeignKey('employees.id'))
+    verified_at = db.Column(db.DateTime)
+
+    # Lifecycle
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    patient = db.relationship('Patient', backref='photos', foreign_keys=[patient_id])
+    employee = db.relationship('Employee', backref='patient_photos_uploaded', foreign_keys=[employee_id])
+    verifier = db.relationship('Employee', backref='patient_photos_verified', foreign_keys=[verified_by])
+    company = db.relationship('Company')
+
+    __table_args__ = (
+        db.Index('ix_patient_photos_company_id', 'company_id'),
+        db.Index('ix_patient_photos_patient_id', 'patient_id'),
+        db.Index('ix_patient_photos_employee_id', 'employee_id'),
+        db.Index('ix_patient_photos_created_at', 'created_at'),
+    )
+
+    def __repr__(self):
+        return f"<PatientPhoto {self.id} - {self.patient.full_name} by {self.employee.full_name}>"
+
+
+# ============================================================
+# EMPLOYEE LOCATION TRACKING (Phase 4: Real-time Route Tracking)
+# ============================================================
+class EmployeeLocation(db.Model):
+    __tablename__ = 'employee_locations'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    # GPS coordinates
+    geo_lat = db.Column(db.Float, nullable=False)
+    geo_lng = db.Column(db.Float, nullable=False)
+    geo_accuracy = db.Column(db.Float)
+
+    # Device information
+    device_mac = db.Column(db.String(17))
+    device_model = db.Column(db.String(255))
+
+    # Movement data
+    speed = db.Column(db.Float)  # m/s if available from GPS
+    heading = db.Column(db.Float)  # degrees if available
+
+    # Metadata
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee = db.relationship('Employee', backref='location_history')
+    company = db.relationship('Company')
+
+    __table_args__ = (
+        db.Index('ix_employee_locations_company_id', 'company_id'),
+        db.Index('ix_employee_locations_employee_id', 'employee_id'),
+        db.Index('ix_employee_locations_created_at', 'created_at'),
+        db.Index('ix_employee_locations_is_active', 'is_active'),
+    )
+
+    def __repr__(self):
+        return f"<EmployeeLocation {self.employee.full_name} at {self.geo_lat}, {self.geo_lng}>"
+
+
+# ============================================================
+# PHASE 3.1: SCHEDULING & VISIT MANAGEMENT
+# ============================================================
+class Procedure(db.Model):
+    """Справочник процедур ухода (создает администратор)"""
+    __tablename__ = 'procedures'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+
+    # Название и описание
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    category = db.Column(db.String(100))  # INJECTION, WOUND_CARE, MEASUREMENT, MEDICATION, etc.
+
+    # Типичная длительность в минутах
+    duration_minutes = db.Column(db.Integer, default=15)
+
+    # Требуемая квалификация
+    required_qualification = db.Column(db.String(100))  # PFLEGEFACHKRAFT, PFLEGEHILFSKRAFT, etc.
+
+    # Требует ли двойной проверки (для лекарств/BTM)
+    requires_verification = db.Column(db.Boolean, default=False)
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    company = db.relationship('Company', backref='procedures')
+
+    __table_args__ = (
+        db.Index('ix_procedures_company_id', 'company_id'),
+        db.Index('ix_procedures_is_active', 'is_active'),
+    )
+
+    def __repr__(self):
+        return f"<Procedure {self.name}>"
+
+
+class EmployeeSchedule(db.Model):
+    """План работ для медсестры на день"""
+    __tablename__ = 'employee_schedules'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+
+    # Когда и где
+    scheduled_date = db.Column(db.Date, nullable=False)
+    scheduled_time = db.Column(db.Time, nullable=False)
+
+    # Процедуры на этот визит (JSON array с IDs процедур)
+    procedures = db.Column(db.Text)  # JSON: [{"id": "proc1", "name": "Injection"}]
+
+    # Адрес (копия из пациента на момент создания плана)
+    address_strasse = db.Column(db.String(255))
+    address_hausnummer = db.Column(db.String(20))
+    address_plz = db.Column(db.String(10))
+    address_ort = db.Column(db.String(100))
+
+    # GPS для оптимизации маршрута
+    patient_geo_lat = db.Column(db.Float)
+    patient_geo_lng = db.Column(db.Float)
+
+    # Статус выполнения
+    status = db.Column(db.String(20), default='PENDING')  # PENDING, IN_PROGRESS, COMPLETED, CANCELLED, RESCHEDULED
+
+    # Заметки для медсестры
+    notes = db.Column(db.Text)
+    alerts = db.Column(db.Text)  # JSON: [{"type": "HIGH_RISK", "message": "Dekubitus!"}]
+
+    # Отчет (связь с VisitReport после выполнения)
+    visit_report_id = db.Column(db.String(36), db.ForeignKey('visit_reports.id'))
+
+    # Дополнительно
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee = db.relationship('Employee', backref='schedules')
+    patient = db.relationship('Patient', backref='schedules')
+    company = db.relationship('Company', backref='employee_schedules')
+    visit_report = db.relationship('VisitReport', foreign_keys=[visit_report_id], backref='schedule')
+
+    __table_args__ = (
+        db.Index('ix_employee_schedules_company_id', 'company_id'),
+        db.Index('ix_employee_schedules_employee_id', 'employee_id'),
+        db.Index('ix_employee_schedules_patient_id', 'patient_id'),
+        db.Index('ix_employee_schedules_scheduled_date', 'scheduled_date'),
+        db.Index('ix_employee_schedules_status', 'status'),
+    )
+
+    def __repr__(self):
+        return f"<Schedule {self.employee.full_name} → {self.patient.full_name} on {self.scheduled_date}>"
+
+
+class VisitReport(db.Model):
+    """Отчет о выполнении визита (заполняет медсестра)"""
+    __tablename__ = 'visit_reports'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+
+    # Время визита
+    visit_date = db.Column(db.Date, nullable=False)
+    visit_start_time = db.Column(db.DateTime, nullable=False)
+    visit_end_time = db.Column(db.DateTime)
+
+    # Выполненные процедуры (JSON array)
+    procedures_completed = db.Column(db.Text)  # JSON: [{"id": "proc1", "name": "Injection", "completed": true}]
+
+    # Результаты и наблюдения
+    observations = db.Column(db.Text)  # Свободный текст - что видела медсестра
+    patient_condition = db.Column(db.String(100))  # STABLE, IMPROVED, DETERIORATED
+
+    # Проблемы/Alerts
+    issues_encountered = db.Column(db.Text)  # JSON array проблем
+
+    # Фото (связь с PatientPhoto)
+    photo_ids = db.Column(db.Text)  # JSON array PatientPhoto.id
+
+    # Верификация действий
+    verification_method = db.Column(db.String(30), default='MAC_GPS')
+    device_mac = db.Column(db.String(17))
+    geo_lat = db.Column(db.Float)
+    geo_lng = db.Column(db.Float)
+
+    # Подпись медсестры
+    signature_confirmed = db.Column(db.Boolean, default=False)
+    signature_time = db.Column(db.DateTime)
+
+    # Верификация другой медсестрой/администратором
+    verified_by = db.Column(db.String(36), db.ForeignKey('employees.id'))
+    verified_at = db.Column(db.DateTime)
+    verification_notes = db.Column(db.Text)
+
+    # Статус
+    status = db.Column(db.String(20), default='DRAFT')  # DRAFT, SUBMITTED, VERIFIED, LOCKED
+
+    # Для отчетности/счетов
+    billable_minutes = db.Column(db.Integer)  # Заполняется при верификации
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee = db.relationship('Employee', backref='visit_reports', foreign_keys=[employee_id])
+    patient = db.relationship('Patient', backref='visit_reports', foreign_keys=[patient_id])
+    company = db.relationship('Company', backref='visit_reports')
+    verifier = db.relationship('Employee', foreign_keys=[verified_by], backref='verified_reports')
+
+    __table_args__ = (
+        db.Index('ix_visit_reports_company_id', 'company_id'),
+        db.Index('ix_visit_reports_employee_id', 'employee_id'),
+        db.Index('ix_visit_reports_patient_id', 'patient_id'),
+        db.Index('ix_visit_reports_visit_date', 'visit_date'),
+        db.Index('ix_visit_reports_status', 'status'),
+    )
+
+    def __repr__(self):
+        return f"<VisitReport {self.employee.full_name} → {self.patient.full_name} on {self.visit_date}>"
+
+
+class ScheduleGeneration(db.Model):
+    """История генерации планов AI (для аудита и отката)"""
+    __tablename__ = 'schedule_generations'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+
+    # Кто создал
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    # Период генерации
+    schedule_start_date = db.Column(db.Date, nullable=False)
+    schedule_end_date = db.Column(db.Date, nullable=False)
+
+    # AI Prompt что было отправлено (для аудита)
+    ai_prompt = db.Column(db.Text)  # Деанонимизированные данные отправленные в Claude
+
+    # AI Response (JSON)
+    ai_response = db.Column(db.Text)  # JSON с предложенным планом
+
+    # Статус генерации
+    status = db.Column(db.String(20), default='GENERATED')  # GENERATED, APPROVED, DISTRIBUTED, CANCELLED
+
+    # Одобрение
+    approved_by = db.Column(db.String(36), db.ForeignKey('employees.id'))
+    approved_at = db.Column(db.DateTime)
+    approval_notes = db.Column(db.Text)
+
+    # Распределение
+    distributed_at = db.Column(db.DateTime)
+    distributed_to_count = db.Column(db.Integer)  # Кому рассылается
+
+    # Кол-во созданных schedules
+    schedules_created = db.Column(db.Integer, default=0)
+
+    # Деанонимизировать ли для AI
+    anonymize_for_ai = db.Column(db.Boolean, default=True)
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    company = db.relationship('Company', backref='schedule_generations')
+    creator = db.relationship('Employee', foreign_keys=[created_by], backref='generated_schedules')
+    approver = db.relationship('Employee', foreign_keys=[approved_by], backref='approved_schedules')
+
+    __table_args__ = (
+        db.Index('ix_schedule_generations_company_id', 'company_id'),
+        db.Index('ix_schedule_generations_created_by', 'created_by'),
+        db.Index('ix_schedule_generations_status', 'status'),
+    )
+
+    def __repr__(self):
+        return f"<ScheduleGeneration {self.schedule_start_date} to {self.schedule_end_date}>"

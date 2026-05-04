@@ -13,9 +13,10 @@
     <div class="d-flex gap-2 align-items-center">
       {% if patient.pflegegrad %}<span class="badge bg-primary">PG {{ patient.pflegegrad }}</span>{% endif %}
       <span class="badge bg-{% if patient.status=='AKTIV' %}success{% else %}secondary{% endif %}">{{ patient.status }}</span>
+      {% if patient.care_type=='HOME_CARE' %}<span class="badge bg-info">Häusliche Pflege</span>{% elif patient.care_type=='INPATIENT' %}<span class="badge bg-light text-dark border">Stationär</span>{% endif %}
       {% if patient.sturzrisiko %}<span class="badge bg-warning text-dark">Sturzrisiko</span>{% endif %}
       {% if patient.dekubitusrisiko %}<span class="badge bg-danger">Dekubitusrisiko</span>{% endif %}
-      {% if patient.zimmer_nr %}<span class="badge bg-light text-dark border">Zi. {{ patient.zimmer_nr }}</span>{% endif %}
+      {% if patient.care_type=='INPATIENT' and patient.zimmer_nr %}<span class="badge bg-light text-dark border">Zi. {{ patient.zimmer_nr }}</span>{% endif %}
     </div>
   </div>
   <div class="d-flex gap-2">
@@ -42,6 +43,10 @@
   <div class="col">
     <a href="{{ url_for('wounds.patient_list', patient_id=patient.id) }}"
        class="btn btn-outline-danger w-100">&#x1FA79; Wunden</a>
+  </div>
+  <div class="col">
+    <a href="{{ url_for('photos.list_photos', patient_id=patient.id) }}"
+       class="btn btn-outline-secondary w-100">&#x1F4F7; Fotos</a>
   </div>
   <div class="col">
     <a href="{{ url_for('leistung.patient_list', patient_id=patient.id) }}"
@@ -72,6 +77,24 @@
     </div>
   </div>
 
+  <!-- Adresse (HOME_CARE) -->
+  {% if patient.care_type=='HOME_CARE' %}
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header fw-semibold">📍 Adresse</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted" style="width:45%">Straße</td><td>{{ patient.strasse or '—' }}</td></tr>
+          <tr><td class="text-muted">Hausnummer</td><td>{{ patient.hausnummer or '—' }}</td></tr>
+          <tr><td class="text-muted">PLZ</td><td>{{ patient.plz or '—' }}</td></tr>
+          <tr><td class="text-muted">Ort</td><td>{{ patient.ort or '—' }}</td></tr>
+          <tr><td class="text-muted">Bundesland</td><td>{{ patient.bundesland or '—' }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Pflegedaten -->
   <div class="col-md-6">
     <div class="card">
@@ -80,7 +103,9 @@
         <table class="table table-sm mb-0">
           <tr><td class="text-muted" style="width:45%">Pflegegrad</td><td><strong>{{ patient.pflegegrad or '—' }}</strong></td></tr>
           <tr><td class="text-muted">PG seit</td><td>{{ patient.pflegegrad_seit|datefmt }}</td></tr>
+          {% if patient.care_type=='INPATIENT' %}
           <tr><td class="text-muted">Zimmer/Bett</td><td>{{ patient.zimmer_nr or '—' }}{% if patient.bett_nr %}/{{ patient.bett_nr }}{% endif %}</td></tr>
+          {% endif %}
           <tr><td class="text-muted">Aufnahme</td><td>{{ patient.aufnahmedatum|datefmt }}</td></tr>
           <tr><td class="text-muted">Krankenk.</td><td>{{ patient.krankenversicherung or '—' }}</td></tr>
           <tr><td class="text-muted">Einwilligung Foto</td>

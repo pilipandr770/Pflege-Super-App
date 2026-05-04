@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}Zeitplan überprüfen{% endblock %}
+
+{% block tour %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const steps = [
+    {
+      position: 'center',
+      icon: '🔍',
+      title: 'Dienstplan prüfen',
+      content: 'Claude AI hat einen Dienstplan erstellt. Bitte prüfen Sie alle Einsätze, bevor Sie ihn genehmigen. Erst nach Ihrer Genehmigung werden die Pläne für Mitarbeiter sichtbar.'
+    },
+    {
+      element: '.card.border-warning',
+      position: 'bottom',
+      title: 'KI-Empfehlungen',
+      content: 'Claude AI gibt hier Hinweise zur Planung: Besonderheiten, Warnungen bei Risikopatient*innen, Routenoptimierungen. Lesen Sie diese sorgfältig.'
+    },
+    {
+      element: '.nav-tabs',
+      position: 'bottom',
+      title: 'Tagesansicht',
+      content: 'Jede Registerkarte zeigt einen Tag. Klicken Sie durch die Tage, um alle Einsätze der Woche zu prüfen.'
+    },
+    {
+      element: '#confirmReview',
+      position: 'top',
+      title: 'Bestätigung',
+      content: 'Setzen Sie diesen Haken erst, wenn Sie alle Einsätze sorgfältig geprüft haben. Als Administrator sind Sie für die Richtigkeit verantwortlich.'
+    },
+    {
+      element: '#approveBtn',
+      position: 'top',
+      title: 'Genehmigen',
+      content: 'Nach Genehmigung werden die Einsätze gespeichert und die Mitarbeiter können ihren Dienstplan in ihrem persönlichen Bereich sehen.'
+    }
+  ];
+
+  const tour = new PflegeOSTour(steps, { storageKey: 'pflegeos_schedule_review_v1' });
+  tour.start();
+  initTourHelpButton(() => new PflegeOSTour(steps, { storageKey: 'pflegeos_schedule_review_v1' }));
+});
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.schedules_list') }}">Zeitpläne</a></li>
+<li class="breadcrumb-item active">Überprüfung und Genehmigung</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-9">
+      <h2><i class="bi bi-check2-circle"></i> Zeitplan überprüfen</h2>
+      <small class="text-muted">Überprüfen Sie den von Claude AI generierten Zeitplan vor der Genehmigung</small>
+    </div>
+    <div class="col-md-3 text-end">
+      <span class="badge bg-info">
+        <i class="bi bi-calendar"></i>
+        {{ schedule_gen.schedule_start_date|default('—') }} bis {{ schedule_gen.schedule_end_date|default('—') }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Информация о генерации -->
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        <strong>Generierungsdetails:</strong>
+        Zeitplan erstellt am {{ schedule_gen.created_at.strftime('%d.%m.%Y %H:%M') }} Uhr
+        {% if schedule_gen.anonymize_for_ai %}
+        | <span class="badge bg-success"><i class="bi bi-shield-lock"></i> Anonymisiert (DSGVO)</span>
+        {% endif %}
+        | <span class="badge bg-secondary">{{ ai_plan|length }} Einsätze total</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Notizen und Empfehlungen -->
+  {% if ai_notes %}
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="card border-warning">
+        <div class="card-header bg-warning bg-opacity-10">
+          <h6 class="mb-0"><i class="bi bi-robot"></i> Claude AI — Empfehlungen und Hinweise</h6>
+        </div>
+        <div class="card-body">
+          <p class="mb-0 text-muted" style="white-space: pre-line;">{{ ai_notes }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Вкладки по дням -->
+  <div class="row">
+    <div class="col-md-12">
+      <ul class="nav nav-tabs" role="tablist" id="scheduleTabsNav">
+        {% set dates = ai_plan|groupby('date')|list %}
+        {% for date_group, schedules_for_date in dates %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link {% if loop.first %}active{% endif %}"
+                    id="tab-{{ loop.index0 }}"
+                    data-bs-toggle="tab"
+                    data-bs-target="#day-{{ loop.index0 }}"
+                    type="button" role="tab">
+              <i class="bi bi-calendar-event"></i>
+              {{ date_group|default('Unbekannt') }}
+              <span class="badge bg-secondary ms-2">{{ schedules_for_date|length }}</span>
+            </button>
+          </li>
+        {% endfor %}
+      </ul>
+
+      <div class="tab-content" id="scheduleTabsContent">
+        {% for date_group, schedules_for_date in dates %}
+        <div class="tab-pane fade {% if loop.first %}show active{% endif %}"
+             id="day-{{ loop.index0 }}" role="tabpanel">
+
+          <!-- Сортировка по сотрудникам -->
+          {% set by_employee = schedules_for_date|groupby('employee_name')|list %}
+
+          {% for emp_name, emp_schedules in by_employee %}
+          <div class="card mt-4">
+            <div class="card-header bg-light">
+              <h6 class="mb-0">
+                <i class="bi bi-person-badge"></i> {{ emp_name }}
+                <span class="float-end">
+                  <span class="badge bg-primary">{{ emp_schedules|length }} Einsätze</span>
+                  <!-- Gesamtdauer для этой медсестры в этот день -->
+                  <span class="badge bg-secondary ms-2">
+                    {% set total_mins = emp_schedules|map(attribute='duration_minutes')|sum %}
+                    {{ total_mins }} Min
+                  </span>
+                </span>
+              </h6>
+            </div>
+            <div class="card-body">
+              <div class="schedule-list">
+                {% for sched in emp_schedules %}
+                <div class="schedule-item border-bottom pb-3 mb-3">
+                  <div class="row">
+                    <div class="col-md-2">
+                      <strong class="text-primary">{{ sched.scheduled_time|default('—') }}</strong>
+                      <br><small class="text-muted">{{ sched.duration_minutes|default('—') }} Min</small>
+                    </div>
+                    <div class="col-md-5">
+                      <strong>{{ sched.patient_name }}</strong>
+                      <br><small class="text-muted">
+                        {% if sched.patient_location %}
+                          <i class="bi bi-geo-alt"></i> {{ sched.patient_location }}
+                        {% else %}
+                          <i class="bi bi-building"></i> {{ sched.patient_room|default('—') }}
+                        {% endif %}
+                      </small>
+                      {% if sched.patient_risk_level %}
+                      <br><span class="badge bg-warning text-dark">⚠️ {{ sched.patient_risk_level }}</span>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-3">
+                      <strong>Verfahren:</strong>
+                      {% if sched.procedures %}
+                      <div class="small">
+                        {% for proc in sched.procedures %}
+                        <span class="badge bg-light text-dark">{{ proc }}</span>
+                        {% endfor %}
+                      </div>
+                      {% else %}
+                      <small class="text-muted">—</small>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-2 text-end">
+                      <button type="button" class="btn btn-sm btn-outline-secondary"
+                              data-bs-toggle="modal"
+                              data-bs-target="#detailsModal"
+                              onclick="showScheduleDetails('{{ sched|tojson|safe }}')">
+                        <i class="bi bi-eye"></i> Details
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Кнопки действия -->
+  <div class="row mt-4">
+    <div class="col-md-12">
+      <div class="card bg-light border-0">
+        <div class="card-body">
+          <h6 class="card-title">Zeitplan genehmigen</h6>
+          <p class="text-muted mb-3">
+            Überprüfen Sie alle oben aufgeführten Einsätze. Falls alles in Ordnung ist, können Sie den Zeitplan genehmigen und zur Verteilung freigeben.
+          </p>
+
+          <form method="POST" action="{{ url_for('admin.schedule_approve', schedule_gen_id=schedule_gen.id) }}" id="approveForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="confirmReview" required>
+              <label class="form-check-label" for="confirmReview">
+                <strong>Ich habe den Zeitplan überprüft und bestätige, dass alle Einsätze korrekt sind</strong>
+              </label>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-success btn-lg" id="approveBtn">
+                <i class="bi bi-check-circle"></i> Zeitplan genehmigen
+              </button>
+              <a href="{{ url_for('admin.schedule_generate') }}" class="btn btn-secondary btn-lg">
+                <i class="bi bi-x-circle"></i> Ablehnen und neu generieren
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal für Details -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Einsatz Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Содержимое будет вставлено JavaScript -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showScheduleDetails(scheduleJson) {
+  try {
+    const sched = JSON.parse(scheduleJson);
+    const html = `
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <strong>Pflegekraft:</strong> ${sched.employee_name || '—'}<br>
+          <strong>Patient:</strong> ${sched.patient_name || '—'}<br>
+          <strong>Datum:</strong> ${sched.date || '—'}<br>
+          <strong>Uhrzeit:</strong> ${sched.scheduled_time || '—'}
+        </div>
+        <div class="col-md-6">
+          <strong>Dauer:</strong> ${sched.duration_minutes || '—'} Minuten<br>
+          <strong>Ort:</strong> ${sched.patient_location || sched.patient_room || '—'}<br>
+          <strong>Pflegegrad:</strong> ${sched.care_level || '—'}<br>
+          <strong>Risiko:</strong> ${sched.patient_risk_level || 'Niedrig'}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <strong>Verfahren:</strong><br>
+        ${sched.procedures && sched.procedures.length > 0
+          ? sched.procedures.map(p => `<span class="badge bg-info">${p}</span>`).join(' ')
+          : '<small class="text-muted">Keine</small>'}
+      </div>
+
+      ${sched.notes ? `
+      <div class="mb-3">
+        <strong>Notizen:</strong><br>
+        <small class="text-muted">${sched.notes}</small>
+      </div>
+      ` : ''}
+
+      <div class="alert alert-light">
+        <small class="text-muted">
+          <i class="bi bi-info-circle"></i>
+          Dieser Einsatz wurde von Claude AI basierend auf Qualifikationen,
+          Verfügbarkeit, Standorten und Workload-Verteilung optimiert.
+        </small>
+      </div>
+    `;
+    document.getElementById('modalBody').innerHTML = html;
+  } catch (e) {
+    document.getElementById('modalBody').innerHTML = '<p class="text-danger">Fehler beim Laden der Details</p>';
+  }
+}
+
+document.getElementById('approveForm').addEventListener('submit', function(e) {
+  const confirmReview = document.getElementById('confirmReview').checked;
+
+  if (!confirmReview) {
+    e.preventDefault();
+    alert('Bitte bestätigen Sie, dass Sie den Zeitplan überprüft haben');
+    return;
+  }
+
+  const approveBtn = document.getElementById('approveBtn');
+  approveBtn.disabled = true;
+  approveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wird genehmigt...';
+});
+</script>
+{% endblock %}

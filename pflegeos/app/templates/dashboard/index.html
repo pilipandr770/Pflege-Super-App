@@ -1,6 +1,103 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 
+{% block tour %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const isAdmin = {{ ('true' if current_user.role == 'ADMIN' else 'false') }};
+
+  const adminSteps = [
+    {
+      position: 'center',
+      icon: '👋',
+      title: 'Willkommen bei PflegeOS!',
+      content: 'Hier ist eine kurze Einführung in Ihren Admin-Bereich. Wir zeigen Ihnen die wichtigsten Funktionen Schritt für Schritt.'
+    },
+    {
+      element: '.row.g-3.mb-4',
+      position: 'bottom',
+      title: 'Übersicht auf einen Blick',
+      content: 'Diese Karten zeigen Ihnen sofort: aktive Patienten, offene SIS-Einschätzungen, heutige Medikamente und Leistungen.'
+    },
+    {
+      element: 'a[href*="patients/new"]',
+      position: 'right',
+      title: 'Neuen Patienten aufnehmen',
+      content: 'Über diesen Button nehmen Sie einen neuen Patienten auf. Danach müssen SIS-Einschätzung und Pflegeplan erstellt werden.'
+    },
+    {
+      element: 'a[href*="leistung/new"]',
+      position: 'right',
+      title: 'Leistung erfassen',
+      content: 'Nach jedem Patientenbesuch dokumentieren Sie hier die erbrachten Leistungen — wichtig für die Abrechnung mit Versicherungen.'
+    },
+    {
+      element: 'a[href*="admin/schedules"]',
+      position: 'right',
+      title: 'KI-Dienstplanung',
+      content: 'Das Herzstück von PflegeOS! Claude AI erstellt optimierte Wochenpläne für Ihr Team — Routen, Qualifikationen, Auslastung automatisch berücksichtigt.'
+    },
+    {
+      position: 'center',
+      icon: '🎉',
+      title: 'Sie sind startklar!',
+      content: 'Sie können die Tour jederzeit über den <strong>?-Button</strong> unten rechts neu starten. Viel Erfolg mit PflegeOS!'
+    }
+  ];
+
+  const nurseSteps = [
+    {
+      position: 'center',
+      icon: '👋',
+      title: 'Willkommen bei PflegeOS!',
+      content: 'Hier sehen Sie Ihren persönlichen Bereich als Pflegekraft. Lassen Sie uns die wichtigsten Funktionen kurz vorstellen.'
+    },
+    {
+      element: '.row.g-3.mb-4',
+      position: 'bottom',
+      title: 'Ihr heutiger Überblick',
+      content: 'Aktive Patienten, offene SIS-Einschätzungen, heutige Medikamente und dokumentierte Leistungen — alles auf einen Blick.'
+    },
+    {
+      element: 'a[href*="leistung/new"]',
+      position: 'right',
+      title: 'Leistung dokumentieren',
+      content: 'Nach jedem Besuch dokumentieren Sie hier die erbrachten Pflegeleistungen. Das ist Pflicht für die Abrechnung.'
+    },
+    {
+      element: 'a[href*="medications/btm"]',
+      position: 'right',
+      title: 'BtM-Buch',
+      content: 'Alle Betäubungsmittel müssen hier nach §13 BtMG eingetragen werden. Erfordert Vier-Augen-Prinzip — zwei Mitarbeiter müssen bestätigen.'
+    },
+    {
+      position: 'center',
+      icon: '📋',
+      title: 'Ihr Tagesplan',
+      content: 'Ihren heutigen Dienstplan sehen Sie unter <strong>Mein Plan</strong> in der Navigation. Dort starten Sie Besuche und dokumentieren den Verlauf direkt.'
+    },
+    {
+      position: 'center',
+      icon: '✅',
+      title: 'Los geht\'s!',
+      content: 'Sie können diese Tour jederzeit über den <strong>?-Button</strong> unten rechts neu starten. Bei Fragen wenden Sie sich an Ihre Leitung.'
+    }
+  ];
+
+  const steps = isAdmin ? adminSteps : nurseSteps;
+  const key = isAdmin ? 'pflegeos_admin_dashboard_v1' : 'pflegeos_nurse_dashboard_v1';
+
+  const tour = new PflegeOSTour(steps, { storageKey: key });
+
+  // Auto-start für neue Nutzer
+  tour.start();
+
+  // Help-Button für manuellen Neustart
+  initTourHelpButton(() => new PflegeOSTour(steps, { storageKey: key }));
+});
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h4 class="fw-bold mb-0">Dashboard</h4>
@@ -176,9 +273,15 @@
             </a>
           </div>
           <div class="col-6">
+            {% if current_user.is_admin or current_user.role in ['ADMIN', 'PFLEGEFACHKRAFT'] %}
+            <a href="{{ url_for('tracking.dashboard') }}" class="btn btn-outline-info w-100 text-start">
+              <i class="bi bi-map"></i> Dienst-Routing
+            </a>
+            {% else %}
             <a href="{{ url_for('patients.index') }}" class="btn btn-outline-secondary w-100 text-start">
               <i class="bi bi-people"></i> Patientenliste
             </a>
+            {% endif %}
           </div>
         </div>
       </div>

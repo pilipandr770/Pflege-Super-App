@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Routengeschichte — {{ employee.full_name }}{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet for maps -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  #map {
+    height: 600px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .route-point {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #2196f3;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .route-path {
+    stroke: #2196f3;
+    stroke-width: 3;
+    fill: none;
+    opacity: 0.6;
+  }
+  .timeline {
+    position: relative;
+    padding: 20px 0;
+  }
+  .timeline-item {
+    padding-left: 40px;
+    padding-bottom: 20px;
+    position: relative;
+    border-left: 2px solid #e0e0e0;
+  }
+  .timeline-item:first-child {
+    border-left-color: #4caf50;
+  }
+  .timeline-item:last-child {
+    border-left-color: #ff6b6b;
+  }
+  .timeline-dot {
+    width: 12px;
+    height: 12px;
+    background-color: #2196f3;
+    border: 2px solid white;
+    border-radius: 50%;
+    position: absolute;
+    left: -8px;
+    top: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .timeline-item:first-child .timeline-dot {
+    background-color: #4caf50;
+  }
+  .timeline-item:last-child .timeline-dot {
+    background-color: #ff6b6b;
+  }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('tracking.dashboard') }}">Dienst-Routenverfolgung</a></li>
+<li class="breadcrumb-item active">{{ employee.full_name }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">{{ employee.full_name }}</h4>
+    <small class="text-muted">{{ employee.role }} | Routengeschichte (letzte 8 Stunden)</small>
+  </div>
+  <a href="{{ url_for('tracking.dashboard') }}" class="btn btn-secondary">
+    <i class="bi bi-arrow-left"></i> Zurück
+  </a>
+</div>
+
+<div class="row g-3">
+  <!-- Map -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-map"></i> Routenkarte</h6>
+      </div>
+      <div class="card-body p-2">
+        <div id="map"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-clock-history"></i> Zeitleiste (<span id="pointCount">0</span> Punkte)</h6>
+      </div>
+      <div class="card-body" id="timeline" style="max-height: 600px; overflow-y: auto;">
+        <div class="text-center text-muted p-3">
+          <i class="bi bi-hourglass-split"></i> Laden...
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-graph-up"></i> Zusammenfassung</h6>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-3">
+            <div>
+              <strong id="totalDistance">—</strong>
+              <small class="text-muted d-block">Geschätzte Strecke</small>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div>
+              <strong id="avgSpeed">—</strong>
+              <small class="text-muted d-block">Durchschnitt Geschwindigkeit</small>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div>
+              <strong id="maxSpeed">—</strong>
+              <small class="text-muted d-block">Max Geschwindigkeit</small>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div>
+              <strong id="duration">—</strong>
+              <small class="text-muted d-block">Zeitdauer</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle"></i> Legende</h6>
+      </div>
+      <div class="card-body small">
+        <div class="mb-2">
+          <div class="route-point" style="margin-bottom: 4px;"></div>
+          <span>Positionspunkt</span>
+        </div>
+        <div class="mb-2">
+          <div style="height: 3px; background-color: #2196f3; opacity: 0.6;"></div>
+          <span>Routenpfad (letzte 8h)</span>
+        </div>
+        <div>
+          <span class="badge bg-light text-dark">Start</span>
+          <span class="badge bg-light text-dark">Ende</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let map = null;
+let routeData = null;
+
+// Calculate distance between two points (Haversine formula)
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Initialize map
+function initMap() {
+  if (!map) {
+    map = L.map('map').setView([52.52, 13.405], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+  }
+}
+
+// Load and display route
+async function loadRoute() {
+  try {
+    const response = await fetch('{{ url_for("tracking.get_employee_route", employee_id=employee.id) }}');
+    if (!response.ok) return;
+
+    routeData = await response.json();
+    const route = routeData.route;
+
+    if (route.length === 0) {
+      document.getElementById('timeline').innerHTML = '<div class="text-center text-muted p-3">Keine Positionsdaten verfügbar</div>';
+      return;
+    }
+
+    // Calculate statistics
+    let totalDistance = 0;
+    let speeds = [];
+    for (let i = 0; i < route.length - 1; i++) {
+      const dist = calculateDistance(route[i].lat, route[i].lng, route[i+1].lat, route[i+1].lng);
+      totalDistance += dist;
+      if (route[i].speed) speeds.push(route[i].speed * 3.6); // convert m/s to km/h
+    }
+
+    const maxSpeed = speeds.length > 0 ? Math.max(...speeds).toFixed(1) : '—';
+    const avgSpeed = speeds.length > 0 ? (speeds.reduce((a,b) => a+b, 0) / speeds.length).toFixed(1) : '—';
+
+    const startTime = new Date(route[0].timestamp);
+    const endTime = new Date(route[route.length - 1].timestamp);
+    const duration = Math.floor((endTime - startTime) / 60000);
+
+    document.getElementById('totalDistance').innerHTML = totalDistance.toFixed(2) + ' km';
+    document.getElementById('avgSpeed').innerHTML = (avgSpeed !== '—' ? avgSpeed + ' km/h' : '—');
+    document.getElementById('maxSpeed').innerHTML = (maxSpeed !== '—' ? maxSpeed + ' km/h' : '—');
+    document.getElementById('duration').innerHTML = duration + ' Min';
+    document.getElementById('pointCount').textContent = route.length;
+
+    // Draw route on map
+    const coords = route.map(p => [p.lat, p.lng]);
+    if (coords.length > 1) {
+      L.polyline(coords, {
+        color: '#2196f3',
+        weight: 3,
+        opacity: 0.6
+      }).addTo(map);
+    }
+
+    // Add start marker
+    if (route.length > 0) {
+      L.circleMarker([route[0].lat, route[0].lng], {
+        radius: 8,
+        fillColor: '#4caf50',
+        color: '#fff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+      })
+        .bindPopup(`<strong>Start</strong><br>${new Date(route[0].timestamp).toLocaleString('de-DE')}`)
+        .addTo(map);
+    }
+
+    // Add end marker
+    if (route.length > 1) {
+      L.circleMarker([route[route.length-1].lat, route[route.length-1].lng], {
+        radius: 8,
+        fillColor: '#ff6b6b',
+        color: '#fff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+      })
+        .bindPopup(`<strong>Ende</strong><br>${new Date(route[route.length-1].timestamp).toLocaleString('de-DE')}`)
+        .addTo(map);
+    }
+
+    // Add all route points as markers
+    route.forEach((point, index) => {
+      L.circleMarker([point.lat, point.lng], {
+        radius: 5,
+        fillColor: '#2196f3',
+        color: '#fff',
+        weight: 1,
+        opacity: 0.7,
+        fillOpacity: 0.7
+      })
+        .bindPopup(`
+          <strong>Punkt ${index + 1}</strong><br>
+          ${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}<br>
+          ${point.timestamp ? new Date(point.timestamp).toLocaleString('de-DE') : ''}
+          ${point.accuracy ? '<br>±' + Math.round(point.accuracy) + 'm Genauigkeit' : ''}
+          ${point.speed ? '<br>' + (point.speed * 3.6).toFixed(1) + ' km/h' : ''}
+        `)
+        .addTo(map);
+    });
+
+    // Fit bounds
+    const group = new L.featureGroup(coords.map(c => L.latLng(c)));
+    map.fitBounds(group.getBounds().pad(0.1), { maxZoom: 14 });
+
+    // Build timeline
+    buildTimeline(route);
+  } catch (error) {
+    console.error('Error loading route:', error);
+    document.getElementById('timeline').innerHTML = '<div class="alert alert-danger">Fehler beim Laden der Route</div>';
+  }
+}
+
+// Build timeline
+function buildTimeline(route) {
+  const timeline = document.getElementById('timeline');
+  timeline.innerHTML = route.map((point, index) => `
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div>
+        <small class="text-muted">${new Date(point.timestamp).toLocaleTimeString('de-DE')}</small><br>
+        <strong>${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}</strong><br>
+        <small class="text-muted">
+          ${point.accuracy ? '±' + Math.round(point.accuracy) + 'm Genauigkeit' : 'Genauigkeit unbekannt'}
+          ${point.speed ? ' | ' + (point.speed * 3.6).toFixed(1) + ' km/h' : ''}
+        </small>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  loadRoute();
+});
+</script>
+{% endblock %}

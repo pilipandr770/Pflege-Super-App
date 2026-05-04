@@ -36,6 +36,53 @@ def admin_required(f):
     return decorated
 
 
+def patient_access_required(patient_id_param='patient_id'):
+    """
+    Декоратор: проверяет доступ к пациенту.
+    - ADMIN: полный доступ ко всем пациентам
+    - Остальные: только к назначенным пациентам
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            from flask import abort
+            from app.models import Patient, EmployeePatientAssignment
+
+            # Получить patient_id из kwargs или request args
+            patient_id = kwargs.get(patient_id_param) or request.args.get(patient_id_param)
+
+            if not patient_id:
+                abort(400)  # Bad request
+
+            # Проверить что пациент существует и принадлежит компании
+            patient = Patient.query.filter_by(
+                id=patient_id,
+                company_id=current_user.company_id,
+                deleted_at=None
+            ).first_or_404()
+
+            # ADMIN может всё
+            if current_user.is_admin:
+                return f(*args, **kwargs)
+
+            # Остальные: только назначенные пациенты
+            assignment = EmployeePatientAssignment.query.filter_by(
+                employee_id=current_user.id,
+                patient_id=patient_id,
+                is_active=True
+            ).first()
+
+            if not assignment:
+                from flask import flash, redirect, url_for
+                flash(f'Доступ запрещен к пациенту {patient.full_name}', 'danger')
+                log_action('ACCESS_DENIED', 'Patient', patient_id)
+                return redirect(url_for('patients.index'))
+
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+
 def log_action(action, entity_type, entity_id=None, old_values=None, new_values=None):
     """Записывает в audit_log."""
     try:

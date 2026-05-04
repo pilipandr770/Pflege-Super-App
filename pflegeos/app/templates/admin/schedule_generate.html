@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Zeitplan generieren{% endblock %}
+
+{% block tour %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const steps = [
+    {
+      position: 'center',
+      icon: '🤖',
+      title: 'KI-Dienstplan erstellen',
+      content: 'Claude AI analysiert Ihre Mitarbeiter und Patienten und erstellt einen optimierten Wochenplan. Das dauert ca. 10–30 Sekunden.'
+    },
+    {
+      element: '#schedule_start_date',
+      position: 'bottom',
+      title: 'Zeitraum wählen',
+      content: 'Wählen Sie Start- und Enddatum für den Dienstplan. Empfehlung: 1 Woche (7 Tage). Längere Zeiträume sind möglich, aber weniger präzise.'
+    },
+    {
+      element: 'input[name="employee_ids"]',
+      position: 'right',
+      title: 'Pflegekräfte auswählen',
+      content: 'Alle aktiven Pflegekräfte sind standardmäßig ausgewählt. Entfernen Sie das Häkchen bei Mitarbeitern im Urlaub oder Krankenstand.'
+    },
+    {
+      element: 'input[name="patient_ids"]',
+      position: 'right',
+      title: 'Patienten auswählen',
+      content: 'Wählen Sie alle Patienten, die in diesem Zeitraum Besuche benötigen. Die KI berücksichtigt Pflegegrad und Risikofaktoren.'
+    },
+    {
+      element: '#anonymize_for_ai',
+      position: 'top',
+      title: 'Datenschutz (DSGVO)',
+      content: 'Wenn aktiviert, sieht Claude AI keine echten Namen — nur anonymisierte IDs. Empfehlung: <strong>aktiviert lassen</strong> für maximale Datensicherheit.'
+    },
+    {
+      element: '#submitBtn',
+      position: 'top',
+      title: 'Plan generieren',
+      content: 'Klicken Sie hier, um den KI-Dienstplan zu erstellen. Nach der Generierung können Sie ihn prüfen und genehmigen, bevor er sichtbar wird.'
+    }
+  ];
+
+  const tour = new PflegeOSTour(steps, { storageKey: 'pflegeos_schedule_gen_v1' });
+  tour.start();
+  initTourHelpButton(() => new PflegeOSTour(steps, { storageKey: 'pflegeos_schedule_gen_v1' }));
+});
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.schedules_list') }}">Zeitpläne</a></li>
+<li class="breadcrumb-item active">Neuer Zeitplan</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <h2><i class="bi bi-robot"></i> Zeitplan mit AI generieren</h2>
+      <small class="text-muted">Claude AI optimiert die Patientenzuweisung basierend auf Qualifikationen, Standorten und Verfügbarkeit</small>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Zeitplan-Parameter</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" id="scheduleForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+            <!-- Datumsbereich -->
+            <div class="row mb-4">
+              <div class="col-md-6">
+                <label for="schedule_start_date" class="form-label"><strong>Startdatum</strong> <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="schedule_start_date" name="schedule_start_date" required>
+              </div>
+              <div class="col-md-6">
+                <label for="schedule_end_date" class="form-label"><strong>Enddatum</strong> <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="schedule_end_date" name="schedule_end_date" required>
+              </div>
+            </div>
+
+            <!-- Выбор медсестер -->
+            <div class="mb-4">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0"><strong>Pflegekräfte auswählen</strong> <span class="text-danger">*</span></label>
+                <div class="btn-group btn-group-sm">
+                  <button type="button" class="btn btn-outline-secondary" onclick="selectAll('employee_ids')">
+                    <i class="bi bi-check-all"></i> Alle
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="deselectAll('employee_ids')">
+                    <i class="bi bi-x"></i> Keine
+                  </button>
+                </div>
+              </div>
+              <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+                {% for emp in employees %}
+                <label class="list-group-item list-group-item-action">
+                  <input type="checkbox" name="employee_ids" value="{{ emp.id }}" class="form-check-input me-2" checked>
+                  <strong>{{ emp.full_name }}</strong>
+                  <span class="float-end">
+                    {% if emp.role == 'PFLEGEFACHKRAFT' %}
+                      <span class="badge bg-primary">Fachkraft</span>
+                    {% elif emp.role == 'PFLEGEHILFSKRAFT' %}
+                      <span class="badge bg-secondary">Hilfskraft</span>
+                    {% else %}
+                      <span class="badge bg-light text-dark">{{ emp.role }}</span>
+                    {% endif %}
+                  </span>
+                  <br><small class="text-muted">
+                    {% if emp.qualification %}{{ emp.qualification }}{% else %}—{% endif %}
+                  </small>
+                </label>
+                {% endfor %}
+              </div>
+              <small class="text-muted d-block mt-2">{{ employees|length }} Pflegekräfte verfügbar</small>
+            </div>
+
+            <!-- Выбор пациентов -->
+            <div class="mb-4">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0"><strong>Patienten auswählen</strong> <span class="text-danger">*</span></label>
+                <div class="btn-group btn-group-sm">
+                  <button type="button" class="btn btn-outline-secondary" onclick="selectAll('patient_ids')">
+                    <i class="bi bi-check-all"></i> Alle
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="deselectAll('patient_ids')">
+                    <i class="bi bi-x"></i> Keine
+                  </button>
+                </div>
+              </div>
+              <div class="list-group" style="max-height: 400px; overflow-y: auto;">
+                {% for pat in patients %}
+                <label class="list-group-item list-group-item-action">
+                  <input type="checkbox" name="patient_ids" value="{{ pat.id }}" class="form-check-input me-2" checked>
+                  <strong>{{ pat.full_name }}</strong>
+                  <span class="float-end">
+                    <span class="badge bg-info">PG {{ pat.pflegegrad or '—' }}</span>
+                    {% if pat.sturzrisiko %}
+                      <span class="badge bg-warning text-dark ms-1" title="Sturzrisiko">⚠️</span>
+                    {% endif %}
+                  </span>
+                  <br><small class="text-muted">
+                    {% if pat.care_type == 'HOME_CARE' %}
+                      <i class="bi bi-geo-alt"></i> {{ pat.strasse or '' }} {{ pat.hausnummer or '' }}, {{ pat.ort or '—' }}
+                    {% else %}
+                      <i class="bi bi-building"></i> Zimmer {{ pat.zimmer_nr or '—' }}
+                    {% endif %}
+                  </small>
+                </label>
+                {% endfor %}
+              </div>
+              <small class="text-muted d-block mt-2">{{ patients|length }} Patienten verfügbar</small>
+            </div>
+
+            <!-- Конфиденциальность для AI -->
+            <div class="mb-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="anonymize_for_ai" name="anonymize_for_ai" checked>
+                <label class="form-check-label" for="anonymize_for_ai">
+                  <strong>Datenschutz: Anonymisierte Daten für AI</strong>
+                </label>
+              </div>
+              <small class="text-muted">
+                Wenn aktiviert, werden Namen und genaue Adressen von Claude AI nicht sichtbar (DSGVO/NIS2 konform).
+                Die AI sieht nur: Standort (Koordinaten), Qualifikationen, Verfügbarkeit.
+              </small>
+            </div>
+
+            <!-- Кнопки -->
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                <i class="bi bi-robot"></i> Zeitplan generieren
+              </button>
+              <a href="{{ url_for('admin.schedules_list') }}" class="btn btn-secondary btn-lg">
+                <i class="bi bi-x-circle"></i> Abbrechen
+              </a>
+            </div>
+
+            <!-- Прогресс генерации -->
+            <div id="generationProgress" class="alert alert-warning mt-3 d-none">
+              <div class="d-flex align-items-center">
+                <span class="spinner-border spinner-border-sm me-3" role="status"></span>
+                <div>
+                  <strong>Claude AI generiert Ihren Zeitplan...</strong>
+                  <br><small class="text-muted">Dies kann 10–30 Sekunden dauern. Bitte warten Sie.</small>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Информационная панель -->
+    <div class="col-md-4">
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-info-circle"></i> Wie es funktioniert</h6>
+        </div>
+        <div class="card-body small">
+          <ol class="small">
+            <li><strong>Auswählen:</strong> Wählen Sie Pflegekräfte und Patienten</li>
+            <li><strong>Generieren:</strong> Claude AI optimiert den Zeitplan</li>
+            <li><strong>Überprüfen:</strong> Prüfen Sie den Entwurf</li>
+            <li><strong>Genehmigen:</strong> Bestätigen Sie die Änderungen</li>
+            <li><strong>Verteilen:</strong> Benachrichtigungen an Pflegekräfte</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-lightbulb"></i> AI-Optimierung berücksichtigt</h6>
+        </div>
+        <div class="card-body small">
+          <ul class="small mb-0">
+            <li>🗺️ Routenoptimierung (minimale Fahrtzeiten)</li>
+            <li>📋 Qualifikationen der Pflegekräfte</li>
+            <li>⚖️ Gleichmäßige Workload-Verteilung</li>
+            <li>⚠️ Patientenbezogene Risiken</li>
+            <li>📅 Wöchentliche Regelmäßigkeit</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>Hinweis:</strong> AI-generierte Zeitpläne sind Vorschläge. Ein Administrator muss den Zeitplan vor der Verteilung genehmigen.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('scheduleForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const startDate = document.getElementById('schedule_start_date').value;
+  const endDate = document.getElementById('schedule_end_date').value;
+  const employees = document.querySelectorAll('input[name="employee_ids"]:checked').length;
+  const patients = document.querySelectorAll('input[name="patient_ids"]:checked').length;
+
+  if (!startDate || !endDate) {
+    alert('Bitte wählen Sie ein Datumsbereich');
+    return;
+  }
+
+  if (new Date(startDate) > new Date(endDate)) {
+    alert('Startdatum muss vor Enddatum liegen');
+    return;
+  }
+
+  if (employees === 0) {
+    alert('Bitte wählen Sie mindestens eine Pflegekraft');
+    return;
+  }
+
+  if (patients === 0) {
+    alert('Bitte wählen Sie mindestens einen Patienten');
+    return;
+  }
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Claude AI denkt nach...';
+
+  // Показать прогресс-сообщение
+  const progressDiv = document.getElementById('generationProgress');
+  if (progressDiv) progressDiv.classList.remove('d-none');
+
+  this.submit();
+});
+
+// Установить текущую дату как стартовую
+document.addEventListener('DOMContentLoaded', function() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('schedule_start_date').value = today;
+
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  document.getElementById('schedule_end_date').value = nextWeek.toISOString().split('T')[0];
+});
+
+function selectAll(name) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach(cb => cb.checked = true);
+}
+
+function deselectAll(name) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach(cb => cb.checked = false);
+}
+</script>
+{% endblock %}

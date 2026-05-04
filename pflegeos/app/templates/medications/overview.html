@@ -9,6 +9,9 @@
 <div class="d-flex justify-content-between mb-3">
   <h4 class="fw-bold">Medikamente — {{ patient.full_name }}</h4>
   <div class="d-flex gap-2">
+    <a href="{{ url_for('medications.patient_documents', patient_id=patient.id) }}" class="btn btn-outline-info btn-sm" title="Alle medikamentösen Dokumente" data-bs-toggle="tooltip">
+      <i class="bi bi-file-earmark-text"></i> Dokumente
+    </a>
     <a href="{{ url_for('medications.btm_buch') }}" class="btn btn-outline-danger btn-sm">BtM-Buch</a>
     <a href="{{ url_for('medications.new_plan', patient_id=patient.id) }}" class="btn btn-primary">+ Plan</a>
   </div>

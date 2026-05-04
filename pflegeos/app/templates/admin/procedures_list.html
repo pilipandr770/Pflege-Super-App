@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Verfahrenverwaltung{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.procedures_list') }}">Admin</a></li>
+<li class="breadcrumb-item active">Verfahren</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <h2><i class="bi bi-hammer"></i> Verfahrenverwaltung</h2>
+      <small class="text-muted">Verwaltung aller Pflegeverfahren</small>
+    </div>
+    <div class="col-md-4 text-end">
+      <a href="{{ url_for('admin.procedure_create') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Neues Verfahren
+      </a>
+    </div>
+  </div>
+
+  <!-- Поиск -->
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <form method="GET" class="d-flex gap-2">
+        <input type="text" name="search" class="form-control" placeholder="Nach Verfahren suchen..." value="{{ search or '' }}">
+        <button type="submit" class="btn btn-outline-primary">
+          <i class="bi bi-search"></i> Suchen
+        </button>
+        {% if search %}
+        <a href="{{ url_for('admin.procedures_list') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-clockwise"></i> Zurücksetzen
+        </a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <!-- Таблица процедур -->
+  <div class="row">
+    <div class="col-md-12">
+      {% if procedures.items %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Name</th>
+                <th>Kategorie</th>
+                <th>Dauer</th>
+                <th>Erforderliche Qualifikation</th>
+                <th>Verifizierung</th>
+                <th>Aktion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for proc in procedures.items %}
+              <tr>
+                <td>
+                  <strong>{{ proc.name }}</strong>
+                  {% if proc.description %}
+                  <br><small class="text-muted">{{ proc.description[:100] }}{% if proc.description|length > 100 %}...{% endif %}</small>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if proc.category %}
+                    <span class="badge bg-light text-dark">{{ proc.category }}</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <strong>{{ proc.duration_minutes }} min</strong>
+                </td>
+                <td>
+                  {% if proc.required_qualification %}
+                    <small>{{ proc.required_qualification }}</small>
+                  {% else %}
+                    <small class="text-muted">—</small>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if proc.requires_verification %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-check2"></i> Ja</span>
+                  {% else %}
+                    <span class="text-muted">Nein</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="{{ url_for('admin.procedure_edit', procedure_id=proc.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil"></i> Bearbeiten
+                  </a>
+                  <button onclick="deleteConfirm('{{ proc.id }}', '{{ proc.name }}')" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i> Löschen
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Пагинация -->
+        {% if procedures.pages > 1 %}
+        <nav aria-label="Page navigation">
+          <ul class="pagination justify-content-center">
+            {% if procedures.has_prev %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('admin.procedures_list', page=procedures.prev_num, search=search) }}">← Vorherige</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">← Vorherige</span>
+              </li>
+            {% endif %}
+
+            {% for page_num in procedures.iter_pages() %}
+              {% if page_num %}
+                {% if page_num == procedures.page %}
+                  <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                  </li>
+                {% else %}
+                  <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.procedures_list', page=page_num, search=search) }}">{{ page_num }}</a>
+                  </li>
+                {% endif %}
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">…</span>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if procedures.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('admin.procedures_list', page=procedures.next_num, search=search) }}">Nächste →</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">Nächste →</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Keine Verfahren vorhanden.
+          <a href="{{ url_for('admin.procedure_create') }}" class="alert-link">Erstellen Sie Ihr erstes Verfahren</a>.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Статистика -->
+  <div class="row mt-4">
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <div class="display-6 text-primary">{{ procedures.total }}</div>
+          <small class="text-muted">Verfahren insgesamt</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form id="deleteForm" method="POST" style="display:none;">
+  <input type="hidden" name="_method" value="DELETE">
+</form>
+
+<script>
+function deleteConfirm(procId, procName) {
+  if (confirm(`Verfahren "${procName}" wirklich löschen?`)) {
+    const form = document.getElementById('deleteForm');
+    form.action = `/admin/procedures/${procId}/delete`;
+    form.submit();
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Bericht Detail — {{ report.patient.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('nurse.my_reports') }}">Meine Berichte</a></li>
+<li class="breadcrumb-item active">{{ report.visit_date|dateformat('%d.%m.%Y') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2>{{ report.patient.full_name }} — {{ report.visit_date|dateformat('%d.%m.%Y') }}</h2>
+          <small class="text-muted">
+            <i class="bi bi-clock"></i> {{ report.visit_start_time|dateformat('%H:%M') }} - {{ report.visit_end_time|dateformat('%H:%M') }}
+            {% if report.visit_end_time and report.visit_start_time %}
+              ({{ ((report.visit_end_time - report.visit_start_time).total_seconds() / 60)|int }} min)
+            {% endif %}
+          </small>
+        </div>
+        <div>
+          <span class="badge bg-{{ 'success' if report.status == 'VERIFIED' else 'warning' if report.status == 'SUBMITTED' else 'secondary' }} p-2">
+            {{ report.status }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Основная информация -->
+    <div class="col-md-8">
+      <!-- Статус визита -->
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-info-circle"></i> Visitendetails</h6>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <p><strong>Pflegefachkraft:</strong><br>{{ report.employee.full_name }}</p>
+              <p><strong>Patientenzustand:</strong><br>
+                {% if report.patient_condition == 'STABLE' %}
+                  <span class="badge bg-success">Stabil</span>
+                {% elif report.patient_condition == 'IMPROVED' %}
+                  <span class="badge bg-success">Verbessert</span>
+                {% elif report.patient_condition == 'DETERIORATED' %}
+                  <span class="badge bg-danger">Verschlechtert</span>
+                {% else %}
+                  {{ report.patient_condition or '—' }}
+                {% endif %}
+              </p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Billable Time:</strong><br>{{ report.billable_minutes or 0 }} Minuten</p>
+              <p><strong>Erstellt:</strong><br>{{ report.created_at|dateformat('%d.%m.%Y %H:%M') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Durchgeführte Verfahren -->
+      {% set procedures = report.procedures_completed|tojson|safe if report.procedures_completed else '[]' %}
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-check-circle"></i> Durchgeführte Verfahren</h6>
+        </div>
+        <div class="card-body">
+          {% if procedures != '[]' %}
+            <ul class="list-unstyled">
+              {% for proc_id in procedures %}
+                <li class="mb-2">
+                  <i class="bi bi-check-lg text-success"></i> {{ proc_id }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted">Keine Verfahren aufgezeichnet</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Beobachtungen -->
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-chat-left-text"></i> Beobachtungen</h6>
+        </div>
+        <div class="card-body">
+          <p>{{ report.observations or '—' }}</p>
+        </div>
+      </div>
+
+      <!-- Aufgetretene Probleme -->
+      {% set issues = report.issues_encountered|tojson|safe if report.issues_encountered else '[]' %}
+      {% if issues != '[]' %}
+      <div class="card mb-3">
+        <div class="card-header bg-warning">
+          <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Aufgetretene Probleme</h6>
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled">
+            {% for issue in issues %}
+              <li class="mb-2">
+                <strong>{{ issue.title or 'Problem' }}:</strong> {{ issue.description or issue }}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Fotos -->
+      {% set photo_ids = report.photo_ids|tojson|safe if report.photo_ids else '[]' %}
+      {% if photo_ids != '[]' %}
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-image"></i> Fotos ({{ photo_ids|length }})</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {% for photo_id in photo_ids %}
+              <div class="col-md-4">
+                <div class="card">
+                  <img src="{{ url_for('photos.view_photo_file', photo_id=photo_id) }}" class="card-img-top" alt="Photo" style="height: 150px; object-fit: cover;">
+                  <div class="card-body">
+                    <a href="{{ url_for('photos.view_photo', photo_id=photo_id) }}" class="btn btn-sm btn-outline-primary w-100">
+                      <i class="bi bi-eye"></i> Anschauen
+                    </a>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Verifikation -->
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-shield-check"></i> Verifikation & Sicherheit</h6>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <p><strong>GPS-Koordinaten:</strong><br>
+                {% if report.geo_lat and report.geo_lng %}
+                  {{ report.geo_lat }}, {{ report.geo_lng }}
+                  <small class="text-muted d-block">(Genauigkeit: {{ report.geo_accuracy|int if report.geo_accuracy else '—' }} m)</small>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Gerät:</strong><br>
+                {{ report.device_mac or '—' }}
+              </p>
+            </div>
+          </div>
+          <hr>
+          <p><strong>Verifikationsmethode:</strong> {{ report.verification_method or '—' }}</p>
+          <p><strong>Signatur bestätigt:</strong>
+            {% if report.signature_confirmed %}
+              <i class="bi bi-check-circle text-success"></i> Ja ({{ report.signature_time|dateformat('%d.%m.%Y %H:%M') if report.signature_time else '—' }})
+            {% else %}
+              <i class="bi bi-x-circle text-danger"></i> Nein
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Боковая панель -->
+    <div class="col-md-4">
+      <!-- Информация о пациенте -->
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-person-badge"></i> Patientendaten</h6>
+        </div>
+        <div class="card-body small">
+          <p><strong>Name:</strong> {{ report.patient.full_name }}</p>
+          <p><strong>Geburtsdatum:</strong> {{ report.patient.geb_datum|dateformat('%d.%m.%Y') if report.patient.geb_datum else '—' }}</p>
+          <p><strong>Pflegegrad:</strong> <span class="badge bg-info">{{ report.patient.pflegegrad or '—' }}</span></p>
+
+          {% if report.patient.care_type == 'HOME_CARE' %}
+            <p><strong>Pflegeart:</strong> <span class="badge bg-info">Häusliche Pflege</span></p>
+            {% if report.patient.strasse %}
+            <p>
+              <strong>Adresse:</strong><br>
+              <small>{{ report.patient.strasse }} {{ report.patient.hausnummer }}<br>
+              {{ report.patient.plz }} {{ report.patient.ort }}</small>
+            </p>
+            {% endif %}
+          {% else %}
+            <p><strong>Pflegeart:</strong> <span class="badge bg-secondary">Stationär</span></p>
+            <p><strong>Zimmer:</strong> {{ report.patient.zimmer_nr or '—' }} | <strong>Bett:</strong> {{ report.patient.bett_nr or '—' }}</p>
+          {% endif %}
+
+          <!-- Риск-факторы -->
+          {% if report.patient.dekubitusrisiko or report.patient.sturzrisiko %}
+          <div class="mt-3">
+            {% if report.patient.dekubitusrisiko %}
+              <p><span class="badge bg-danger"><i class="bi bi-exclamation-circle"></i> Dekubitusrisiko</span></p>
+            {% endif %}
+            {% if report.patient.sturzrisiko %}
+              <p><span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Sturzrisiko</span></p>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Одобрение (для админа) -->
+      {% if current_user.is_admin and report.status == 'SUBMITTED' %}
+      <div class="card mb-3">
+        <div class="card-header bg-info text-white">
+          <h6 class="mb-0"><i class="bi bi-check2-square"></i> Admin-Aktion</h6>
+        </div>
+        <div class="card-body">
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" onclick="approveReport('{{ report.id }}')">
+              <i class="bi bi-check-circle"></i> Genehmigen
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="rejectReport('{{ report.id }}')">
+              <i class="bi bi-x-circle"></i> Ablehnen
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- История -->
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-clock-history"></i> Geschichte</h6>
+        </div>
+        <div class="card-body small">
+          <p><strong>Erstellt:</strong><br>{{ report.created_at|dateformat('%d.%m.%Y %H:%M') if report.created_at else '—' }}</p>
+          <p><strong>Geändert:</strong><br>{{ report.updated_at|dateformat('%d.%m.%Y %H:%M') if report.updated_at else '—' }}</p>
+          {% if report.verified_at %}
+          <p><strong>Genehmigt:</strong><br>{{ report.verified_at|dateformat('%d.%m.%Y %H:%M') }}</p>
+          <p><strong>Von:</strong> {{ report.verified_by_user.full_name if report.verified_by_user else '—' }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Карта с GPS -->
+  {% if report.geo_lat and report.geo_lng %}
+  <div class="row mt-4">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-map"></i> Besuchsort</h6>
+        </div>
+        <div class="card-body p-0" style="height: 300px;">
+          <div id="mapContainer" style="width: 100%; height: 100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script>
+    const map = L.map('mapContainer').setView([{{ report.geo_lat }}, {{ report.geo_lng }}], 15);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    L.circleMarker([{{ report.geo_lat }}, {{ report.geo_lng }}], {
+      radius: 15,
+      fillColor: '#28a745',
+      color: '#fff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.8
+    }).bindPopup('<strong>{{ report.patient.full_name }}</strong><br>{{ report.visit_date|dateformat('%d.%m.%Y %H:%M') }}')
+      .addTo(map);
+  </script>
+  {% endif %}
+</div>
+
+<script>
+function approveReport(reportId) {
+  if (!confirm('Diesen Bericht genehmigen?')) return;
+
+  fetch(`/nurse/reports/${reportId}/verify`, {
+    method: 'POST'
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert('Bericht genehmigt');
+      location.reload();
+    } else {
+      alert('Fehler: ' + data.message);
+    }
+  })
+  .catch(err => alert('Fehler: ' + err));
+}
+
+function rejectReport(reportId) {
+  const reason = prompt('Grund für Ablehnung:');
+  if (!reason) return;
+
+  fetch(`/nurse/reports/${reportId}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: reason })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert('Bericht abgelehnt');
+      location.reload();
+    } else {
+      alert('Fehler: ' + data.message);
+    }
+  })
+  .catch(err => alert('Fehler: ' + err));
+}
+</script>
+{% endblock %}

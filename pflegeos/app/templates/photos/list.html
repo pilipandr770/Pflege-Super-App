@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Fotos — {{ patient.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.show', patient_id=patient.id) }}">{{ patient.full_name }}</a></li>
+<li class="breadcrumb-item active">Fotos</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <h4>Fotos — {{ patient.full_name }}</h4>
+      <small class="text-muted">{{ patient.zimmer_nr }}, Pflegegrad {{ patient.pflegegrad }}</small>
+    </div>
+    <div class="col-md-4 text-end">
+      <a href="{{ url_for('photos.capture', patient_id=patient.id) }}" class="btn btn-primary">
+        <i class="bi bi-camera-fill"></i> Neues Foto
+      </a>
+      <a href="{{ url_for('patients.show', patient_id=patient.id) }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurück
+      </a>
+    </div>
+  </div>
+
+  {% if photos %}
+  <div class="row g-3">
+    {% for photo in photos %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 photo-card">
+        <!-- Thumbnail -->
+        <div class="position-relative" style="height: 200px; overflow: hidden; background: #f5f5f5;">
+          <img src="{{ url_for('photos.view_photo_file', photo_id=photo.id, _external=True) }}"
+               class="img-fluid position-absolute top-50 start-50 translate-middle photo-thumbnail"
+               style="object-fit: cover; width: 100%; height: 100%;"
+               alt="Photo"
+               onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22%3E%3Crect fill=%22%23ddd%22 width=%22200%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2214%22%3EBild nicht verf%C3%BCgbar%3C/text%3E%3C/svg%3E'">
+
+          <!-- Badge Typ -->
+          <span class="badge position-absolute top-2 start-2" style="background: rgba(0,0,0,0.6);">
+            {% if photo.photo_type == 'WOUND' %}
+              <i class="bi bi-exclamation-circle"></i> Wunde
+            {% elif photo.photo_type == 'PRESSURE_ULCER' %}
+              <i class="bi bi-exclamation-triangle"></i> Dekubitus
+            {% elif photo.photo_type == 'INSPECTION' %}
+              <i class="bi bi-eye"></i> Inspektion
+            {% else %}
+              <i class="bi bi-image"></i> Allgemein
+            {% endif %}
+          </span>
+
+          <!-- Verification Status -->
+          {% if photo.verified_at %}
+          <span class="badge bg-success position-absolute top-2 end-2">
+            <i class="bi bi-check-circle"></i> Verifiziert
+          </span>
+          {% endif %}
+        </div>
+
+        <!-- Card Body -->
+        <div class="card-body">
+          <!-- Время -->
+          <small class="text-muted d-block mb-2">
+            <i class="bi bi-calendar"></i> {{ photo.created_at|datetimefmt }}
+          </small>
+
+          <!-- Описание -->
+          {% if photo.description %}
+          <p class="card-text small mb-2">{{ photo.description|truncate(100) }}</p>
+          {% endif %}
+
+          <!-- GPS -->
+          {% if photo.geo_lat and photo.geo_lng %}
+          <p class="geo-indicator mb-2">
+            <i class="bi bi-geo-alt"></i>
+            {{ photo.geo_lat|round(4) }}, {{ photo.geo_lng|round(4) }}
+            {% if photo.geo_accuracy %}
+              <br><small>(±{{ photo.geo_accuracy|int }}m)</small>
+            {% endif %}
+          </p>
+          {% endif %}
+
+          <!-- Теги -->
+          {% if photo.tags %}
+          <div class="mb-2">
+            {% for tag in photo.tags.split(',') %}
+            <span class="badge bg-light text-dark small">{{ tag|trim }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <!-- Автор -->
+          <p class="small text-muted mb-3">
+            <i class="bi bi-person"></i> {{ photo.employee.full_name }}
+          </p>
+
+          <!-- Buttons -->
+          <div class="d-flex gap-2">
+            <a href="{{ url_for('photos.view_photo', photo_id=photo.id) }}" class="btn btn-sm btn-outline-primary flex-grow-1">
+              <i class="bi bi-eye"></i> Ansicht
+            </a>
+            {% if current_user.id == photo.employee_id or current_user.is_admin %}
+            <form method="POST" action="{{ url_for('photos.delete_photo', photo_id=photo.id) }}" style="display:inline;" onsubmit="return confirm('Foto löschen?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i> Löschen
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="alert alert-info" role="alert">
+    <i class="bi bi-info-circle"></i> Keine Fotos vorhanden.
+    <a href="{{ url_for('photos.capture', patient_id=patient.id) }}" class="btn btn-sm btn-primary ms-2">
+      <i class="bi bi-camera-fill"></i> Erstes Foto aufnehmen
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+.photo-card {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.photo-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+</style>
+{% endblock %}

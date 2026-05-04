@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Foto — {{ patient.full_name }}{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet for maps -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.show', patient_id=patient.id) }}">{{ patient.full_name }}</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('photos.list_photos', patient_id=patient.id) }}">Fotos</a></li>
+<li class="breadcrumb-item active">Detail</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <a href="{{ url_for('photos.list_photos', patient_id=patient.id) }}" class="btn btn-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Zurück
+      </a>
+      {% if current_user.id == photo.employee_id or current_user.is_admin %}
+      <form method="POST" action="{{ url_for('photos.delete_photo', photo_id=photo.id) }}" style="display:inline;" onsubmit="return confirm('Foto löschen?')">
+        <button type="submit" class="btn btn-danger btn-sm">
+          <i class="bi bi-trash"></i> Löschen
+        </button>
+      </form>
+      {% endif %}
+      {% if photo.verified_at %}
+      <span class="badge bg-success">
+        <i class="bi bi-check-circle"></i> Verifiziert von {{ photo.verifier.full_name }} am {{ photo.verified_at|datetimefmt }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Foto -->
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body p-0">
+          <img src="{{ url_for('photos.view_photo_file', photo_id=photo.id, _external=True) }}"
+               class="img-fluid rounded-top"
+               alt="Photo"
+               style="width: 100%; max-height: 600px; object-fit: contain;"
+               onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22600%22 height=%22400%22%3E%3Crect fill=%22%23ddd%22 width=%22600%22 height=%22400%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2220%22%3EBild nicht verf%C3%BCgbar%3C/text%3E%3C/svg%3E'">
+        </div>
+      </div>
+
+      <!-- Описание -->
+      {% if photo.description %}
+      <div class="card mt-3">
+        <div class="card-header">
+          <h6 class="mb-0">Beschreibung</h6>
+        </div>
+        <div class="card-body">
+          {{ photo.description }}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Карта GPS -->
+      {% if photo.geo_lat and photo.geo_lng %}
+      <div class="card mt-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-geo-alt"></i> GPS-Standort</h6>
+        </div>
+        <div class="card-body p-2">
+          <div id="mapContainer" style="height: 400px; border-radius: 4px;"></div>
+          <small class="text-muted d-block mt-2">
+            Koordinaten: {{ photo.geo_lat|round(6) }}, {{ photo.geo_lng|round(6) }}
+            {% if photo.geo_accuracy %}
+              | Genauigkeit: ±{{ photo.geo_accuracy|int }}m
+            {% endif %}
+          </small>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Информационная панель -->
+    <div class="col-md-4">
+      <!-- Тип и метаданные -->
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0">Fotoinformationen</h6>
+        </div>
+        <div class="card-body">
+          <p class="mb-2">
+            <strong>Typ:</strong><br>
+            {% if photo.photo_type == 'WOUND' %}
+              <span class="badge bg-danger"><i class="bi bi-exclamation-circle"></i> Wunde</span>
+            {% elif photo.photo_type == 'PRESSURE_ULCER' %}
+              <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Dekubitus</span>
+            {% elif photo.photo_type == 'INSPECTION' %}
+              <span class="badge bg-info"><i class="bi bi-eye"></i> Inspektion</span>
+            {% else %}
+              <span class="badge bg-secondary"><i class="bi bi-image"></i> Allgemein</span>
+            {% endif %}
+          </p>
+
+          <p class="mb-2">
+            <strong>Aufnahmedatum:</strong><br>
+            {{ photo.created_at|datetimefmt }}
+          </p>
+
+          <p class="mb-2">
+            <strong>Aufnahme durch:</strong><br>
+            {{ photo.employee.full_name }}
+          </p>
+
+          <p class="mb-2">
+            <strong>Dateigröße:</strong><br>
+            {% if photo.file_size %}
+              {{ (photo.file_size / 1024 / 1024)|round(2) }} MB
+            {% else %}
+              —
+            {% endif %}
+          </p>
+
+          {% if photo.device_model %}
+          <p class="mb-0">
+            <strong>Gerät:</strong><br>
+            {{ photo.device_model }}
+          </p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Patient Info -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <h6 class="mb-0">Patientendaten</h6>
+        </div>
+        <div class="card-body">
+          <p class="mb-2">
+            <strong>Name:</strong><br>
+            {{ patient.full_name }}
+          </p>
+
+          <!-- Care Type Info -->
+          {% if patient.care_type == 'HOME_CARE' %}
+            <!-- Home Care Info -->
+            <p class="mb-2">
+              <strong>Pflegeart:</strong><br>
+              <span class="badge bg-info">Häusliche Pflege</span>
+            </p>
+            {% if patient.strasse %}
+            <p class="mb-2">
+              <strong>Adresse:</strong><br>
+              <small>{{ patient.strasse }} {{ patient.hausnummer }}<br>
+              {{ patient.plz }} {{ patient.ort }}</small>
+            </p>
+            {% endif %}
+          {% else %}
+            <!-- Inpatient Care Info -->
+            <p class="mb-2">
+              <strong>Pflegeart:</strong><br>
+              <span class="badge bg-secondary">Stationär</span>
+            </p>
+            <p class="mb-2">
+              <strong>Zimmer:</strong><br>
+              {{ patient.zimmer_nr or '—' }}
+            </p>
+            <p class="mb-2">
+              <strong>Bett:</strong><br>
+              {{ patient.bett_nr or '—' }}
+            </p>
+          {% endif %}
+
+          <p class="mb-0">
+            <strong>Pflegegrad:</strong><br>
+            <span class="badge bg-info">{{ patient.pflegegrad }}</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Теги -->
+      {% if photo.tags %}
+      <div class="card mt-3">
+        <div class="card-header">
+          <h6 class="mb-0">Schlagwörter</h6>
+        </div>
+        <div class="card-body">
+          {% for tag in photo.tags.split(',') %}
+          <span class="badge bg-light text-dark me-1 mb-1">{{ tag|trim }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Download -->
+      <a href="{{ url_for('photos.download_photo', photo_id=photo.id) }}" class="btn btn-outline-primary w-100 mt-3">
+        <i class="bi bi-download"></i> Herunterladen
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+{% if photo.geo_lat and photo.geo_lng %}
+// Инициализировать карту
+const map = L.map('mapContainer').setView([{{ photo.geo_lat }}, {{ photo.geo_lng }}], 16);
+
+// OpenStreetMap tiles
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(map);
+
+// Маркер с точностью
+const marker = L.circleMarker([{{ photo.geo_lat }}, {{ photo.geo_lng }}], {
+  radius: 8,
+  fillColor: '#1a5f7a',
+  color: '#fff',
+  weight: 2,
+  opacity: 1,
+  fillOpacity: 0.8
+}).bindPopup('Fotografi aufgenommen<br>{{ photo.created_at|datetimefmt }}').addTo(map);
+
+{% if photo.geo_accuracy %}
+// Круг точности
+L.circle([{{ photo.geo_lat }}, {{ photo.geo_lng }}], {
+  radius: {{ photo.geo_accuracy|int }},
+  color: '#ffc107',
+  fillOpacity: 0.1,
+  weight: 1,
+  dashArray: '5, 5'
+}).addTo(map);
+{% endif %}
+{% endif %}
+</script>
+{% endblock %}

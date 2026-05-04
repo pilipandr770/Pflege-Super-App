@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Назначения пациентов{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item active">Назначения пациентов</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Назначения пациентов медсёстрам</h4>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assignModal">
+    + Назначить пациента
+  </button>
+</div>
+
+<!-- Таблица назначений -->
+<div class="card">
+  <div class="card-body p-0">
+    {% if assignments %}
+    <table class="table mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Медсестра</th>
+          <th>Пациент</th>
+          <th>Кабинет</th>
+          <th>PG</th>
+          <th>Роль</th>
+          <th>Назначена</th>
+          <th style="width: 80px;">Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for assignment in assignments %}
+        <tr>
+          <td>
+            <strong class="small">{{ assignment.employee.full_name }}</strong>
+            <div class="text-muted" style="font-size:0.75rem;">{{ assignment.employee.role }}</div>
+          </td>
+          <td>
+            <a href="{{ url_for('patients.show', patient_id=assignment.patient.id) }}" class="text-decoration-none fw-semibold">
+              {{ assignment.patient.full_name }}
+            </a>
+          </td>
+          <td class="small">{{ assignment.patient.zimmer_nr or '—' }}</td>
+          <td class="small">PG {{ assignment.patient.pflegegrad or '?' }}</td>
+          <td>
+            {% if assignment.role == 'PRIMARY_NURSE' %}
+            <span class="badge bg-success">Основная</span>
+            {% elif assignment.role == 'SECONDARY_NURSE' %}
+            <span class="badge bg-info">Вспомогательная</span>
+            {% else %}
+            <span class="badge bg-secondary">{{ assignment.role }}</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ assignment.assigned_at|datetimefmt }}</td>
+          <td>
+            <form method="POST" action="{{ url_for('assignments.remove', assignment_id=assignment.id) }}"
+                  style="display:inline;" onsubmit="return confirm('Отозвать назначение?');">
+              <button type="submit" class="btn btn-danger btn-sm" title="Отозвать назначение">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="p-5 text-center text-muted">
+      <p class="mb-0">Назначений не найдено</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal: Назначить пациента -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('assignments.create') }}" class="modal-content">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-header">
+        <h5 class="modal-title">Назначить пациента медсестре</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Медсестра <span class="text-danger">*</span></label>
+          <select name="employee_id" class="form-select form-select-sm" required>
+            <option value="">— Выберите медсестру —</option>
+            {% for emp in employees %}
+            <option value="{{ emp.id }}">{{ emp.full_name }} ({{ emp.role }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Пациент <span class="text-danger">*</span></label>
+          <select name="patient_id" class="form-select form-select-sm" required>
+            <option value="">— Выберите пациента —</option>
+            {% for pat in patients %}
+            <option value="{{ pat.id }}">
+              {{ pat.full_name }} (Кв. {{ pat.zimmer_nr }}, PG {{ pat.pflegegrad }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Роль в уходе</label>
+          <select name="role" class="form-select form-select-sm">
+            <option value="PRIMARY_NURSE" selected>Основная медсестра</option>
+            <option value="SECONDARY_NURSE">Вспомогательная медсестра</option>
+            <option value="CAREGIVER">Помощник по уходу</option>
+          </select>
+          <small class="text-muted d-block mt-1">
+            Основная: полный доступ ко всем данным пациента и отчётам
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+        <button type="submit" class="btn btn-primary btn-sm">Назначить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Статистика -->
+<div class="row g-3 mt-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Всего назначений</div>
+        <div class="h3 fw-bold mb-0">{{ assignments|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Медсестры</div>
+        <div class="h3 fw-bold mb-0">{{ employees|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Активные пациенты</div>
+        <div class="h3 fw-bold mb-0">{{ patients|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Без назначения</div>
+        <div class="h3 fw-bold mb-0">
+          {% set assigned_patients = [] %}
+          {% for a in assignments %}
+            {% if a.patient.id not in assigned_patients %}
+              {% set _ = assigned_patients.append(a.patient.id) %}
+            {% endif %}
+          {% endfor %}
+          {{ patients|length - assigned_patients|length }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

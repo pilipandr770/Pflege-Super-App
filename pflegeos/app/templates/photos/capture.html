@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Fotoaufnahme — {{ patient.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.show', patient_id=patient.id) }}">{{ patient.full_name }}</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('photos.list_photos', patient_id=patient.id) }}">Fotos</a></li>
+<li class="breadcrumb-item active">Aufnahme</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Foto aufnehmen — {{ patient.full_name }}</h5>
+        </div>
+        <div class="card-body">
+          <form id="photoForm" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <!-- Камера/Файл -->
+            <div class="mb-3">
+              <label for="photoInput" class="form-label">Foto <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="file" class="form-control" id="photoInput" name="photo" accept="image/*" capture="environment" required>
+                <button class="btn btn-outline-secondary" type="button" id="cameraBtn" onclick="openCamera()">
+                  <i class="bi bi-camera-fill"></i> Kamera
+                </button>
+              </div>
+              <small class="text-muted">JPG, PNG (max 10MB) • На мобil: Kamera-Button für direkte Kameraöffnung</small>
+            </div>
+
+            <!-- Превью фото -->
+            <div class="mb-3">
+              <div id="photoPreview" style="display:none;">
+                <img id="previewImg" class="img-fluid rounded" style="max-height: 300px;">
+              </div>
+            </div>
+
+            <!-- Тип фото -->
+            <div class="mb-3">
+              <label for="photoType" class="form-label">Fototyp <span class="text-danger">*</span></label>
+              <select class="form-select" id="photoType" name="photo_type" required>
+                <option value="GENERAL">Allgemein</option>
+                <option value="WOUND">Wunde</option>
+                <option value="PRESSURE_ULCER">Dekubitus</option>
+                <option value="INSPECTION">Inspektion</option>
+              </select>
+            </div>
+
+            <!-- GPS -->
+            <div class="mb-3">
+              <label class="form-label">GPS-Standort</label>
+              <small class="text-muted d-block mb-2">
+                <i class="bi bi-info-circle"></i> Automatisch aus Foto (EXIF) oder manuell eingeben
+              </small>
+              <div class="row">
+                <div class="col-md-6">
+                  <input type="number" class="form-control" id="geo_lat" name="geo_lat" step="0.000001" readonly placeholder="Breite">
+                </div>
+                <div class="col-md-6">
+                  <input type="number" class="form-control" id="geo_lng" name="geo_lng" step="0.000001" readonly placeholder="Länge">
+                </div>
+              </div>
+              <small id="geo-status" class="text-muted d-block mt-2">
+                <i class="bi bi-hourglass-split"></i> Wird ermittelt...
+              </small>
+              <input type="hidden" id="geo_accuracy" name="geo_accuracy">
+              <input type="hidden" id="device_model" name="device_model">
+              <input type="hidden" id="device_mac" name="device_mac">
+            </div>
+
+            <!-- Описание -->
+            <div class="mb-3">
+              <label for="description" class="form-label">Beschreibung</label>
+              <textarea class="form-control" id="description" name="description" rows="3" placeholder="z.B. Wunde hat sich verbessert..."></textarea>
+            </div>
+
+            <!-- Теги -->
+            <div class="mb-3">
+              <label for="tags" class="form-label">Schlagwörter</label>
+              <input type="text" class="form-control" id="tags" name="tags" placeholder="z.B. dringend, Kontrolle erforderlich">
+            </div>
+
+            <!-- Кнопки -->
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary" id="submitBtn">
+                <i class="bi bi-check-circle"></i> Speichern
+              </button>
+              <a href="{{ url_for('photos.list_photos', patient_id=patient.id) }}" class="btn btn-secondary">
+                <i class="bi bi-x-circle"></i> Abbrechen
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Инфо блок -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0">Patient Info</h6>
+        </div>
+        <div class="card-body small">
+          <p><strong>Name:</strong> {{ patient.full_name }}</p>
+
+          <!-- Care Type Info -->
+          {% if patient.care_type == 'HOME_CARE' %}
+            <!-- Home Care Info -->
+            <p><strong>Pflegeart:</strong> <span class="badge bg-info">Häusliche Pflege</span></p>
+            {% if patient.strasse %}
+            <p class="mb-1">
+              <strong>Adresse:</strong><br>
+              <small>{{ patient.strasse }} {{ patient.hausnummer }}<br>
+              {{ patient.plz }} {{ patient.ort }}</small>
+            </p>
+            {% endif %}
+          {% else %}
+            <!-- Inpatient Care Info -->
+            <p><strong>Pflegeart:</strong> <span class="badge bg-secondary">Stationär</span></p>
+            <p><strong>Zimmer:</strong> {{ patient.zimmer_nr or '—' }}</p>
+            <p><strong>Bett:</strong> {{ patient.bett_nr or '—' }}</p>
+          {% endif %}
+
+          <p><strong>Pflegegrad:</strong> <span class="badge bg-info">{{ patient.pflegegrad }}</span></p>
+          {% if patient.dekubitusrisiko %}
+            <p><span class="badge bg-danger">⚠ Dekubitusrisiko</span></p>
+          {% endif %}
+          {% if patient.sturzrisiko %}
+            <p><span class="badge bg-warning text-dark">⚠ Sturzrisiko</span></p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header">
+          <h6 class="mb-0">GPS-Status</h6>
+        </div>
+        <div class="card-body small">
+          <p id="gpsCoords">Wird ermittelt...</p>
+          <p id="gpsAccuracy" class="text-muted"></p>
+          <p id="deviceInfo" class="text-muted"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden camera input für Capacitor -->
+<input type="file" id="cameraInputHidden" accept="image/*" style="display:none;">
+
+<script>
+// Foto-превю при выборе файла
+document.getElementById('photoInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      document.getElementById('previewImg').src = event.target.result;
+      document.getElementById('photoPreview').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Отправка формы
+document.getElementById('photoForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const formData = new FormData(this);
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wird gespeichert...';
+
+  try {
+    const response = await fetch('{{ url_for("photos.capture", patient_id=patient.id) }}', {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      showAlert('Foto erfolgreich gespeichert', 'success');
+      setTimeout(() => {
+        window.location.href = '{{ url_for("photos.list_photos", patient_id=patient.id) }}';
+      }, 1500);
+    } else {
+      showAlert(result.error || 'Fehler beim Speichern', 'danger');
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Speichern';
+    }
+  } catch (error) {
+    showAlert('Netzwerkfehler: ' + error.message, 'danger');
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Speichern';
+  }
+});
+
+// Открыть камеру напрямую (без Capacitor)
+function openCamera() {
+  const input = document.getElementById('photoInput');
+  input.setAttribute('capture', 'environment');
+  input.click();
+  // Убираем capture после выбора, чтобы не мешал обычному выбору файла
+  input.addEventListener('change', function restoreInput() {
+    input.removeAttribute('capture');
+    input.removeEventListener('change', restoreInput);
+  });
+}
+
+// GPS-отслеживание
+async function updateGPS() {
+  if (typeof window.Capacitor !== 'undefined') {
+    try {
+      const { Geolocation } = window.Capacitor.Plugins;
+      const coordinates = await Geolocation.getCurrentPosition();
+
+      document.getElementById('geo_lat').value = coordinates.coords.latitude.toFixed(6);
+      document.getElementById('geo_lng').value = coordinates.coords.longitude.toFixed(6);
+      document.getElementById('geo_accuracy').value = coordinates.coords.accuracy;
+
+      document.getElementById('geo-status').innerHTML = '<i class="bi bi-check-circle text-success"></i> GPS erfasst';
+      document.getElementById('gpsCoords').textContent = `${coordinates.coords.latitude.toFixed(6)}, ${coordinates.coords.longitude.toFixed(6)}`;
+      document.getElementById('gpsAccuracy').textContent = `Genauigkeit: ±${Math.round(coordinates.coords.accuracy)} m`;
+    } catch (error) {
+      console.log('Capacitor Geolocation nicht verfügbar, verwende Browser API');
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(position) {
+            document.getElementById('geo_lat').value = position.coords.latitude.toFixed(6);
+            document.getElementById('geo_lng').value = position.coords.longitude.toFixed(6);
+            document.getElementById('geo_accuracy').value = position.coords.accuracy;
+
+            document.getElementById('geo-status').innerHTML = '<i class="bi bi-check-circle text-success"></i> GPS erfasst';
+            document.getElementById('gpsCoords').textContent = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
+            document.getElementById('gpsAccuracy').textContent = `Genauigkeit: ±${Math.round(position.coords.accuracy)} m`;
+          },
+          function(error) {
+            document.getElementById('geo-status').innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> GPS nicht verfügbar';
+          }
+        );
+      }
+    }
+  } else {
+    // Browser Geolocation fallback
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          document.getElementById('geo_lat').value = position.coords.latitude.toFixed(6);
+          document.getElementById('geo_lng').value = position.coords.longitude.toFixed(6);
+          document.getElementById('geo_accuracy').value = position.coords.accuracy;
+
+          document.getElementById('geo-status').innerHTML = '<i class="bi bi-check-circle text-success"></i> GPS erfasst';
+          document.getElementById('gpsCoords').textContent = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
+          document.getElementById('gpsAccuracy').textContent = `Genauigkeit: ±${Math.round(position.coords.accuracy)} m`;
+        },
+        function(error) {
+          document.getElementById('geo-status').innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> GPS nicht verfügbar';
+        }
+      );
+    }
+  }
+}
+
+// Устройство информация
+function updateDeviceInfo() {
+  if (typeof window.Capacitor !== 'undefined') {
+    try {
+      const { Device } = window.Capacitor.Plugins;
+      Device.getInfo().then(info => {
+        document.getElementById('device_model').value = info.model || '';
+        document.getElementById('deviceInfo').textContent = `Gerät: ${info.model}`;
+      });
+    } catch (error) {
+      console.log('Device info nicht verfügbar');
+    }
+  }
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+  updateGPS();
+  updateDeviceInfo();
+
+  // Обновлять GPS каждые 10 секунд
+  setInterval(updateGPS, 10000);
+});
+
+function showAlert(message, type) {
+  const alertDiv = document.createElement('div');
+  alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+  alertDiv.role = 'alert';
+  alertDiv.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  `;
+  document.querySelector('.p-4').insertBefore(alertDiv, document.querySelector('.container-fluid'));
+
+  setTimeout(() => alertDiv.remove(), 5000);
+}
+</script>
+{% endblock %}

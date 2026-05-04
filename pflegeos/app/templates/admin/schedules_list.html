@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}Zeitplanverwaltung{% endblock %}
+
+{% block tour %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const steps = [
+    {
+      position: 'center',
+      icon: '📅',
+      title: 'Dienstplanverwaltung',
+      content: 'Hier sehen Sie alle generierten und genehmigten Dienstpläne Ihres Pflegebetriebs. Jeder Plan durchläuft den Prozess: Generieren → Prüfen → Genehmigen → Verteilen.'
+    },
+    {
+      element: 'a[href*="schedule/generate"]',
+      position: 'bottom',
+      title: 'Neuen Plan erstellen',
+      content: 'Klicken Sie hier, um einen neuen KI-Dienstplan zu erstellen. Claude AI optimiert Routen, Qualifikationen und Auslastung automatisch.'
+    },
+    {
+      element: 'table.table',
+      position: 'top',
+      title: 'Planliste',
+      content: 'Jede Zeile ist ein Dienstplan. Status zeigt den aktuellen Stand: <strong>KI-Generiert</strong> → wartet auf Ihre Prüfung, <strong>Genehmigt</strong> → bereit zur Verteilung.'
+    },
+    {
+      element: 'form.d-flex',
+      position: 'bottom',
+      title: 'Filtern',
+      content: 'Filtern Sie nach Status oder Zeitraum, um schnell den gewünschten Plan zu finden.'
+    }
+  ];
+
+  const tour = new PflegeOSTour(steps, { storageKey: 'pflegeos_schedules_list_v1' });
+  tour.start();
+  initTourHelpButton(() => new PflegeOSTour(steps, { storageKey: 'pflegeos_schedules_list_v1' }));
+});
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+<li class="breadcrumb-item active">Zeitpläne</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <h2><i class="bi bi-calendar2-week"></i> Zeitplanherverwaltung</h2>
+      <small class="text-muted">Verwaltung aller generierten und genehmigten Zeitpläne</small>
+    </div>
+    <div class="col-md-4 text-end">
+      <a href="{{ url_for('admin.schedule_generate') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-robot"></i> Neuer Zeitplan (AI)
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <form method="GET" class="d-flex gap-2 flex-wrap">
+        <select name="status" class="form-select" style="max-width: 200px;">
+          <option value="">— Alle Status —</option>
+          <option value="DRAFT" {% if request.args.get('status') == 'DRAFT' %}selected{% endif %}>Entwurf</option>
+          <option value="PENDING_REVIEW" {% if request.args.get('status') == 'PENDING_REVIEW' %}selected{% endif %}>Überprüfung ausstehend</option>
+          <option value="APPROVED" {% if request.args.get('status') == 'APPROVED' %}selected{% endif %}>Genehmigt</option>
+          <option value="DISTRIBUTED" {% if request.args.get('status') == 'DISTRIBUTED' %}selected{% endif %}>Verteilt</option>
+          <option value="ACTIVE" {% if request.args.get('status') == 'ACTIVE' %}selected{% endif %}>Aktiv</option>
+          <option value="COMPLETED" {% if request.args.get('status') == 'COMPLETED' %}selected{% endif %}>Abgeschlossen</option>
+        </select>
+
+        <input type="date" name="from_date" class="form-control" style="max-width: 150px;"
+               value="{{ request.args.get('from_date', '') }}" placeholder="Von Datum">
+        <input type="date" name="to_date" class="form-control" style="max-width: 150px;"
+               value="{{ request.args.get('to_date', '') }}" placeholder="Bis Datum">
+
+        <button type="submit" class="btn btn-outline-primary">
+          <i class="bi bi-search"></i> Filtern
+        </button>
+        {% if request.args %}
+        <a href="{{ url_for('admin.schedules_list') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-clockwise"></i> Zurücksetzen
+        </a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <!-- Таблица с расписаниями -->
+  <div class="row">
+    <div class="col-md-12">
+      {% if schedules.items %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Zeitraum</th>
+                <th>Status</th>
+                <th>Pflegekräfte</th>
+                <th>Patienten</th>
+                <th>Einsätze</th>
+                <th>Erstellt am</th>
+                <th>Aktion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for schedule in schedules.items %}
+              <tr>
+                <td>
+                  <strong>{{ schedule.schedule_start_date|default('—') }}</strong>
+                  <br><small class="text-muted">bis {{ schedule.schedule_end_date|default('—') }}</small>
+                </td>
+                <td>
+                  {% if schedule.status == 'DRAFT' %}
+                    <span class="badge bg-secondary">
+                      <i class="bi bi-pencil"></i> Entwurf
+                    </span>
+                  {% elif schedule.status == 'PENDING_REVIEW' %}
+                    <span class="badge bg-warning text-dark">
+                      <i class="bi bi-hourglass-split"></i> Überprüfung ausstehend
+                    </span>
+                  {% elif schedule.status == 'APPROVED' %}
+                    <span class="badge bg-info">
+                      <i class="bi bi-check-circle"></i> Genehmigt
+                    </span>
+                  {% elif schedule.status == 'GENERATED' %}
+                    <span class="badge bg-primary">
+                      <i class="bi bi-robot"></i> KI-Generiert
+                    </span>
+                  {% elif schedule.status == 'DISTRIBUTED' %}
+                    <span class="badge bg-success">
+                      <i class="bi bi-send"></i> Verteilt
+                    </span>
+                  {% elif schedule.status == 'ACTIVE' %}
+                    <span class="badge bg-primary">
+                      <i class="bi bi-play-circle"></i> Aktiv
+                    </span>
+                  {% elif schedule.status == 'COMPLETED' %}
+                    <span class="badge bg-light text-dark">
+                      <i class="bi bi-check2-all"></i> Abgeschlossen
+                    </span>
+                  {% else %}
+                    <span class="badge bg-light text-dark">{{ schedule.status }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-light text-dark">{{ schedule.employee_count|default(0) }}</span>
+                </td>
+                <td>
+                  <span class="badge bg-light text-dark">{{ schedule.patient_count|default(0) }}</span>
+                </td>
+                <td>
+                  <strong>{{ schedule.total_assignments|default(0) }}</strong>
+                  <br><small class="text-muted">Einsätze</small>
+                </td>
+                <td>
+                  <small>
+                    {{ schedule.created_at.strftime('%d.%m.%Y') }}<br>
+                    <span class="text-muted">{{ schedule.created_at.strftime('%H:%M') }} Uhr</span>
+                  </small>
+                </td>
+                <td>
+                  <div class="btn-group btn-group-sm" role="group">
+                    {% if schedule.status in ('PENDING_REVIEW', 'GENERATED') %}
+                    <a href="{{ url_for('admin.schedule_review', schedule_gen_id=schedule.id) }}"
+                       class="btn btn-outline-primary">
+                      <i class="bi bi-eye"></i> Überprüfen
+                    </a>
+                    {% elif schedule.status == 'APPROVED' %}
+                    <a href="{{ url_for('admin.schedule_distribute', schedule_gen_id=schedule.id) }}"
+                       class="btn btn-outline-success">
+                      <i class="bi bi-send"></i> Verteilen
+                    </a>
+                    {% elif schedule.status == 'DRAFT' %}
+                    <button type="button" class="btn btn-outline-danger btn-sm"
+                            onclick="deleteSchedule('{{ schedule.id }}')">
+                      <i class="bi bi-trash"></i> Löschen
+                    </button>
+                    {% else %}
+                    <a href="{{ url_for('admin.schedule_review', schedule_gen_id=schedule.id) }}"
+                       class="btn btn-outline-secondary">
+                      <i class="bi bi-eye"></i> Ansicht
+                    </a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Пагинация -->
+        {% if schedules.pages > 1 %}
+        <nav aria-label="Page navigation">
+          <ul class="pagination justify-content-center">
+            {% if schedules.has_prev %}
+              <li class="page-item">
+                <a class="page-link"
+                   href="{{ url_for('admin.schedules_list', page=schedules.prev_num, **request.args) }}">
+                  ← Vorherige
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">← Vorherige</span>
+              </li>
+            {% endif %}
+
+            {% for page_num in schedules.iter_pages() %}
+              {% if page_num %}
+                {% if page_num == schedules.page %}
+                  <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                  </li>
+                {% else %}
+                  <li class="page-item">
+                    <a class="page-link"
+                       href="{{ url_for('admin.schedules_list', page=page_num, **request.args) }}">
+                      {{ page_num }}
+                    </a>
+                  </li>
+                {% endif %}
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">…</span>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if schedules.has_next %}
+              <li class="page-item">
+                <a class="page-link"
+                   href="{{ url_for('admin.schedules_list', page=schedules.next_num, **request.args) }}">
+                  Nächste →
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">Nächste →</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Keine Zeitpläne vorhanden.
+          <a href="{{ url_for('admin.schedule_generate') }}" class="alert-link">Erstellen Sie Ihren ersten AI-Zeitplan</a>.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Статистика -->
+  <div class="row mt-4">
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <div class="display-6 text-primary">{{ total_schedules|default(0) }}</div>
+          <small class="text-muted">Zeitpläne insgesamt</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <div class="display-6 text-warning">{{ pending_review|default(0) }}</div>
+          <small class="text-muted">Überprüfung ausstehend</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <div class="display-6 text-success">{{ approved|default(0) }}</div>
+          <small class="text-muted">Genehmigt und verteilt</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <div class="display-6 text-info">{{ total_assignments|default(0) }}</div>
+          <small class="text-muted">Geplante Einsätze</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete form (hidden) -->
+<form id="deleteForm" method="POST" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+  <input type="hidden" name="_method" value="DELETE">
+</form>
+
+<script>
+function deleteSchedule(scheduleId) {
+  if (confirm('Diesen Zeitplanntwurf wirklich löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.')) {
+    const form = document.getElementById('deleteForm');
+    form.action = `/admin/schedules/${scheduleId}/delete`;
+    form.submit();
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}{% if procedure %}Verfahren bearbeiten{% else %}Neues Verfahren{% endif %}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.procedures_list') }}">Verfahren</a></li>
+<li class="breadcrumb-item active">{% if procedure %}{{ procedure.name }}{% else %}Neues Verfahren{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-8 offset-md-2">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">{% if procedure %}<i class="bi bi-pencil"></i> Verfahren bearbeiten{% else %}<i class="bi bi-plus-circle"></i> Neues Verfahren{% endif %}</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" id="procedureForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+            <!-- Name -->
+            <div class="mb-3">
+              <label for="name" class="form-label"><strong>Verfahrensname</strong> <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="name" name="name"
+                     value="{{ procedure.name if procedure else '' }}" required maxlength="255">
+              <small class="text-muted">z.B. Blutdruckmessung, Wundversorgung, Injektionen</small>
+            </div>
+
+            <!-- Beschreibung -->
+            <div class="mb-3">
+              <label for="description" class="form-label">Beschreibung</label>
+              <textarea class="form-control" id="description" name="description" rows="4">{{ procedure.description if procedure else '' }}</textarea>
+              <small class="text-muted">Detaillierte Beschreibung des Verfahrens und ggf. spezielle Anmerkungen</small>
+            </div>
+
+            <!-- Категория -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="category" class="form-label">Kategorie</label>
+                <select class="form-select" id="category" name="category">
+                  <option value="">— Keine —</option>
+                  <option value="MONITORING" {% if procedure and procedure.category == 'MONITORING' %}selected{% endif %}>Überwachung</option>
+                  <option value="CARE" {% if procedure and procedure.category == 'CARE' %}selected{% endif %}>Körperpflege</option>
+                  <option value="WOUND" {% if procedure and procedure.category == 'WOUND' %}selected{% endif %}>Wundbehandlung</option>
+                  <option value="MEDICATION" {% if procedure and procedure.category == 'MEDICATION' %}selected{% endif %}>Medikation</option>
+                  <option value="MOBILITY" {% if procedure and procedure.category == 'MOBILITY' %}selected{% endif %}>Mobilität</option>
+                  <option value="NUTRITION" {% if procedure and procedure.category == 'NUTRITION' %}selected{% endif %}>Ernährung</option>
+                  <option value="THERAPY" {% if procedure and procedure.category == 'THERAPY' %}selected{% endif %}>Therapie</option>
+                  <option value="OTHER" {% if procedure and procedure.category == 'OTHER' %}selected{% endif %}>Sonstige</option>
+                </select>
+              </div>
+
+              <!-- Дюрация -->
+              <div class="col-md-6">
+                <label for="duration_minutes" class="form-label"><strong>Geschätzte Dauer (Minuten)</strong></label>
+                <input type="number" class="form-control" id="duration_minutes" name="duration_minutes"
+                       value="{{ procedure.duration_minutes if procedure else 15 }}" min="1" max="480" required>
+                <small class="text-muted">Durchschnittliche Zeit für dieses Verfahren</small>
+              </div>
+            </div>
+
+            <!-- Квалификация -->
+            <div class="mb-3">
+              <label for="required_qualification" class="form-label">Erforderliche Qualifikation</label>
+              <select class="form-select" id="required_qualification" name="required_qualification">
+                <option value="">— Keine spezifische Qualifikation —</option>
+                <option value="PFLEGEFACHKRAFT" {% if procedure and procedure.required_qualification == 'PFLEGEFACHKRAFT' %}selected{% endif %}>Pflegefachkraft</option>
+                <option value="PFLEGEHILFSKRAFT" {% if procedure and procedure.required_qualification == 'PFLEGEHILFSKRAFT' %}selected{% endif %}>Pflegehilfskraft</option>
+                <option value="PFLEGEFACHFRAU" {% if procedure and procedure.required_qualification == 'PFLEGEFACHFRAU' %}selected{% endif %}>Pflegefachfrau/-mann</option>
+              </select>
+              <small class="text-muted">Mindestqualifikation zur Durchführung dieses Verfahrens</small>
+            </div>
+
+            <!-- Верификация -->
+            <div class="mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="requires_verification" name="requires_verification"
+                       {% if procedure and procedure.requires_verification %}checked{% endif %}>
+                <label class="form-check-label" for="requires_verification">
+                  <strong>Erfordert Verifikation (GPS + Foto + Signatur)</strong>
+                </label>
+              </div>
+              <small class="text-muted">Aktivieren Sie dies für Verfahren, die dokumentiert und verifiziert werden müssen (z.B. Injektionen, Verbandswechsel)</small>
+            </div>
+
+            <!-- Кнопки -->
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-check-circle"></i> {% if procedure %}Aktualisieren{% else %}Erstellen{% endif %}
+              </button>
+              <a href="{{ url_for('admin.procedures_list') }}" class="btn btn-secondary btn-lg">
+                <i class="bi bi-x-circle"></i> Abbrechen
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('procedureForm').addEventListener('submit', async function(e) {
+  const name = document.getElementById('name').value.trim();
+  const duration = parseInt(document.getElementById('duration_minutes').value);
+
+  if (!name) {
+    alert('Verfahrensname ist erforderlich');
+    e.preventDefault();
+    return;
+  }
+
+  if (duration < 1 || duration > 480) {
+    alert('Dauer muss zwischen 1 und 480 Minuten liegen');
+    e.preventDefault();
+    return;
+  }
+});
+</script>
+{% endblock %}
