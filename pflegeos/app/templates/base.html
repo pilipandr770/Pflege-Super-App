@@ -104,12 +104,6 @@
         <hr class="text-white-50 my-1">
         <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Administration</small></li>
         <li class="nav-item">
-          <a href="{{ url_for('admin.reports_list') }}"
-             class="nav-link {% if request.endpoint == 'admin.reports_list' %}active{% endif %}">
-            <i class="bi bi-clipboard2-data-fill"></i> Berichte & Bestätigung
-          </a>
-        </li>
-        <li class="nav-item">
           <a href="{{ url_for('admin.schedules_list') }}"
              class="nav-link {% if 'admin' in request.endpoint and 'schedule' in request.endpoint %}active{% endif %}">
             <i class="bi bi-calendar2-week-fill"></i> Dienstpläne (AI)

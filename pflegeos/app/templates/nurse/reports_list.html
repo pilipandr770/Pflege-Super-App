@@ -18,7 +18,7 @@
 
   <!-- Статистика -->
   <div class="row mb-4">
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md-6">
       <div class="card text-center border-0 bg-light">
         <div class="card-body py-3">
           <div class="display-6 text-primary">{{ visit_reports|length }}</div>
@@ -26,27 +26,11 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
-      <div class="card text-center border-0 bg-light">
-        <div class="card-body py-3">
-          <div class="display-6 text-success">{{ visit_reports|selectattr('status','equalto','VERIFIED')|list|length }}</div>
-          <small class="text-muted">Bestätigt ✓</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md-6">
       <div class="card text-center border-0 bg-light">
         <div class="card-body py-3">
           <div class="display-6 text-info">{{ leistungen|length }}</div>
           <small class="text-muted">Leistungsnachweise</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="card text-center border-0 bg-light">
-        <div class="card-body py-3">
-          <div class="display-6 text-success">{{ leistungen|selectattr('abgerechnet','equalto',True)|list|length }}</div>
-          <small class="text-muted">LN bestätigt</small>
         </div>
       </div>
     </div>
@@ -84,7 +68,6 @@
                 <th>Dauer</th>
                 <th>Zustand</th>
                 <th>Fotos</th>
-                <th>Status</th>
                 <th>Aktion</th>
               </tr>
             </thead>
@@ -143,19 +126,6 @@
                   {% endif %}
                 </td>
                 <td>
-                  {% if report.status == 'VERIFIED' %}
-                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Genehmigt</span>
-                  {% elif report.status == 'SUBMITTED' %}
-                    <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Eingereicht</span>
-                  {% elif report.status == 'DRAFT' %}
-                    <span class="badge bg-secondary">Entwurf</span>
-                  {% elif report.status == 'LOCKED' %}
-                    <span class="badge bg-info">Gesperrt</span>
-                  {% else %}
-                    <span class="badge bg-light text-dark">{{ report.status }}</span>
-                  {% endif %}
-                </td>
-                <td>
                   <a href="{{ url_for('nurse.view_report', report_id=report.id) }}"
                      class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-eye"></i>
@@ -187,7 +157,6 @@
                 <th>Leistung</th>
                 <th>Dauer</th>
                 <th>Verifikation</th>
-                <th>Status</th>
                 <th>Bemerkungen</th>
               </tr>
             </thead>
@@ -230,17 +199,6 @@
                   {% endif %}
                   {% if not ln.geo_lat and not ln.nfc_tag_id and not ln.device_mac %}
                     <small class="text-muted">—</small>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if ln.abgerechnet %}
-                    <span class="badge bg-success">
-                      <i class="bi bi-check-circle-fill"></i> Bestätigt
-                    </span>
-                  {% else %}
-                    <span class="badge bg-warning text-dark">
-                      <i class="bi bi-hourglass-split"></i> Offen
-                    </span>
                   {% endif %}
                 </td>
                 <td>
