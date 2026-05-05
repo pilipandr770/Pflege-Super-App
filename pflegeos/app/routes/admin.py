@@ -7,7 +7,7 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models import (
     Company, Employee, Patient, Procedure, EmployeeSchedule, VisitReport,
-    EmployeePatientAssignment
+    EmployeePatientAssignment, Leistungsnachweis, PatientPhoto
 )
 from app.utils.auth import admin_required, log_action
 from datetime import datetime, date, timedelta
@@ -702,3 +702,186 @@ def _create_schedules_from_plan(schedule_gen, ai_plan):
         db.session.rollback()
 
     return schedules_created
+
+
+# ==================== ADMIN BERICHTE ====================
+
+@admin_bp.route('/reports')
+@login_required
+@admin_required
+def reports_list():
+    """Admin: Übersicht aller Visitenberichte + Leistungsnachweise"""
+    cid = current_user.company_id
+
+    # Filter-Parameter
+    date_from_str = request.args.get('date_from', '')
+    date_to_str   = request.args.get('date_to', '')
+    employee_id   = request.args.get('employee_id', '')
+    status_filter = request.args.get('status', '')
+
+    # ── VisitReports ──
+    vr_q = VisitReport.query.filter_by(company_id=cid, is_active=True)
+    if date_from_str:
+        try:
+            vr_q = vr_q.filter(VisitReport.visit_date >= date.fromisoformat(date_from_str))
+        except ValueError:
+            pass
+    if date_to_str:
+        try:
+            vr_q = vr_q.filter(VisitReport.visit_date <= date.fromisoformat(date_to_str))
+        except ValueError:
+            pass
+    if employee_id:
+        vr_q = vr_q.filter(VisitReport.employee_id == employee_id)
+    if status_filter:
+        vr_q = vr_q.filter(VisitReport.status == status_filter)
+    visit_reports = vr_q.order_by(VisitReport.visit_date.desc()).all()
+
+    # Fotos für VisitReports
+    visit_photo_map = {}
+    for vr in visit_reports:
+        try:
+            import json as _j
+            ids = _j.loads(vr.photo_ids or '[]')
+            if ids:
+                visit_photo_map[vr.id] = PatientPhoto.query.filter(
+                    PatientPhoto.id.in_(ids), PatientPhoto.is_active == True
+                ).all()
+        except Exception:
+            pass
+
+    # ── Leistungsnachweise ──
+    ln_q = Leistungsnachweis.query.filter_by(company_id=cid)
+    if date_from_str:
+        try:
+            ln_q = ln_q.filter(Leistungsnachweis.durchgefuehrt_am >= date.fromisoformat(date_from_str))
+        except ValueError:
+            pass
+    if date_to_str:
+        try:
+            ln_q = ln_q.filter(Leistungsnachweis.durchgefuehrt_am <= date.fromisoformat(date_to_str))
+        except ValueError:
+            pass
+    if employee_id:
+        ln_q = ln_q.filter(Leistungsnachweis.employee_id == employee_id)
+    if status_filter == 'VERIFIED':
+        ln_q = ln_q.filter(Leistungsnachweis.abgerechnet == True)
+    elif status_filter == 'SUBMITTED':
+        ln_q = ln_q.filter(Leistungsnachweis.abgerechnet == False)
+    leistungen = ln_q.order_by(Leistungsnachweis.durchgefuehrt_am.desc()).all()
+
+    # Fotos für Leistungsnachweise (via tags: 'nachweis:<id>')
+    leistung_photo_map = {}
+    for ln in leistungen:
+        photos = PatientPhoto.query.filter(
+            PatientPhoto.tags.like(f'%nachweis:{ln.id}%'),
+            PatientPhoto.company_id == cid,
+            PatientPhoto.is_active == True
+        ).all()
+        if photos:
+            leistung_photo_map[ln.id] = photos
+
+    # Mitarbeiterliste für Filter
+    employees = Employee.query.filter_by(
+        company_id=cid, is_active=True
+    ).order_by(Employee.nachname).all()
+
+    # Statistik
+    stats = {
+        'total_visits':    len(visit_reports),
+        'pending_visits':  sum(1 for r in visit_reports if r.status in ('DRAFT', 'SUBMITTED')),
+        'verified_visits': sum(1 for r in visit_reports if r.status == 'VERIFIED'),
+        'total_leistung':  len(leistungen),
+        'pending_leistung': sum(1 for l in leistungen if not l.abgerechnet),
+    }
+
+    return render_template('admin/reports.html',
+                           visit_reports=visit_reports,
+                           leistungen=leistungen,
+                           visit_photo_map=visit_photo_map,
+                           leistung_photo_map=leistung_photo_map,
+                           employees=employees,
+                           stats=stats,
+                           date_from=date_from_str,
+                           date_to=date_to_str,
+                           sel_employee=employee_id,
+                           sel_status=status_filter)
+
+
+@admin_bp.route('/reports/visit/<report_id>/verify', methods=['POST'])
+@login_required
+@admin_required
+def verify_visit_report(report_id):
+    """Admin bestätigt einen Visitenbericht."""
+    report = VisitReport.query.filter_by(
+        id=report_id, company_id=current_user.company_id, is_active=True
+    ).first_or_404()
+
+    report.status = 'VERIFIED'
+    report.verified_by = current_user.id
+    report.verified_at = datetime.now()
+    db.session.commit()
+
+    log_action('VISIT_REPORT_VERIFIED', 'VisitReport', report_id, new_values={
+        'patient': report.patient.full_name,
+        'verified_by': current_user.full_name
+    })
+    return jsonify({'success': True, 'new_status': 'VERIFIED'})
+
+
+@admin_bp.route('/reports/visit/<report_id>/reject', methods=['POST'])
+@login_required
+@admin_required
+def reject_visit_report(report_id):
+    """Admin lehnt einen Visitenbericht ab."""
+    data = request.get_json(silent=True) or {}
+    reason = data.get('reason', 'Kein Grund angegeben')
+
+    report = VisitReport.query.filter_by(
+        id=report_id, company_id=current_user.company_id, is_active=True
+    ).first_or_404()
+
+    report.status = 'DRAFT'
+    report.verification_notes = f"Abgelehnt von {current_user.full_name}: {reason}"
+    db.session.commit()
+
+    log_action('VISIT_REPORT_REJECTED', 'VisitReport', report_id, new_values={
+        'reason': reason, 'by': current_user.full_name
+    })
+    return jsonify({'success': True, 'new_status': 'DRAFT'})
+
+
+@admin_bp.route('/reports/leistung/<ln_id>/confirm', methods=['POST'])
+@login_required
+@admin_required
+def confirm_leistung(ln_id):
+    """Admin bestätigt einen Leistungsnachweis (abgerechnet = True)."""
+    ln = Leistungsnachweis.query.filter_by(
+        id=ln_id, company_id=current_user.company_id
+    ).first_or_404()
+
+    ln.abgerechnet = True
+    db.session.commit()
+
+    log_action('LEISTUNG_CONFIRMED', 'Leistungsnachweis', ln_id, new_values={
+        'patient': ln.patient.full_name,
+        'leistung': ln.leistung.bezeichnung if ln.leistung else '?',
+        'confirmed_by': current_user.full_name
+    })
+    return jsonify({'success': True})
+
+
+@admin_bp.route('/reports/leistung/<ln_id>/unconfirm', methods=['POST'])
+@login_required
+@admin_required
+def unconfirm_leistung(ln_id):
+    """Admin widerruft Bestätigung eines Leistungsnachweises."""
+    ln = Leistungsnachweis.query.filter_by(
+        id=ln_id, company_id=current_user.company_id
+    ).first_or_404()
+
+    ln.abgerechnet = False
+    db.session.commit()
+
+    log_action('LEISTUNG_UNCONFIRMED', 'Leistungsnachweis', ln_id)
+    return jsonify({'success': True})

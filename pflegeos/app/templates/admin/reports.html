@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% block title %}Berichte & Bestätigung{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Berichte & Bestätigung</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0"><i class="bi bi-clipboard2-data"></i> Berichte & Bestätigung</h4>
+</div>
+
+{# ── Statistik ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-primary mb-0">{{ stats.total_visits }}</div>
+        <small class="text-muted">Visitenberichte</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-warning mb-0">{{ stats.pending_visits }}</div>
+        <small class="text-muted">Warten auf Bestätigung</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-info mb-0">{{ stats.total_leistung }}</div>
+        <small class="text-muted">Leistungsnachweise</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-danger mb-0">{{ stats.pending_leistung }}</div>
+        <small class="text-muted">LN unbestätigt</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Filter ── #}
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-12 col-md-2">
+        <label class="form-label form-label-sm mb-1">Von</label>
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label form-label-sm mb-1">Bis</label>
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label form-label-sm mb-1">Mitarbeiter</label>
+        <select name="employee_id" class="form-select form-select-sm">
+          <option value="">— Alle —</option>
+          {% for emp in employees %}
+          <option value="{{ emp.id }}" {% if sel_employee == emp.id %}selected{% endif %}>
+            {{ emp.full_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label form-label-sm mb-1">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="">— Alle —</option>
+          <option value="SUBMITTED" {% if sel_status == 'SUBMITTED' %}selected{% endif %}>Eingereicht</option>
+          <option value="VERIFIED"  {% if sel_status == 'VERIFIED'  %}selected{% endif %}>Bestätigt</option>
+          <option value="DRAFT"     {% if sel_status == 'DRAFT'     %}selected{% endif %}>Entwurf</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel"></i> Filtern
+        </button>
+        <a href="{{ url_for('admin.reports_list') }}" class="btn btn-outline-secondary btn-sm ms-1">
+          <i class="bi bi-x"></i> Reset
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Tabs ── #}
+<ul class="nav nav-tabs mb-0" id="reportTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#visitTab">
+      <i class="bi bi-clipboard-check"></i> Visitenberichte
+      <span class="badge bg-primary ms-1">{{ visit_reports|length }}</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#leistungTab">
+      <i class="bi bi-list-check"></i> Leistungsnachweise
+      <span class="badge bg-info ms-1">{{ leistungen|length }}</span>
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom bg-white p-0 mb-4">
+
+  {# ══════════ TAB 1: Visitenberichte ══════════ #}
+  <div class="tab-pane fade show active" id="visitTab">
+    {% if visit_reports %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:110px">Datum</th>
+            <th>Mitarbeiter</th>
+            <th>Patient</th>
+            <th>Dauer</th>
+            <th>Zustand</th>
+            <th>Fotos</th>
+            <th>GPS</th>
+            <th>Status</th>
+            <th style="width:120px">Aktion</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in visit_reports %}
+          <tr id="vr-row-{{ r.id }}">
+            <td>
+              <strong>{{ r.visit_date|datefmt }}</strong><br>
+              <small class="text-muted">{{ r.visit_start_time.strftime('%H:%M') if r.visit_start_time else '—' }}</small>
+            </td>
+            <td>
+              <span class="fw-semibold">{{ r.employee.full_name }}</span><br>
+              <small class="text-muted">{{ r.employee.role_label }}</small>
+            </td>
+            <td>
+              <strong>{{ r.patient.full_name }}</strong>
+            </td>
+            <td>
+              {% if r.visit_end_time and r.visit_start_time %}
+                {{ ((r.visit_end_time - r.visit_start_time).total_seconds()/60)|int }} min
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if r.patient_condition == 'STABLE' %}<span class="badge bg-success">Stabil</span>
+              {% elif r.patient_condition == 'IMPROVED' %}<span class="badge bg-success">Verbessert</span>
+              {% elif r.patient_condition == 'DETERIORATED' %}<span class="badge bg-danger">Verschlechtert</span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td>
+              {% set photos = visit_photo_map.get(r.id, []) %}
+              {% if photos %}
+                <div class="d-flex gap-1">
+                  {% for p in photos[:2] %}
+                  <a href="/photos/{{ p.id }}/view-file" target="_blank"
+                     class="d-block" style="width:36px;height:36px;overflow:hidden;border-radius:4px;">
+                    <img src="/photos/{{ p.id }}/view-file"
+                         style="width:36px;height:36px;object-fit:cover;" alt="">
+                  </a>
+                  {% endfor %}
+                  {% if photos|length > 2 %}
+                  <span class="badge bg-secondary align-self-center">+{{ photos|length - 2 }}</span>
+                  {% endif %}
+                </div>
+              {% else %}<small class="text-muted">—</small>{% endif %}
+            </td>
+            <td>
+              {% if r.geo_lat and r.geo_lng %}
+                <a href="https://maps.google.com/?q={{ r.geo_lat }},{{ r.geo_lng }}"
+                   target="_blank" class="text-success" title="{{ r.geo_lat }}, {{ r.geo_lng }}">
+                  <i class="bi bi-geo-alt-fill"></i>
+                </a>
+              {% else %}<i class="bi bi-geo-alt text-muted"></i>{% endif %}
+            </td>
+            <td id="vr-status-{{ r.id }}">
+              {% if r.status == 'VERIFIED' %}
+                <span class="badge bg-success"><i class="bi bi-check-circle"></i> Bestätigt</span>
+                {% if r.verifier %}<div class="small text-muted">{{ r.verifier.full_name }}</div>{% endif %}
+              {% elif r.status == 'SUBMITTED' %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Eingereicht</span>
+              {% elif r.status == 'DRAFT' %}
+                <span class="badge bg-secondary">Entwurf</span>
+              {% else %}
+                <span class="badge bg-light text-dark">{{ r.status }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary me-1"
+                      onclick="showDetail('vr', '{{ r.id }}')"
+                      title="Details">
+                <i class="bi bi-eye"></i>
+              </button>
+              {% if r.status != 'VERIFIED' %}
+              <button class="btn btn-sm btn-success"
+                      onclick="verifyVisit('{{ r.id }}')"
+                      title="Bestätigen" id="vr-btn-{{ r.id }}">
+                <i class="bi bi-check-lg"></i>
+              </button>
+              {% else %}
+              <button class="btn btn-sm btn-outline-danger"
+                      onclick="rejectVisit('{{ r.id }}')"
+                      title="Ablehnen">
+                <i class="bi bi-x-lg"></i>
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+
+          {# Detail-Zeile (versteckt) #}
+          <tr id="vr-detail-{{ r.id }}" class="d-none bg-light">
+            <td colspan="9" class="p-3">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <h6 class="fw-semibold">Beobachtungen</h6>
+                  <p class="small mb-2">{{ r.observations or '—' }}</p>
+                  {% if r.issues_encountered and r.issues_encountered != '[]' %}
+                  <h6 class="fw-semibold text-danger">Probleme</h6>
+                  <p class="small">{{ r.issues_encountered }}</p>
+                  {% endif %}
+                  {% if r.verification_notes %}
+                  <div class="alert alert-warning py-1 px-2 small">
+                    {{ r.verification_notes }}
+                  </div>
+                  {% endif %}
+                </div>
+                <div class="col-md-3">
+                  <h6 class="fw-semibold">Verifikation</h6>
+                  <table class="table table-sm table-borderless small mb-0">
+                    <tr><td class="text-muted">Methode</td><td>{{ r.verification_method or '—' }}</td></tr>
+                    <tr><td class="text-muted">GPS</td>
+                      <td>{% if r.geo_lat %}{{ r.geo_lat }}, {{ r.geo_lng }}{% else %}—{% endif %}</td></tr>
+                    <tr><td class="text-muted">MAC</td><td>{{ r.device_mac or '—' }}</td></tr>
+                    <tr><td class="text-muted">Signatur</td>
+                      <td>{% if r.signature_confirmed %}<i class="bi bi-check text-success"></i> Ja{% else %}Nein{% endif %}</td></tr>
+                  </table>
+                </div>
+                <div class="col-md-3">
+                  <h6 class="fw-semibold">Fotos</h6>
+                  {% set photos = visit_photo_map.get(r.id, []) %}
+                  {% if photos %}
+                  <div class="d-flex flex-wrap gap-1">
+                    {% for p in photos %}
+                    <a href="/photos/{{ p.id }}/view-file" target="_blank">
+                      <img src="/photos/{{ p.id }}/view-file"
+                           style="width:60px;height:60px;object-fit:cover;border-radius:6px;" alt="">
+                    </a>
+                    {% endfor %}
+                  </div>
+                  {% else %}<small class="text-muted">Keine Fotos</small>{% endif %}
+
+                  {% if r.status != 'VERIFIED' %}
+                  <div class="mt-2">
+                    <button class="btn btn-success btn-sm w-100"
+                            onclick="verifyVisit('{{ r.id }}')">
+                      <i class="bi bi-check-circle"></i> Jetzt bestätigen
+                    </button>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-muted text-center">
+      <i class="bi bi-clipboard-x fs-2 d-block mb-2"></i>
+      Keine Visitenberichte für die gewählten Filter.
+    </div>
+    {% endif %}
+  </div>
+
+  {# ══════════ TAB 2: Leistungsnachweise ══════════ #}
+  <div class="tab-pane fade" id="leistungTab">
+    {% if leistungen %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:110px">Datum</th>
+            <th>Mitarbeiter</th>
+            <th>Patient</th>
+            <th>Leistung</th>
+            <th>Dauer</th>
+            <th>Fotos</th>
+            <th>Verifikation</th>
+            <th>Status</th>
+            <th style="width:80px">Aktion</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ln in leistungen %}
+          <tr id="ln-row-{{ ln.id }}">
+            <td>
+              <strong>{{ ln.durchgefuehrt_am|datefmt }}</strong><br>
+              <small class="text-muted">{{ ln.durchgefuehrt_um.strftime('%H:%M') if ln.durchgefuehrt_um else '—' }}</small>
+            </td>
+            <td>
+              <span class="fw-semibold">{{ ln.employee.full_name }}</span><br>
+              <small class="text-muted">{{ ln.employee.role_label }}</small>
+            </td>
+            <td><strong>{{ ln.patient.full_name }}</strong></td>
+            <td>
+              {% if ln.leistung %}
+              <span class="badge bg-light text-dark border me-1">{{ ln.leistung.leistung_nr }}</span>
+              {{ ln.leistung.bezeichnung }}
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ ln.dauer_minuten or '—' }}{% if ln.dauer_minuten %} min{% endif %}</td>
+            <td>
+              {% set photos = leistung_photo_map.get(ln.id, []) %}
+              {% if photos %}
+                <div class="d-flex gap-1">
+                  {% for p in photos[:2] %}
+                  <a href="/photos/{{ p.id }}/view-file" target="_blank"
+                     class="d-block" style="width:36px;height:36px;overflow:hidden;border-radius:4px;">
+                    <img src="/photos/{{ p.id }}/view-file"
+                         style="width:36px;height:36px;object-fit:cover;" alt="">
+                  </a>
+                  {% endfor %}
+                  {% if photos|length > 2 %}<span class="badge bg-secondary align-self-center">+{{ photos|length-2 }}</span>{% endif %}
+                </div>
+              {% else %}<small class="text-muted">—</small>{% endif %}
+            </td>
+            <td>
+              {% if ln.geo_lat %}
+                <a href="https://maps.google.com/?q={{ ln.geo_lat }},{{ ln.geo_lng }}"
+                   target="_blank" class="text-success me-1" title="GPS: {{ ln.geo_lat }}, {{ ln.geo_lng }}">
+                  <i class="bi bi-geo-alt-fill"></i>
+                </a>
+              {% endif %}
+              {% if ln.nfc_tag_id %}
+                <i class="bi bi-broadcast text-primary me-1" title="NFC: {{ ln.nfc_tag_id }}"></i>
+              {% endif %}
+              {% if ln.device_mac %}
+                <i class="bi bi-phone text-secondary" title="MAC: {{ ln.device_mac }}"></i>
+              {% endif %}
+              {% if not ln.geo_lat and not ln.nfc_tag_id and not ln.device_mac %}
+                <small class="text-muted">—</small>
+              {% endif %}
+            </td>
+            <td id="ln-status-{{ ln.id }}">
+              {% if ln.abgerechnet %}
+                <span class="badge bg-success"><i class="bi bi-check-circle"></i> Bestätigt</span>
+              {% else %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Offen</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if not ln.abgerechnet %}
+              <button class="btn btn-sm btn-success" title="Bestätigen"
+                      onclick="confirmLeistung('{{ ln.id }}', true)"
+                      id="ln-btn-{{ ln.id }}">
+                <i class="bi bi-check-lg"></i>
+              </button>
+              {% else %}
+              <button class="btn btn-sm btn-outline-danger" title="Bestätigung zurückziehen"
+                      onclick="confirmLeistung('{{ ln.id }}', false)"
+                      id="ln-btn-{{ ln.id }}">
+                <i class="bi bi-x-lg"></i>
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+
+          {# Detail / Bemerkungen #}
+          {% if ln.bemerkungen %}
+          <tr class="bg-light">
+            <td colspan="9" class="py-1 px-4">
+              <small class="text-muted"><i class="bi bi-chat-text"></i> {{ ln.bemerkungen }}</small>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-muted text-center">
+      <i class="bi bi-list-x fs-2 d-block mb-2"></i>
+      Keine Leistungsnachweise für die gewählten Filter.
+    </div>
+    {% endif %}
+  </div>
+
+</div>{# /tab-content #}
+
+{# Reject-Modal #}
+<div class="modal fade" id="rejectModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Bericht ablehnen</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label small">Grund (optional)</label>
+        <textarea id="rejectReason" class="form-control form-control-sm" rows="3"
+                  placeholder="z.B. GPS fehlt, Foto fehlt..."></textarea>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="doReject()">Ablehnen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+// ── Detail-Zeile aufklappen ──
+function showDetail(type, id) {
+  const row = document.getElementById(`${type}-detail-${id}`);
+  if (!row) return;
+  row.classList.toggle('d-none');
+}
+
+// ── Visitenbericht bestätigen ──
+async function verifyVisit(id) {
+  const res = await fetch(`/admin/reports/visit/${id}/verify`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' }
+  });
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById(`vr-status-${id}`).innerHTML =
+      '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Bestätigt</span>';
+    const btn = document.getElementById(`vr-btn-${id}`);
+    if (btn) {
+      btn.className = 'btn btn-sm btn-outline-danger';
+      btn.title = 'Ablehnen';
+      btn.innerHTML = '<i class="bi bi-x-lg"></i>';
+      btn.onclick = () => rejectVisit(id);
+    }
+  }
+}
+
+// ── Visitenbericht ablehnen (Modal) ──
+let pendingRejectId = null;
+function rejectVisit(id) {
+  pendingRejectId = id;
+  document.getElementById('rejectReason').value = '';
+  new bootstrap.Modal(document.getElementById('rejectModal')).show();
+}
+async function doReject() {
+  const reason = document.getElementById('rejectReason').value.trim();
+  bootstrap.Modal.getInstance(document.getElementById('rejectModal'))?.hide();
+  const res = await fetch(`/admin/reports/visit/${pendingRejectId}/reject`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason })
+  });
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById(`vr-status-${pendingRejectId}`).innerHTML =
+      '<span class="badge bg-secondary">Entwurf</span>';
+    const btn = document.getElementById(`vr-btn-${pendingRejectId}`);
+    if (btn) {
+      btn.className = 'btn btn-sm btn-success';
+      btn.title = 'Bestätigen';
+      btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+      btn.onclick = () => verifyVisit(pendingRejectId);
+    }
+  }
+}
+
+// ── Leistungsnachweis bestätigen / widerrufen ──
+async function confirmLeistung(id, confirm) {
+  const url = confirm
+    ? `/admin/reports/leistung/${id}/confirm`
+    : `/admin/reports/leistung/${id}/unconfirm`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' }
+  });
+  const data = await res.json();
+  if (data.success) {
+    if (confirm) {
+      document.getElementById(`ln-status-${id}`).innerHTML =
+        '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Bestätigt</span>';
+      const btn = document.getElementById(`ln-btn-${id}`);
+      btn.className = 'btn btn-sm btn-outline-danger';
+      btn.title = 'Bestätigung zurückziehen';
+      btn.innerHTML = '<i class="bi bi-x-lg"></i>';
+      btn.onclick = () => confirmLeistung(id, false);
+    } else {
+      document.getElementById(`ln-status-${id}`).innerHTML =
+        '<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Offen</span>';
+      const btn = document.getElementById(`ln-btn-${id}`);
+      btn.className = 'btn btn-sm btn-success';
+      btn.title = 'Bestätigen';
+      btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+      btn.onclick = () => confirmLeistung(id, true);
+    }
+  }
+}
+</script>
+{% endblock %}

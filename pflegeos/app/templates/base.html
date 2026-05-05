@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}PflegeOS{% endblock %} — PflegeOS</title>
 
   <!-- Bootstrap 5.3 -->
@@ -102,6 +103,12 @@
 
         <hr class="text-white-50 my-1">
         <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Administration</small></li>
+        <li class="nav-item">
+          <a href="{{ url_for('admin.reports_list') }}"
+             class="nav-link {% if request.endpoint == 'admin.reports_list' %}active{% endif %}">
+            <i class="bi bi-clipboard2-data-fill"></i> Berichte & Bestätigung
+          </a>
+        </li>
         <li class="nav-item">
           <a href="{{ url_for('admin.schedules_list') }}"
              class="nav-link {% if 'admin' in request.endpoint and 'schedule' in request.endpoint %}active{% endif %}">
