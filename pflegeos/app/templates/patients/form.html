@@ -240,6 +240,11 @@
               <input type="text" name="betreuer_verhaeltnis" class="form-control form-control-sm"
                      placeholder="Verhältnis (Sohn, etc.)" value="{{ form_data.get('betreuer_verhaeltnis','') }}">
             </div>
+            <div class="col-12">
+              <input type="email" name="betreuer_email" class="form-control form-control-sm"
+                     placeholder="E-Mail Angehörige (für Portal-Link)"
+                     value="{{ form_data.get('betreuer_email','') }}">
+            </div>
             <div class="col-12 mt-2">
               <label class="form-label small fw-semibold">Hausarzt</label>
               <input type="text" name="hausarzt_name" class="form-control form-control-sm"
@@ -256,6 +261,16 @@
             <label class="form-check-label" for="einwilligung_foto">
               &#x1F4F7; Einwilligung zur Fotodokumentation erteilt
             </label>
+          </div>
+          <div class="form-check form-switch mt-2">
+            <input type="checkbox" name="portal_enabled" class="form-check-input" id="portal_enabled"
+                   {% if form_data.get('portal_enabled') %}checked{% endif %}>
+            <label class="form-check-label" for="portal_enabled">
+              🔗 Angehörigen-Portal aktivieren
+            </label>
+          </div>
+          <div class="form-text ms-4">
+            Nach dem Speichern erscheint ein Link, den Sie an Angehörige weitergeben können.
           </div>
         </div>
       </div>

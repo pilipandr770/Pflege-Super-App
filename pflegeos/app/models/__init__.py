@@ -237,8 +237,14 @@ class Patient(db.Model):
     betreuer_name = db.Column(db.String(255))
     betreuer_telefon = db.Column(db.String(50))
     betreuer_verhaeltnis = db.Column(db.String(100))
+    betreuer_email = db.Column(db.String(255))      # E-Mail des Angehörigen
     hausarzt_name = db.Column(db.String(255))
     hausarzt_telefon = db.Column(db.String(50))
+
+    # Angehörigen-Portal (Magic-Link-Zugang)
+    portal_token = db.Column(db.String(36), default=gen_uuid, unique=True)
+    portal_enabled = db.Column(db.Boolean, default=False)
+    portal_sprache = db.Column(db.String(5), default='de')  # de / ru / en
 
     # Тип обслуживания (домашний уход или стационар)
     care_type = db.Column(db.String(30), default='HOME_CARE')  # HOME_CARE | INPATIENT

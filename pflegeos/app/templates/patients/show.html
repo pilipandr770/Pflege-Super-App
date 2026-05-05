@@ -125,9 +125,44 @@
           <tr><td class="text-muted" style="width:45%">Betreuer</td><td>{{ patient.betreuer_name or '—' }}</td></tr>
           <tr><td class="text-muted">Betreuer Tel.</td><td>{{ patient.betreuer_telefon or '—' }}</td></tr>
           <tr><td class="text-muted">Verhältnis</td><td>{{ patient.betreuer_verhaeltnis or '—' }}</td></tr>
+          <tr><td class="text-muted">E-Mail</td><td>{{ patient.betreuer_email or '—' }}</td></tr>
           <tr><td class="text-muted">Hausarzt</td><td>{{ patient.hausarzt_name or '—' }}</td></tr>
           <tr><td class="text-muted">Hausarzt Tel.</td><td>{{ patient.hausarzt_telefon or '—' }}</td></tr>
         </table>
+
+        {# ── Angehörigen-Portal ── #}
+        {% if patient.portal_enabled and patient.portal_token %}
+        <div class="mt-3 p-2 rounded border border-success bg-success bg-opacity-10">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <small class="fw-semibold text-success">🔗 Angehörigen-Portal aktiv</small>
+            <span class="badge bg-success">Online</span>
+          </div>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control form-control-sm"
+                   id="portalLink"
+                   value="{{ request.host_url }}familie/{{ patient.portal_token }}"
+                   readonly>
+            <button class="btn btn-outline-success btn-sm"
+                    onclick="copyPortalLink()" title="Link kopieren">
+              <i class="bi bi-clipboard" id="copyIcon"></i>
+            </button>
+          </div>
+          <div class="mt-1">
+            <a href="{{ url_for('family.portal', token=patient.portal_token) }}"
+               target="_blank" class="small text-success">
+              <i class="bi bi-box-arrow-up-right"></i> Vorschau öffnen
+            </a>
+          </div>
+        </div>
+        {% elif not patient.portal_enabled %}
+        <div class="mt-3">
+          <small class="text-muted">
+            <i class="bi bi-lock"></i> Portal nicht aktiviert.
+            <a href="{{ url_for('patients.edit', patient_id=patient.id) }}">Einstellungen</a>
+          </small>
+        </div>
+        {% endif %}
+
       </div>
     </div>
   </div>
@@ -166,4 +201,21 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyPortalLink() {
+  const input = document.getElementById('portalLink');
+  if (!input) return;
+  navigator.clipboard.writeText(input.value).then(() => {
+    const icon = document.getElementById('copyIcon');
+    icon.className = 'bi bi-clipboard-check';
+    setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
+  }).catch(() => {
+    input.select();
+    document.execCommand('copy');
+  });
+}
+</script>
 {% endblock %}
