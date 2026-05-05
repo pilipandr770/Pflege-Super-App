@@ -69,8 +69,8 @@
               {% for report in reports.items %}
               <tr>
                 <td>
-                  <strong>{{ report.visit_date|dateformat('%d.%m.%Y') }}</strong><br>
-                  <small class="text-muted">{{ report.visit_start_time|dateformat('%H:%M') }}</small>
+                  <strong>{{ report.visit_date|datefmt }}</strong><br>
+                  <small class="text-muted">{{ report.visit_start_time.strftime('%H:%M') if report.visit_start_time else '—' }}</small>
                 </td>
                 <td>
                   <strong>{{ report.patient.full_name }}</strong><br>

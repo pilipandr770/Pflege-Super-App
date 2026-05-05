@@ -64,11 +64,13 @@ def create_app(config_name=None):
     app.register_blueprint(export_bp)
 
     # Глобальные template filters
-    @app.template_filter('datefmt')
-    def datefmt(value, fmt='%d.%m.%Y'):
+    def _fmt(value, fmt='%d.%m.%Y'):
         if value is None:
             return '—'
         return value.strftime(fmt)
+
+    app.template_filter('datefmt')(_fmt)
+    app.template_filter('dateformat')(_fmt)   # alias — некоторые шаблоны используют это имя
 
     @app.template_filter('datetimefmt')
     def datetimefmt(value, fmt='%d.%m.%Y %H:%M'):
