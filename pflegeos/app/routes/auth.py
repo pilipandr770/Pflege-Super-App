@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
-from app.extensions import db, bcrypt
+from app.extensions import db, bcrypt, csrf
 from app.models import Employee, Company
 from app.utils.auth import log_action
 
@@ -9,6 +9,7 @@ auth_bp = Blueprint('auth', __name__)
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@csrf.exempt
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.index'))
@@ -53,6 +54,7 @@ def logout():
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@csrf.exempt
 def register():
     """Регистрация новой Pflegeeinrichtung."""
     if current_user.is_authenticated:
