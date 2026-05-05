@@ -380,8 +380,10 @@ def schedule_approve(schedule_gen_id):
         company_id=current_user.company_id
     ).first_or_404()
 
-    if schedule_gen.status != 'GENERATED':
-        return jsonify({'error': 'Nur generierte Zeitpläne können genehmigt werden'}), 400
+    # Status-Check case-insensitiv (DB kann 'generated' oder 'GENERATED' enthalten)
+    if schedule_gen.status.upper() not in ('GENERATED', 'PENDING_REVIEW'):
+        flash(f'Dieser Zeitplan kann nicht genehmigt werden (Status: {schedule_gen.status}).', 'warning')
+        return redirect(url_for('admin.schedules_list'))
 
     try:
         approval_notes = request.form.get('approval_notes', '')
@@ -403,11 +405,13 @@ def schedule_approve(schedule_gen_id):
             'approval_notes': approval_notes
         })
 
-        flash(f'Zeitplan genehmigt. {schedules_created} Zeitpläne erstellt', 'success')
+        flash(f'Zeitplan genehmigt! {schedules_created} Einsätze erstellt.', 'success')
         return redirect(url_for('admin.schedule_distribute', schedule_gen_id=schedule_gen_id))
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error(f"Approve error: {str(e)}")
+        flash(f'Fehler beim Genehmigen: {str(e)}', 'danger')
+        return redirect(url_for('admin.schedule_review', schedule_gen_id=schedule_gen_id))
 
 
 @admin_bp.route('/schedules/<schedule_gen_id>/distribute', methods=['GET', 'POST'])
