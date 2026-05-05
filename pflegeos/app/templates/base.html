@@ -99,9 +99,33 @@
           <i class="bi bi-list-check"></i> Leistungskatalog
         </a>
       </li>
+
+      <!-- Mein Plan — für Pflegekräfte -->
+      {% if not current_user.is_admin %}
+      <hr class="text-white-50 my-1">
+      <li class="nav-item">
+        <a href="{{ url_for('nurse.dashboard') }}"
+           class="nav-link {% if 'nurse' in request.endpoint %}active{% endif %}">
+          <i class="bi bi-calendar2-check-fill"></i> Mein Dienstplan
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('nurse.my_reports') }}"
+           class="nav-link {% if request.endpoint == 'nurse.my_reports' %}active{% endif %}">
+          <i class="bi bi-journal-check"></i> Meine Berichte
+        </a>
+      </li>
+      {% endif %}
+
       {% if current_user.is_admin %}
       <hr class="text-white-50 my-1">
       <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Administration</small></li>
+      <li class="nav-item">
+        <a href="{{ url_for('admin.schedules_list') }}"
+           class="nav-link {% if 'admin' in request.endpoint and 'schedule' in request.endpoint %}active{% endif %}">
+          <i class="bi bi-calendar2-week-fill"></i> Dienstpläne (AI)
+        </a>
+      </li>
       <li class="nav-item">
         <a href="{{ url_for('assignments.index') }}"
            class="nav-link {% if 'assignments' in request.endpoint %}active{% endif %}">

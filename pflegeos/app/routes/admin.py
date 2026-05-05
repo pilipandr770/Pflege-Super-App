@@ -210,8 +210,8 @@ def schedule_generate():
                 Patient.company_id == current_user.company_id
             ).all()
 
-            # Построить промпт для Claude
-            ai_prompt = _build_schedule_prompt(
+            # Построить промпт для Claude (+ получить маппинги)
+            ai_prompt_text, employee_map, patient_map = _build_schedule_prompt(
                 employees=employees,
                 patients=patients,
                 schedule_start_date=schedule_start_date,
@@ -219,8 +219,15 @@ def schedule_generate():
                 anonymize=anonymize_for_ai
             )
 
+            # Сохраняем prompt + маппинги вместе (для де-анонимизации при approve)
+            ai_prompt_envelope = json.dumps({
+                'prompt':       ai_prompt_text,
+                'employee_map': employee_map,   # {'NURSE_1': real_uuid, ...}
+                'patient_map':  patient_map,    # {'PATIENT_1': real_uuid, ...}
+            }, ensure_ascii=False)
+
             # Вызвать Claude API
-            ai_response = _call_claude_api(ai_prompt)
+            ai_response = _call_claude_api(ai_prompt_text)
 
             if not ai_response:
                 return jsonify({'error': 'Fehler beim Kontakt mit Claude AI'}), 500
@@ -233,7 +240,7 @@ def schedule_generate():
                 created_by=current_user.id,
                 schedule_start_date=schedule_start_date,
                 schedule_end_date=schedule_end_date,
-                ai_prompt=ai_prompt,
+                ai_prompt=ai_prompt_envelope,   # JSON envelope с маппингами
                 ai_response=ai_response,
                 status='GENERATED',
                 anonymize_for_ai=anonymize_for_ai
@@ -286,47 +293,71 @@ def schedule_review(schedule_gen_id):
     except Exception:
         raw_plan = {}
 
-    # Карты сотрудников и пациентов для resolve по ID
-    emp_map = {str(e.id): e for e in Employee.query.filter_by(
+    # Загрузить маппинги из envelope (для де-анонимизации)
+    employee_map = {}
+    patient_map  = {}
+    try:
+        envelope = json.loads(schedule_gen.ai_prompt or '{}')
+        employee_map = envelope.get('employee_map', {})  # NURSE_N → real_uuid
+        patient_map  = envelope.get('patient_map',  {})  # PATIENT_N → real_uuid
+    except Exception:
+        pass
+
+    # Инвертированные маппинги: real_uuid → anon_id (для обратного поиска)
+    # + реальные объекты по UUID
+    emp_by_id = {str(e.id): e for e in Employee.query.filter_by(
         company_id=current_user.company_id
     ).all()}
-    pat_map = {str(p.id): p for p in Patient.query.filter(
-        Patient.company_id == current_user.company_id
+    pat_by_id = {str(p.id): p for p in Patient.query.filter(
+        Patient.company_id == current_user.company_id,
+        Patient.deleted_at.is_(None)
     ).all()}
+
+    def resolve_employee(raw_id):
+        """NURSE_N или real_uuid → Employee объект"""
+        if raw_id.startswith('NURSE_'):
+            real_id = employee_map.get(raw_id, '')
+            return emp_by_id.get(real_id)
+        return emp_by_id.get(raw_id)
+
+    def resolve_patient(raw_id):
+        """PATIENT_N или real_uuid → Patient объект"""
+        if raw_id.startswith('PATIENT_'):
+            real_id = patient_map.get(raw_id, '')
+            return pat_by_id.get(real_id)
+        return pat_by_id.get(raw_id)
 
     # Flatten: AI response → список визитов для шаблона
     ai_plan = []
     for item in raw_plan.get('schedule', []):
-        nurse_id = item.get('nurse_id', '')
-        nurse = emp_map.get(nurse_id)
-        emp_name = nurse.full_name if nurse else nurse_id
+        nurse_raw = item.get('nurse_id', '')
+        nurse = resolve_employee(nurse_raw)
+        emp_name = nurse.full_name if nurse else f'Unbekannt ({nurse_raw})'
         date_str = item.get('date', '')
 
         for visit in item.get('visits', []):
-            patient_id = visit.get('patient_id', '')
-            patient = pat_map.get(patient_id)
-            pat_name = patient.full_name if patient else patient_id
+            patient_raw = visit.get('patient_id', '')
+            patient = resolve_patient(patient_raw)
+            pat_name = patient.full_name if patient else f'Unbekannt ({patient_raw})'
 
             risk_flags = []
             if patient:
-                if patient.sturzrisiko:
-                    risk_flags.append('Sturzrisiko')
-                if patient.dekubitusrisiko:
-                    risk_flags.append('Dekubitusrisiko')
+                if patient.sturzrisiko:    risk_flags.append('Sturzrisiko')
+                if patient.dekubitusrisiko: risk_flags.append('Dekubitusrisiko')
 
             ai_plan.append({
-                'date': date_str,
-                'employee_name': emp_name,
-                'employee_id': nurse_id,
-                'patient_name': pat_name,
-                'patient_id': patient_id,
-                'scheduled_time': visit.get('time', '09:00'),
+                'date':             date_str,
+                'employee_name':    emp_name,
+                'employee_id':      nurse_raw,
+                'patient_name':     pat_name,
+                'patient_id':       patient_raw,
+                'scheduled_time':   visit.get('time', '09:00'),
                 'duration_minutes': visit.get('duration_minutes', 30),
-                'procedures': [],
+                'procedures':       [],
                 'patient_location': patient.ort if patient else None,
-                'care_level': patient.pflegegrad if patient else None,
+                'care_level':       patient.pflegegrad if patient else None,
                 'patient_risk_level': ', '.join(risk_flags) if risk_flags else None,
-                'notes': visit.get('reason', ''),
+                'notes':            visit.get('reason', ''),
             })
 
     ai_notes = raw_plan.get('notes', '')
@@ -428,83 +459,90 @@ def schedule_distribute(schedule_gen_id):
 # ==================== HELPER FUNCTIONS ====================
 
 def _build_schedule_prompt(employees, patients, schedule_start_date, schedule_end_date, anonymize=True):
-    """Построить промпт для Claude API для генерации расписания"""
+    """Построить промпт для Claude API.
+    Returns (prompt_str, employee_map, patient_map)
+    где employee_map: {'NURSE_1': real_emp_id, ...}
+    """
+    employee_map = {}   # NURSE_N → real employee.id
+    patient_map  = {}   # PATIENT_N → real patient.id
 
-    # Подготовить данные о сотрудниках
     employee_data = []
-    for emp in employees:
+    for i, emp in enumerate(employees, start=1):
+        anon_id = f'NURSE_{i}'
+        employee_map[anon_id] = emp.id
         emp_info = {
-            'id': emp.id if not anonymize else f'NURSE_{len(employee_data)+1}',
-            'name': emp.full_name if not anonymize else f'Nurse {len(employee_data)+1}',
+            'id':   emp.id   if not anonymize else anon_id,
+            'name': emp.full_name if not anonymize else f'Nurse {i}',
+            'role': emp.role,
             'qualifications': [q for q in [emp.qualification] if q],
             'max_patients_per_day': 8,
-            'languages': []
         }
         employee_data.append(emp_info)
 
-    # Подготовить данные о пациентах
     patient_data = []
-    for pat in patients:
+    for i, pat in enumerate(patients, start=1):
+        anon_id = f'PATIENT_{i}'
+        patient_map[anon_id] = pat.id
         pat_info = {
-            'id': pat.id if not anonymize else f'PATIENT_{len(patient_data)+1}',
-            'name': pat.full_name if not anonymize else f'Patient {len(patient_data)+1}',
+            'id':   pat.id   if not anonymize else anon_id,
+            'name': pat.full_name if not anonymize else f'Patient {i}',
             'location': {
-                'street': pat.strasse if not anonymize else 'Location',
-                'city': pat.ort if not anonymize else 'City',
-                'latitude': getattr(pat, 'geo_lat', None),
-                'longitude': getattr(pat, 'geo_lng', None)
+                'street':    pat.strasse if not anonymize else 'Location',
+                'city':      pat.ort     if not anonymize else 'City',
+                'latitude':  getattr(pat, 'geo_lat', None),
+                'longitude': getattr(pat, 'geo_lng', None),
             },
-            'care_type': pat.care_type,
-            'pflegegrad': pat.pflegegrad,
+            'care_type':   pat.care_type,
+            'pflegegrad':  pat.pflegegrad,
             'risks': {
-                'fall_risk': pat.sturzrisiko,
-                'pressure_ulcer_risk': pat.dekubitusrisiko
+                'fall_risk':           bool(pat.sturzrisiko),
+                'pressure_ulcer_risk': bool(pat.dekubitusrisiko),
             },
-            'required_qualifications': [],
-            'visit_frequency_per_week': 3  # Default
+            'visit_frequency_per_week': 3,
         }
         patient_data.append(pat_info)
 
-    prompt = f"""Вы опытный планировщик домашнего ухода. Создайте оптимальное расписание посещений для медицинского персонала.
+    prompt = f"""Sie sind ein erfahrener Pflegedienstplaner in Deutschland.
+Erstellen Sie einen optimierten Wochendienstplan (Heimbesuchsplan) für das Pflegepersonal.
 
-ДАННЫЕ:
-- Период: {schedule_start_date} до {schedule_end_date}
-- Медсестры: {len(employees)}
-- Пациенты: {len(patients)}
+PLANUNGSZEITRAUM: {schedule_start_date} bis {schedule_end_date}
+PFLEGEKRÄFTE: {len(employees)}
+PATIENTEN: {len(patients)}
 
-ТРЕБОВАНИЯ:
-1. Минимизируйте расстояния между пациентами (оптимизация маршрута)
-2. Уважайте квалификацию медсестер
-3. Распределяйте нагрузку равномерно
-4. Учитывайте риски пациентов (особое внимание)
-5. Планируйте на каждый день недели
+ANFORDERUNGEN:
+1. Routenoptimierung: geografisch nahe Patienten zum selben Pflegekraft zuweisen
+2. Qualifikationen beachten (PFLEGEFACHKRAFT für Behandlungspflege, PFLEGEHILFSKRAFT für Grundpflege)
+3. Gleichmäßige Auslastung — max. 8 Patienten pro Pflegekraft pro Tag
+4. Risikomarkierungen beachten (fall_risk / pressure_ulcer_risk → mehr Zeit einplanen)
+5. Jeden Tag des Zeitraums planen
+6. Uhrzeiten zwischen 07:00 und 18:00, realistisch gestaffelt
 
-МЕДСЕСТРЫ:
+PFLEGEKRÄFTE-DATEN:
 {json.dumps(employee_data, ensure_ascii=False, indent=2)}
 
-ПАЦИЕНТЫ:
+PATIENTEN-DATEN:
 {json.dumps(patient_data, ensure_ascii=False, indent=2)}
 
-Верните JSON с расписанием в формате:
+ANTWORTFORMAT — nur gültiges JSON, keine Erklärungen davor/danach:
 {{
   "schedule": [
     {{
       "date": "YYYY-MM-DD",
-      "nurse_id": "id",
+      "nurse_id": "<id aus Pflegekräfte-Daten>",
       "visits": [
         {{
-          "patient_id": "id",
+          "patient_id": "<id aus Patienten-Daten>",
           "time": "HH:MM",
           "duration_minutes": 45,
-          "reason": "Grund für Besuch"
+          "reason": "Kurze Begründung auf Deutsch"
         }}
       ]
     }}
   ],
-  "notes": "Замечания и рекомендации"
+  "notes": "Empfehlungen und Hinweise auf Deutsch"
 }}
 """
-    return prompt
+    return prompt, employee_map, patient_map
 
 
 def _call_claude_api(prompt):
@@ -547,54 +585,95 @@ def _call_claude_api(prompt):
 
 
 def _create_schedules_from_plan(schedule_gen, ai_plan):
-    """Создать EmployeeSchedule записи из AI плана"""
+    """Создать EmployeeSchedule записи из AI плана с корректной де-анонимизацией."""
     schedules_created = 0
+
+    # Загрузить маппинги из сохранённого промпта
+    employee_map = {}
+    patient_map  = {}
+    try:
+        envelope = json.loads(schedule_gen.ai_prompt or '{}')
+        employee_map = envelope.get('employee_map', {})
+        patient_map  = envelope.get('patient_map',  {})
+    except Exception:
+        pass  # Если промпт не JSON — маппинги пустые (режим без анонимизации)
 
     try:
         if 'schedule' not in ai_plan:
             return 0
 
         for day_plan in ai_plan['schedule']:
-            schedule_date = datetime.strptime(day_plan['date'], '%Y-%m-%d').date()
-            nurse_id = day_plan['nurse_id']
+            try:
+                schedule_date = datetime.strptime(day_plan['date'], '%Y-%m-%d').date()
+            except Exception:
+                continue
 
-            # Найти реального ID медсестры (если был анонимизирован)
-            if nurse_id.startswith('NURSE_'):
-                # Восстановить реальный ID из исходного плана
-                nurses = Employee.query.filter_by(
-                    company_id=current_user.company_id,
-                    is_active=True
-                ).limit(int(nurse_id.split('_')[1])).all()
-                if nurses:
-                    nurse_id = nurses[-1].id
-                else:
+            raw_nurse_id = day_plan.get('nurse_id', '')
+
+            # Де-анонимизировать NURSE_N → real UUID
+            if raw_nurse_id.startswith('NURSE_'):
+                nurse_id = employee_map.get(raw_nurse_id)
+                if not nurse_id:
+                    current_app.logger.warning(f"No mapping for {raw_nurse_id}")
                     continue
+            else:
+                nurse_id = raw_nurse_id  # Уже реальный UUID
+
+            # Проверить, что медсестра существует
+            nurse = Employee.query.filter_by(
+                id=nurse_id,
+                company_id=current_user.company_id,
+                is_active=True
+            ).first()
+            if not nurse:
+                current_app.logger.warning(f"Nurse {nurse_id} not found")
+                continue
 
             for visit in day_plan.get('visits', []):
-                patient_id = visit['patient_id']
+                raw_patient_id = visit.get('patient_id', '')
 
-                # Восстановить реальный ID пациента если нужно
-                if patient_id.startswith('PATIENT_'):
-                    patients = Patient.query.filter(
-                        Patient.company_id == current_user.company_id,
-                        Patient.deleted_at.is_(None)
-                    ).limit(int(patient_id.split('_')[1])).all()
-                    if patients:
-                        patient_id = patients[-1].id
-                    else:
+                # Де-анонимизировать PATIENT_N → real UUID
+                if raw_patient_id.startswith('PATIENT_'):
+                    patient_id = patient_map.get(raw_patient_id)
+                    if not patient_id:
+                        current_app.logger.warning(f"No mapping for {raw_patient_id}")
                         continue
+                else:
+                    patient_id = raw_patient_id
+
+                # Проверить пациента
+                patient = Patient.query.filter(
+                    Patient.id == patient_id,
+                    Patient.company_id == current_user.company_id,
+                    Patient.deleted_at.is_(None)
+                ).first()
+                if not patient:
+                    current_app.logger.warning(f"Patient {patient_id} not found")
+                    continue
 
                 # Создать EmployeeSchedule
+                try:
+                    sched_time = datetime.strptime(visit.get('time', '09:00'), '%H:%M').time()
+                except Exception:
+                    sched_time = datetime.strptime('09:00', '%H:%M').time()
+
                 schedule = EmployeeSchedule(
                     company_id=current_user.company_id,
                     employee_id=nurse_id,
                     patient_id=patient_id,
                     scheduled_date=schedule_date,
-                    scheduled_time=datetime.strptime(visit.get('time', '09:00'), '%H:%M').time(),
-                    procedures='[]',  # Будет заполнено позже
-                    status='PENDING'
+                    scheduled_time=sched_time,
+                    address_strasse=patient.strasse,
+                    address_hausnummer=patient.hausnummer,
+                    address_plz=patient.plz,
+                    address_ort=patient.ort,
+                    patient_geo_lat=getattr(patient, 'geo_lat', None),
+                    patient_geo_lng=getattr(patient, 'geo_lng', None),
+                    notes=visit.get('reason', ''),
+                    procedures='[]',
+                    status='PENDING',
+                    is_active=True,
                 )
-
                 db.session.add(schedule)
                 schedules_created += 1
 

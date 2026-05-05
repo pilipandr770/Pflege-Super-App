@@ -7,6 +7,143 @@ from datetime import datetime, date, time as dtime
 
 leistung_bp = Blueprint('leistung', __name__)
 
+# ─────────────────────────────────────────────────────────────
+# Vollständiger SGB XI / SGB V Leistungskatalog (LK-System)
+# Grundlage: Leistungskomplex-Vergütungsvereinbarungen der
+# Pflegekassen — gültig für ambulante Pflegedienste in Deutschland
+# ─────────────────────────────────────────────────────────────
+STANDARD_KATALOG = [
+    # ── Körperpflege ──────────────────────────────────────────
+    dict(leistung_nr='LK01', bezeichnung='Kleine Körperpflege (Teilwäsche)',
+         beschreibung='Waschen von Gesicht, Händen, Intimbereiche; Mund-/Zahnpflege, Kämmen',
+         kategorie='Körperpflege', dauer_minuten=20, preis=7.49),
+    dict(leistung_nr='LK02', bezeichnung='Große Körperpflege (Ganzkörperwäsche im Bett)',
+         beschreibung='Vollständige Körperpflege im Bett inkl. Hautpflege, Kämmen, Rasieren',
+         kategorie='Körperpflege', dauer_minuten=35, preis=13.70),
+    dict(leistung_nr='LK03', bezeichnung='Duschen / Baden (inkl. An-/Auskleiden)',
+         beschreibung='Vollbad oder Dusche inkl. An-/Auskleiden, Hautpflege, Haarpflege',
+         kategorie='Körperpflege', dauer_minuten=45, preis=18.12),
+    dict(leistung_nr='LK04', bezeichnung='Mund-, Zahn- und Prothesenpflege',
+         beschreibung='Zähneputzen, Prothesenreinigung, Mundspülung',
+         kategorie='Körperpflege', dauer_minuten=10, preis=3.85),
+    dict(leistung_nr='LK05', bezeichnung='Kämmen / Rasieren / Nagelpflege',
+         beschreibung='Haare kämmen/bürsten, Rasieren, Fingernägel feilen (nicht medizinisch)',
+         kategorie='Körperpflege', dauer_minuten=10, preis=3.50),
+    dict(leistung_nr='LK06', bezeichnung='An- und Auskleiden',
+         beschreibung='Hilfe beim An- und Ausziehen der Kleidung, inkl. Strümpfe',
+         kategorie='Körperpflege', dauer_minuten=15, preis=5.71),
+
+    # ── Ernährung ─────────────────────────────────────────────
+    dict(leistung_nr='LK07', bezeichnung='Mundgerechte Zubereitung der Mahlzeit',
+         beschreibung='Schneiden, Portionieren, Servieren — kein Kochen',
+         kategorie='Ernährung', dauer_minuten=10, preis=3.50),
+    dict(leistung_nr='LK08', bezeichnung='Hilfe bei der Nahrungsaufnahme',
+         beschreibung='Unterstützung / vollständige Übernahme bei Essen und Trinken',
+         kategorie='Ernährung', dauer_minuten=20, preis=6.54),
+    dict(leistung_nr='LK09', bezeichnung='Sondenkost anlegen und verabreichen',
+         beschreibung='Enterale Ernährung über PEG/Nasensonde, Kontrolle der Sonde',
+         kategorie='Ernährung', dauer_minuten=15, preis=5.90),
+
+    # ── Mobilität ─────────────────────────────────────────────
+    dict(leistung_nr='LK10', bezeichnung='Hilfe beim Aufstehen / Zubettgehen',
+         beschreibung='Aufstehen aus dem Bett, Hinlegen, Sicherung beim Transfer',
+         kategorie='Mobilität', dauer_minuten=15, preis=5.71),
+    dict(leistung_nr='LK11', bezeichnung='Lagern / Positionswechsel (Dekubitusprophylaxe)',
+         beschreibung='Regelmäßige Umlagerung zur Druckentlastung, Lagerungshilfen',
+         kategorie='Mobilität', dauer_minuten=20, preis=7.49),
+    dict(leistung_nr='LK12', bezeichnung='Transfer (Rollstuhl / Gehilfe / Lifter)',
+         beschreibung='Umsetzen vom Bett in Rollstuhl und zurück, Begleitung beim Gehen',
+         kategorie='Mobilität', dauer_minuten=10, preis=3.85),
+
+    # ── Hauswirtschaft ────────────────────────────────────────
+    dict(leistung_nr='LK14', bezeichnung='Reinigung des Wohnbereichs',
+         beschreibung='Staubsaugen, Wischen, Abstauben des Wohn-/Schlafzimmers',
+         kategorie='Hauswirtschaft', dauer_minuten=45, preis=16.68),
+    dict(leistung_nr='LK15', bezeichnung='Reinigung Sanitärbereich (WC/Bad)',
+         beschreibung='Reinigung von Badezimmer, Toilette, Waschbecken',
+         kategorie='Hauswirtschaft', dauer_minuten=30, preis=11.12),
+    dict(leistung_nr='LK16', bezeichnung='Wäschepflege / Waschen und Wechseln',
+         beschreibung='Wäsche sortieren, waschen, trocknen, zusammenlegen',
+         kategorie='Hauswirtschaft', dauer_minuten=30, preis=11.12),
+    dict(leistung_nr='LK17', bezeichnung='Einkaufen',
+         beschreibung='Besorgungen für den täglichen Bedarf (Lebensmittel, Drogerie)',
+         kategorie='Hauswirtschaft', dauer_minuten=45, preis=16.68),
+    dict(leistung_nr='LK18', bezeichnung='Kochen einer Hauptmahlzeit',
+         beschreibung='Zubereitung von Mittagessen oder Abendessen inkl. Abwasch',
+         kategorie='Hauswirtschaft', dauer_minuten=30, preis=11.12),
+
+    # ── Behandlungspflege (SGB V § 37) ───────────────────────
+    dict(leistung_nr='LK20', bezeichnung='Medikamentengabe oral / sublingual',
+         beschreibung='Richten und Verabreichen von Tabletten, Tropfen, Suppositorien',
+         kategorie='Behandlungspflege', dauer_minuten=10, preis=3.85),
+    dict(leistung_nr='LK21', bezeichnung='Injektion subkutan (z.B. Insulin)',
+         beschreibung='Subcutane Injektion inkl. Blutzuckermessung bei Bedarf',
+         kategorie='Behandlungspflege', dauer_minuten=10, preis=5.20),
+    dict(leistung_nr='LK22', bezeichnung='Injektion intramuskulär',
+         beschreibung='Intramuskuläre Injektion nach ärztlicher Verordnung',
+         kategorie='Behandlungspflege', dauer_minuten=15, preis=6.80),
+    dict(leistung_nr='LK23', bezeichnung='Verbandwechsel einfach',
+         beschreibung='Steriler Verbandwechsel bei einfachen Wunden, Nähten, Schürfwunden',
+         kategorie='Behandlungspflege', dauer_minuten=20, preis=8.50),
+    dict(leistung_nr='LK24', bezeichnung='Wundversorgung komplex (Dekubitus / chronische Wunde)',
+         beschreibung='Spezialisierte Wundversorgung bei Dekubitus, Ulcus cruris, diabetischem Fuß',
+         kategorie='Behandlungspflege', dauer_minuten=45, preis=19.80),
+    dict(leistung_nr='LK25', bezeichnung='Blutdruckmessung',
+         beschreibung='Blutdruckkontrolle, Dokumentation, Weiterleitung an Arzt bei Abweichung',
+         kategorie='Behandlungspflege', dauer_minuten=10, preis=3.50),
+    dict(leistung_nr='LK26', bezeichnung='Blutzuckermessung',
+         beschreibung='Kapilläre Blutzuckermessung, Dokumentation, ggf. Insulin-Anpassung',
+         kategorie='Behandlungspflege', dauer_minuten=5, preis=3.20),
+    dict(leistung_nr='LK27', bezeichnung='Harnkatheter-Versorgung (liegend / suprapubisch)',
+         beschreibung='Pflege, Kontrolle und Wechsel des Dauerkatheters nach ärztl. Verordnung',
+         kategorie='Behandlungspflege', dauer_minuten=20, preis=9.10),
+    dict(leistung_nr='LK28', bezeichnung='Kompressionsstrümpfe an-/ausziehen',
+         beschreibung='An- und Ausziehen medizinischer Kompressionsstrümpfe Kl. I–III',
+         kategorie='Behandlungspflege', dauer_minuten=15, preis=5.90),
+    dict(leistung_nr='LK29', bezeichnung='Inhalationstherapie',
+         beschreibung='Inhalation mit Vernebler/Spacer, Atemübungen nach Verordnung',
+         kategorie='Behandlungspflege', dauer_minuten=15, preis=5.90),
+    dict(leistung_nr='LK30', bezeichnung='Stoma-Versorgung (Kolostomie / Urostomie)',
+         beschreibung='Versorgung und Wechsel des Stomabeutels, Stomarandpflege',
+         kategorie='Behandlungspflege', dauer_minuten=30, preis=14.50),
+
+    # ── Soziale Betreuung (§ 45b SGB XI) ─────────────────────
+    dict(leistung_nr='LK31', bezeichnung='Betreuungsleistungen / Alltagsbegleitung',
+         beschreibung='Gespräch, Vorlesen, Spaziergang, Beschäftigung — nach § 45b SGB XI',
+         kategorie='Soziale Betreuung', dauer_minuten=60, preis=25.20),
+    dict(leistung_nr='LK32', bezeichnung='Kognitive Aktivierung / Gedächtnistraining',
+         beschreibung='Gedächtnisübungen, Wahrnehmungsförderung, Orientierungshilfe',
+         kategorie='Soziale Betreuung', dauer_minuten=45, preis=18.70),
+    dict(leistung_nr='LK33', bezeichnung='Nachtbereitschaft / Nachtpflege',
+         beschreibung='Betreuung und Pflege in der Nacht (pro Einsatz)',
+         kategorie='Soziale Betreuung', dauer_minuten=60, preis=32.50),
+
+    # ── Beratung ──────────────────────────────────────────────
+    dict(leistung_nr='LK34', bezeichnung='Pflegeberatungsbesuch (§ 37 Abs. 3 SGB XI)',
+         beschreibung='Qualitätssichernder Beratungsbesuch für Pflegegeldempfänger',
+         kategorie='Beratung', dauer_minuten=30, preis=23.50),
+    dict(leistung_nr='LK35', bezeichnung='Erstgespräch / Pflegeanamnese',
+         beschreibung='Aufnahme der Pflegeanamnese, Erhebung des Hilfebedarfs, SIS-Vorbereitung',
+         kategorie='Beratung', dauer_minuten=60, preis=38.00),
+]
+
+
+def seed_leistungskatalog(company_id):
+    """Erstellt den Standard-SGB XI Leistungskatalog für eine neue Firma."""
+    for item in STANDARD_KATALOG:
+        eintrag = Leistungskatalog(
+            company_id=company_id,
+            leistung_nr=item['leistung_nr'],
+            bezeichnung=item['bezeichnung'],
+            beschreibung=item.get('beschreibung', ''),
+            kategorie=item.get('kategorie', ''),
+            dauer_minuten=item.get('dauer_minuten'),
+            preis=item.get('preis'),
+            is_active=True,
+        )
+        db.session.add(eintrag)
+    db.session.commit()
+
 
 @leistung_bp.route('/patient/<patient_id>')
 @login_required
@@ -105,8 +242,47 @@ def katalog_manage():
 
     items = Leistungskatalog.query.filter_by(
         company_id=current_user.company_id
-    ).order_by(Leistungskatalog.kategorie).all()
+    ).order_by(Leistungskatalog.kategorie, Leistungskatalog.leistung_nr).all()
+
+    # Auto-Seed: Wenn noch keine Leistungen vorhanden, Standard-Katalog laden
+    if not items:
+        seed_leistungskatalog(current_user.company_id)
+        flash('Standard-Leistungskatalog (SGB XI) wurde automatisch geladen.', 'info')
+        items = Leistungskatalog.query.filter_by(
+            company_id=current_user.company_id
+        ).order_by(Leistungskatalog.kategorie, Leistungskatalog.leistung_nr).all()
+
     return render_template('leistung/katalog.html', items=items)
+
+
+@leistung_bp.route('/katalog/seed', methods=['POST'])
+@login_required
+def katalog_seed():
+    """Standard SGB XI Katalog neu laden (vorhandene bleiben erhalten)."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Keine Berechtigung'}), 403
+
+    existing_nrs = {
+        item.leistung_nr
+        for item in Leistungskatalog.query.filter_by(company_id=current_user.company_id).all()
+    }
+    added = 0
+    for item in STANDARD_KATALOG:
+        if item['leistung_nr'] not in existing_nrs:
+            db.session.add(Leistungskatalog(
+                company_id=current_user.company_id,
+                leistung_nr=item['leistung_nr'],
+                bezeichnung=item['bezeichnung'],
+                beschreibung=item.get('beschreibung', ''),
+                kategorie=item.get('kategorie', ''),
+                dauer_minuten=item.get('dauer_minuten'),
+                preis=item.get('preis'),
+                is_active=True,
+            ))
+            added += 1
+    db.session.commit()
+    flash(f'Standard-Katalog aktualisiert: {added} neue Leistungen hinzugefügt.', 'success')
+    return redirect(url_for('leistung.katalog_manage'))
 
 
 def _get_patient(patient_id):

@@ -1,59 +1,115 @@
 {% extends "base.html" %}
 {% block title %}Leistungskatalog{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between mb-3">
-  <h4 class="fw-bold">Leistungskatalog</h4>
-  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">+ Hinzufügen</button>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="fw-bold mb-0"><i class="bi bi-list-check"></i> Leistungskatalog</h4>
+    <small class="text-muted">{{ items|length }} Leistungen · SGB XI / SGB V</small>
+  </div>
+  <div class="d-flex gap-2">
+    <!-- Seed-Button: fehlende Standard-Leistungen nachladen -->
+    <form method="POST" action="{{ url_for('leistung.katalog_seed') }}" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-outline-secondary btn-sm"
+              title="Fehlende Standard-LK-Leistungen aus dem SGB XI-Katalog hinzufügen">
+        <i class="bi bi-arrow-repeat"></i> Standardkatalog aktualisieren
+      </button>
+    </form>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">
+      <i class="bi bi-plus-lg"></i> Eigene Leistung
+    </button>
+  </div>
+</div>
+
+<!-- Kategorie-Übersicht -->
+{% set kategorien = items | map(attribute='kategorie') | unique | list %}
+<div class="row g-2 mb-3">
+  {% for kat in kategorien %}
+  {% set kat_items = items | selectattr('kategorie', 'equalto', kat) | list %}
+  <div class="col-auto">
+    <span class="badge bg-light text-dark border">{{ kat or 'Allgemein' }} ({{ kat_items|length }})</span>
+  </div>
+  {% endfor %}
 </div>
 
 <div class="card">
   <div class="card-body p-0">
-    <table class="table mb-0">
+    <table class="table mb-0 table-hover">
       <thead class="table-light">
-        <tr><th>Nr.</th><th>Bezeichnung</th><th>Kategorie</th><th>Dauer</th><th>Preis</th><th>Status</th></tr>
+        <tr>
+          <th>Nr.</th>
+          <th>Bezeichnung</th>
+          <th>Kategorie</th>
+          <th>Dauer</th>
+          <th>Preis</th>
+          <th>Status</th>
+        </tr>
       </thead>
       <tbody>
         {% set current_kat = namespace(val='') %}
         {% for item in items %}
           {% if item.kategorie != current_kat.val %}
           <tr class="table-secondary">
-            <td colspan="6" class="small fw-bold text-uppercase py-1 px-3">{{ item.kategorie or 'Allgemein' }}</td>
+            <td colspan="6" class="small fw-bold text-uppercase py-1 px-3">
+              <i class="bi bi-tag"></i> {{ item.kategorie or 'Allgemein' }}
+            </td>
           </tr>
           {% set current_kat.val = item.kategorie %}
           {% endif %}
           <tr>
-            <td class="small font-monospace">{{ item.leistung_nr or '—' }}</td>
+            <td class="small font-monospace text-primary fw-bold">{{ item.leistung_nr or '—' }}</td>
             <td>
               <strong class="small">{{ item.bezeichnung }}</strong>
-              {% if item.beschreibung %}<div class="text-muted" style="font-size:0.75rem">{{ item.beschreibung[:80] }}{% if item.beschreibung|length > 80 %}…{% endif %}</div>{% endif %}
+              {% if item.beschreibung %}
+                <div class="text-muted" style="font-size:0.75rem">
+                  {{ item.beschreibung[:90] }}{% if item.beschreibung|length > 90 %}…{% endif %}
+                </div>
+              {% endif %}
             </td>
-            <td class="small">{{ item.kategorie or '—' }}</td>
-            <td class="small">{{ item.dauer_minuten or '—' }} min</td>
-            <td class="small">{% if item.preis %}{{ "%.2f"|format(item.preis) }} €{% else %}—{% endif %}</td>
-            <td><span class="badge bg-{% if item.is_active %}success{% else %}secondary{% endif %}">{% if item.is_active %}Aktiv{% else %}Inaktiv{% endif %}</span></td>
+            <td class="small text-muted">{{ item.kategorie or '—' }}</td>
+            <td class="small">
+              {% if item.dauer_minuten %}
+                <span class="badge bg-light text-dark">{{ item.dauer_minuten }} min</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="small">
+              {% if item.preis %}
+                <strong>{{ "%.2f"|format(item.preis) }} €</strong>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <span class="badge bg-{% if item.is_active %}success{% else %}secondary{% endif %}">
+                {% if item.is_active %}Aktiv{% else %}Inaktiv{% endif %}
+              </span>
+            </td>
           </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-5">Kein Leistungskatalog — bitte Leistungen hinzufügen</td></tr>
+        <tr>
+          <td colspan="6" class="text-center text-muted py-5">
+            <i class="bi bi-inbox display-6 d-block mb-2"></i>
+            Noch keine Leistungen — klicken Sie auf "Standardkatalog aktualisieren"
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<!-- Modal hinzufügen -->
+<!-- Modal: eigene Leistung hinzufügen -->
 <div class="modal fade" id="addModal" tabindex="-1">
   <div class="modal-dialog">
     <form method="POST" class="modal-content">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-header">
-        <h5 class="modal-title">Leistung hinzufügen</h5>
+        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Eigene Leistung hinzufügen</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div class="row g-3">
           <div class="col-md-4">
-            <label class="form-label small fw-semibold">Nr.</label>
-            <input type="text" name="leistung_nr" class="form-control form-control-sm" placeholder="LK01">
+            <label class="form-label small fw-semibold">Nr. (z.B. LK99)</label>
+            <input type="text" name="leistung_nr" class="form-control form-control-sm" placeholder="LK99">
           </div>
           <div class="col-md-8">
             <label class="form-label small fw-semibold">Bezeichnung <span class="text-danger">*</span></label>
@@ -62,15 +118,15 @@
           <div class="col-12">
             <label class="form-label small fw-semibold">Kategorie</label>
             <input type="text" name="kategorie" class="form-control form-control-sm"
-                   list="kategorie-list" placeholder="z.B. Körperpflege, Mobilisation...">
+                   list="kategorie-list" placeholder="z.B. Körperpflege, Mobilität...">
             <datalist id="kategorie-list">
               <option value="Körperpflege">
-              <option value="Mobilisation">
               <option value="Ernährung">
-              <option value="Medikamente">
+              <option value="Mobilität">
+              <option value="Hauswirtschaft">
               <option value="Behandlungspflege">
               <option value="Soziale Betreuung">
-              <option value="Hauswirtschaft">
+              <option value="Beratung">
             </datalist>
           </div>
           <div class="col-12">
@@ -89,7 +145,9 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
-        <button type="submit" class="btn btn-primary btn-sm">Hinzufügen</button>
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-lg"></i> Hinzufügen
+        </button>
       </div>
     </form>
   </div>
