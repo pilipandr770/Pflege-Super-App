@@ -203,6 +203,27 @@ def new():
             bemerkungen=fd.get('bemerkungen', '').strip(),
         )
         db.session.add(nachweis)
+        db.session.flush()  # nachweis.id ist jetzt verfügbar
+
+        # Fotos verknüpfen: photo_ids aus dem Formular lesen und Tags aktualisieren
+        import json as _json
+        try:
+            photo_ids = _json.loads(fd.get('photo_ids', '[]'))
+        except Exception:
+            photo_ids = []
+
+        if photo_ids:
+            from app.models import PatientPhoto
+            for pid in photo_ids:
+                photo = PatientPhoto.query.filter_by(
+                    id=pid, company_id=current_user.company_id
+                ).first()
+                if photo:
+                    # Ersetze 'leistung:pending' durch 'nachweis:<id>'
+                    existing = [t for t in (photo.tags or '').split(',') if t and not t.startswith('leistung:')]
+                    existing.append(f'nachweis:{nachweis.id}')
+                    photo.tags = ','.join(existing)
+
         db.session.commit()
         log_action('CREATE', 'leistungsnachweise', entity_id=nachweis.id)
         flash('Leistung dokumentiert.', 'success')

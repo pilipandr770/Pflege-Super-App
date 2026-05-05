@@ -178,114 +178,181 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 
-<!-- Fehlende Dokumentation (Versicherung zahlt ohne vollständige Doku nicht!) -->
-{% if docs_missing %}
-<div class="alert alert-warning border-start border-5 border-warning mb-4" role="alert">
-  <div class="d-flex align-items-start">
-    <div class="flex-shrink-0">
-      <span class="fs-5">⚠️</span>
-    </div>
-    <div class="flex-grow-1 ms-3">
-      <h5 class="alert-heading">{{ docs_missing|length }} Patienten mit fehlender Dokumentation</h5>
-      <small class="text-muted d-block mb-2">Versicherungen zahlen ohne vollständige Dokumentation nicht. Klicken Sie auf einen Dokumenttyp, um ihn zu erstellen:</small>
-      {% for item in docs_missing %}
-      <div class="small mb-2">
-        <a href="{{ url_for('patients.show', patient_id=item.patient.id) }}" class="fw-semibold text-decoration-none">
-          {{ item.patient.full_name }}
-        </a>
-        <span class="badge bg-danger ms-2">{{ item.missing|length }} Doku</span>
-        <div class="ms-3 mt-1">
-          {% for doc in item.missing %}
-            {% if doc == 'SIS-Einschätzung' %}
-              <a href="{{ url_for('sis.new', patient_id=item.patient.id) }}" class="badge bg-warning text-dark text-decoration-none me-1" style="cursor: pointer;">
-                {{ doc }}
-              </a>
-            {% elif doc.startswith('Wundbeurteilung') %}
-              <a href="{{ url_for('wounds.new_wound', patient_id=item.patient.id) }}" class="badge bg-danger text-white text-decoration-none me-1" style="cursor: pointer;">
-                {{ doc }}
-              </a>
-            {% else %}
-              <span class="badge bg-light text-dark me-1">{{ doc }}</span>
-            {% endif %}
-          {% endfor %}
+{% if current_user.is_admin %}
+
+  {# ── ADMIN: fehlende Dokumentation ── #}
+  {% if docs_missing %}
+  <div class="alert alert-warning border-start border-5 border-warning mb-4" role="alert">
+    <div class="d-flex align-items-start">
+      <div class="flex-shrink-0"><span class="fs-5">⚠️</span></div>
+      <div class="flex-grow-1 ms-3">
+        <h5 class="alert-heading">{{ docs_missing|length }} Patienten mit fehlender Dokumentation</h5>
+        <small class="text-muted d-block mb-2">Versicherungen zahlen ohne vollständige Dokumentation nicht.</small>
+        {% for item in docs_missing %}
+        <div class="small mb-2">
+          <a href="{{ url_for('patients.show', patient_id=item.patient.id) }}" class="fw-semibold text-decoration-none">
+            {{ item.patient.full_name }}
+          </a>
+          <span class="badge bg-danger ms-2">{{ item.missing|length }} Doku</span>
+          <div class="ms-3 mt-1">
+            {% for doc in item.missing %}
+              {% if doc == 'SIS-Einschätzung' %}
+                <a href="{{ url_for('sis.new', patient_id=item.patient.id) }}"
+                   class="badge bg-warning text-dark text-decoration-none me-1">{{ doc }}</a>
+              {% elif doc.startswith('Wundbeurteilung') %}
+                <a href="{{ url_for('wounds.new_wound', patient_id=item.patient.id) }}"
+                   class="badge bg-danger text-white text-decoration-none me-1">{{ doc }}</a>
+              {% else %}
+                <span class="badge bg-light text-dark me-1">{{ doc }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
         </div>
+        {% endfor %}
       </div>
-      {% endfor %}
     </div>
   </div>
-</div>
-{% endif %}
+  {% endif %}
 
-<div class="row g-3">
-  <!-- Risikopatienten -->
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header bg-transparent fw-semibold">
-        &#x26A0;&#xFE0F; Risikopatienten
-      </div>
-      <div class="card-body p-0">
-        {% if risiko_patienten %}
-        <ul class="list-group list-group-flush">
-          {% for p in risiko_patienten %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-              <a href="{{ url_for('patients.show', patient_id=p.id) }}" class="fw-semibold text-decoration-none">
-                {{ p.full_name }}
-              </a>
+  <div class="row g-3">
+    {# Risikopatienten #}
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header bg-transparent fw-semibold">⚠️ Risikopatienten</div>
+        <div class="card-body p-0">
+          {% if risiko_patienten %}
+          <ul class="list-group list-group-flush">
+            {% for p in risiko_patienten %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
               <div>
-                {% if p.sturzrisiko %}<span class="badge bg-warning text-dark risk-badge me-1">Sturz</span>{% endif %}
-                {% if p.dekubitusrisiko %}<span class="badge bg-danger risk-badge me-1">Dekubitus</span>{% endif %}
-                {% if p.ernaehrungsrisiko %}<span class="badge bg-info risk-badge">Ernährung</span>{% endif %}
+                <a href="{{ url_for('patients.show', patient_id=p.id) }}" class="fw-semibold text-decoration-none">
+                  {{ p.full_name }}
+                </a>
+                <div>
+                  {% if p.sturzrisiko %}<span class="badge bg-warning text-dark risk-badge me-1">Sturz</span>{% endif %}
+                  {% if p.dekubitusrisiko %}<span class="badge bg-danger risk-badge me-1">Dekubitus</span>{% endif %}
+                  {% if p.ernaehrungsrisiko %}<span class="badge bg-info risk-badge">Ernährung</span>{% endif %}
+                </div>
               </div>
+              <span class="badge bg-secondary">PG {{ p.pflegegrad or '?' }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="p-3 text-muted small">Keine Risikopatienten</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Admin Schnellzugriff #}
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header bg-transparent fw-semibold">⚡ Schnellzugriff</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-6">
+              <a href="{{ url_for('leistung.new') }}" class="btn btn-outline-primary w-100 text-start">
+                <i class="bi bi-clipboard2-plus"></i> Leistung erfassen
+              </a>
             </div>
-            <span class="badge bg-secondary">PG {{ p.pflegegrad or '?' }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <div class="p-3 text-muted small">Keine Risikopatienten</div>
-        {% endif %}
+            <div class="col-6">
+              <a href="{{ url_for('patients.new') }}" class="btn btn-outline-success w-100 text-start">
+                <i class="bi bi-person-plus"></i> Neuer Patient
+              </a>
+            </div>
+            <div class="col-6">
+              <a href="{{ url_for('medications.btm_buch') }}" class="btn btn-outline-warning w-100 text-start">
+                <i class="bi bi-journal-medical"></i> BtM-Buch
+              </a>
+            </div>
+            <div class="col-6">
+              <a href="{{ url_for('admin.schedules_list') }}" class="btn btn-outline-info w-100 text-start">
+                <i class="bi bi-calendar2-week"></i> Dienstpläne (AI)
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Schnellzugriff -->
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header bg-transparent fw-semibold">
-        &#x26A1; Schnellzugriff
+{% else %}
+
+  {# ── PFLEGEKRAFT: heutiger Tagesplan ── #}
+  <div class="row g-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-transparent fw-semibold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-calendar2-check"></i> Mein Plan heute</span>
+          <a href="{{ url_for('nurse.dashboard') }}" class="btn btn-sm btn-outline-primary">
+            Vollständiger Plan →
+          </a>
+        </div>
+        <div class="card-body p-0">
+          {% if nurse_schedule_today %}
+          <ul class="list-group list-group-flush">
+            {% for s in nurse_schedule_today[:5] %}
+            <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+              <div>
+                <strong>{{ s.patient.full_name }}</strong>
+                <div class="small text-muted">
+                  {{ s.scheduled_time.strftime('%H:%M') if s.scheduled_time else '—' }}
+                  {% if s.notes %} · {{ s.notes[:40] }}{% endif %}
+                </div>
+              </div>
+              <span class="badge
+                {% if s.status == 'COMPLETED' %}bg-success
+                {% elif s.status == 'IN_PROGRESS' %}bg-warning text-dark
+                {% elif s.status == 'CANCELLED' %}bg-secondary
+                {% else %}bg-light text-dark border{% endif %}">
+                {% if s.status == 'COMPLETED' %}✓ Erledigt
+                {% elif s.status == 'IN_PROGRESS' %}Läuft
+                {% elif s.status == 'CANCELLED' %}Abgesagt
+                {% else %}Geplant{% endif %}
+              </span>
+            </li>
+            {% endfor %}
+            {% if nurse_schedule_today|length > 5 %}
+            <li class="list-group-item text-center text-muted small py-2">
+              + {{ nurse_schedule_today|length - 5 }} weitere Einsätze →
+              <a href="{{ url_for('nurse.dashboard') }}">alle anzeigen</a>
+            </li>
+            {% endif %}
+          </ul>
+          {% else %}
+          <div class="p-3 text-muted small">
+            <i class="bi bi-calendar-x"></i>
+            Keine Einsätze für heute geplant.
+          </div>
+          {% endif %}
+        </div>
       </div>
-      <div class="card-body">
-        <div class="row g-2">
-          <div class="col-6">
-            <a href="{{ url_for('leistung.new') }}" class="btn btn-outline-primary w-100 text-start">
-              <i class="bi bi-clipboard2-plus"></i> Leistung erfassen
-            </a>
-          </div>
-          <div class="col-6">
-            <a href="{{ url_for('patients.new') }}" class="btn btn-outline-success w-100 text-start">
-              <i class="bi bi-person-plus"></i> Neuer Patient
-            </a>
-          </div>
-          <div class="col-6">
-            <a href="{{ url_for('medications.btm_buch') }}" class="btn btn-outline-warning w-100 text-start">
-              <i class="bi bi-journal-medical"></i> BtM-Buch
-            </a>
-          </div>
-          <div class="col-6">
-            {% if current_user.is_admin or current_user.role in ['ADMIN', 'PFLEGEFACHKRAFT'] %}
-            <a href="{{ url_for('tracking.dashboard') }}" class="btn btn-outline-info w-100 text-start">
-              <i class="bi bi-map"></i> Dienst-Routing
-            </a>
-            {% else %}
-            <a href="{{ url_for('patients.index') }}" class="btn btn-outline-secondary w-100 text-start">
-              <i class="bi bi-people"></i> Patientenliste
-            </a>
+    </div>
+
+    {# Pflegekraft Schnellzugriff — nur eine Aktion #}
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-transparent fw-semibold">⚡ Schnellzugriff</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-12 col-sm-6 col-md-4">
+              <a href="{{ url_for('leistung.new') }}" class="btn btn-primary w-100">
+                <i class="bi bi-clipboard2-plus"></i> Leistung erfassen
+              </a>
+            </div>
+            {% if current_user.can_see_btm %}
+            <div class="col-12 col-sm-6 col-md-4">
+              <a href="{{ url_for('medications.btm_buch') }}" class="btn btn-outline-warning w-100">
+                <i class="bi bi-capsule-pill"></i> BtM-Buch
+              </a>
+            </div>
             {% endif %}
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
+
+{% endif %}
 {% endblock %}

@@ -7,6 +7,7 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="geo_lat" id="geo_lat">
   <input type="hidden" name="geo_lng" id="geo_lng">
+  <input type="hidden" name="photo_ids" id="photoIdsField" value="[]">
 
   <div class="card mb-3">
     <div class="card-body">
@@ -103,6 +104,65 @@
     </div>
   </div>
 
+  <!-- ── Foto-Upload ── -->
+  <div class="card mb-3">
+    <div class="card-header fw-semibold">
+      <i class="bi bi-camera-fill text-primary"></i> Fotos (optional)
+      <small class="text-muted fw-normal ms-2">Bis zu 5 Fotos als Nachweis</small>
+    </div>
+    <div class="card-body">
+
+      <!-- Buttons: Kamera + Galerie -->
+      <div class="d-flex gap-2 mb-3 flex-wrap">
+        <button type="button" class="btn btn-primary" id="btnCamera"
+                onclick="document.getElementById('cameraInput').click()">
+          <i class="bi bi-camera-fill"></i> Kamera
+        </button>
+        <button type="button" class="btn btn-outline-secondary"
+                onclick="document.getElementById('galleryInput').click()">
+          <i class="bi bi-image"></i> Galerie
+        </button>
+
+        <!-- Fototyp -->
+        <select id="photoTypeSelect" class="form-select form-select-sm" style="width:auto;">
+          <option value="GENERAL">Allgemein</option>
+          <option value="BEFORE">Vorher</option>
+          <option value="AFTER">Nachher</option>
+          <option value="WOUND">Wunde</option>
+          <option value="INSPECTION">Kontrolle</option>
+        </select>
+
+        <!-- NFC Tag -->
+        <input type="text" id="nfcTagInput" class="form-control form-control-sm"
+               placeholder="NFC-Tag (optional)" style="width:160px;">
+      </div>
+
+      <!-- Hidden file inputs -->
+      <input type="file" id="cameraInput"  accept="image/*" capture="environment" class="d-none">
+      <input type="file" id="galleryInput" accept="image/*"                       class="d-none">
+
+      <!-- GPS Status -->
+      <div class="mb-2">
+        <small id="gpsStatusPhoto" class="text-muted">
+          <i class="bi bi-geo-alt"></i> GPS wird erfasst...
+        </small>
+      </div>
+
+      <!-- Upload Status -->
+      <div id="uploadStatus" class="d-none mb-2">
+        <div class="d-flex align-items-center gap-2">
+          <div class="spinner-border spinner-border-sm text-primary"></div>
+          <small class="text-muted">Foto wird hochgeladen...</small>
+        </div>
+      </div>
+
+      <!-- Thumbnails -->
+      <div id="photoThumbnails" class="d-flex flex-wrap gap-2"></div>
+
+      <small id="photoCountInfo" class="text-muted d-block mt-2">0 / 5 Fotos</small>
+    </div>
+  </div>
+
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-primary fw-semibold px-4">✓ Leistung dokumentieren</button>
     <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
@@ -128,6 +188,121 @@ function toggleNfc(sel) {
   document.querySelectorAll('.nfc-field').forEach(el => {
     el.classList.toggle('d-none', !sel.value.includes('NFC'));
   });
+}
+
+// ── Foto-Upload ────────────────────────────────────────────────
+const MAX_PHOTOS = 5;
+let uploadedPhotoIds = [];
+let currentGps = { lat: null, lng: null };
+
+// GPS kontinuierlich erfassen
+function startGpsWatch() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(pos => {
+    currentGps.lat = pos.coords.latitude.toFixed(6);
+    currentGps.lng = pos.coords.longitude.toFixed(6);
+    // auch in Leistungs-GPS-Feldern setzen
+    const latF = document.getElementById('geo_lat');
+    const lngF = document.getElementById('geo_lng');
+    if (latF && !latF.value) latF.value = currentGps.lat;
+    if (lngF && !lngF.value) lngF.value = currentGps.lng;
+    document.getElementById('gpsStatusPhoto').innerHTML =
+      `<i class="bi bi-geo-alt-fill text-success"></i> GPS: ${currentGps.lat}, ${currentGps.lng}`;
+  }, () => {
+    document.getElementById('gpsStatusPhoto').innerHTML =
+      `<i class="bi bi-geo-alt text-warning"></i> GPS nicht verfügbar`;
+  }, { enableHighAccuracy: true });
+}
+startGpsWatch();
+
+// Patienten-ID aus dem Formular lesen
+function getPatientId() {
+  const sel = document.querySelector('select[name="patient_id"]');
+  if (sel) return sel.value;
+  const hidden = document.querySelector('input[name="patient_id"]');
+  return hidden ? hidden.value : '';
+}
+
+// File inputs
+document.getElementById('cameraInput').addEventListener('change', e => handleFile(e.target.files[0]));
+document.getElementById('galleryInput').addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if (!file) return;
+  if (uploadedPhotoIds.length >= MAX_PHOTOS) {
+    alert(`Maximal ${MAX_PHOTOS} Fotos erlaubt.`);
+    return;
+  }
+  const patientId = getPatientId();
+  if (!patientId) {
+    alert('Bitte zuerst einen Patienten auswählen.');
+    return;
+  }
+  uploadPhoto(file, patientId);
+}
+
+async function uploadPhoto(file, patientId) {
+  document.getElementById('uploadStatus').classList.remove('d-none');
+
+  const fd = new FormData();
+  fd.append('photo', file);
+  fd.append('patient_id', patientId);
+  fd.append('photo_type', document.getElementById('photoTypeSelect').value);
+  fd.append('geo_lat',  currentGps.lat || '');
+  fd.append('geo_lng',  currentGps.lng || '');
+  fd.append('nfc_tag_id', document.getElementById('nfcTagInput').value.trim());
+
+  try {
+    const res = await fetch('/photos/leistung-upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    document.getElementById('uploadStatus').classList.add('d-none');
+
+    if (data.success) {
+      uploadedPhotoIds.push(data.photo_id);
+      document.getElementById('photoIdsField').value = JSON.stringify(uploadedPhotoIds);
+      addThumbnail(data.photo_id, data.preview_url, data.has_gps, file.name);
+      updateCount();
+    } else {
+      alert('Fehler: ' + (data.error || 'Unbekannt'));
+    }
+  } catch (err) {
+    document.getElementById('uploadStatus').classList.add('d-none');
+    alert('Upload-Fehler: ' + err.message);
+  }
+}
+
+function addThumbnail(photoId, previewUrl, hasGps, filename) {
+  const wrap = document.getElementById('photoThumbnails');
+  const div = document.createElement('div');
+  div.className = 'position-relative';
+  div.style.cssText = 'width:80px;height:80px;';
+  div.innerHTML = `
+    <img src="${previewUrl}" alt="${filename}"
+         style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid #dee2e6;">
+    ${hasGps ? '<span class="position-absolute top-0 start-0 badge bg-success" style="font-size:0.6rem;padding:2px 4px;">GPS</span>' : ''}
+    <button type="button" onclick="removePhoto('${photoId}', this)"
+            class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0"
+            style="width:20px;height:20px;font-size:0.65rem;border-radius:50%;line-height:1;">×</button>
+  `;
+  wrap.appendChild(div);
+}
+
+function removePhoto(photoId, btn) {
+  uploadedPhotoIds = uploadedPhotoIds.filter(id => id !== photoId);
+  document.getElementById('photoIdsField').value = JSON.stringify(uploadedPhotoIds);
+  btn.closest('div').remove();
+  updateCount();
+}
+
+function updateCount() {
+  document.getElementById('photoCountInfo').textContent =
+    `${uploadedPhotoIds.length} / ${MAX_PHOTOS} Fotos`;
+  const camBtn = document.getElementById('btnCamera');
+  if (uploadedPhotoIds.length >= MAX_PHOTOS) {
+    camBtn.disabled = true;
+  } else {
+    camBtn.disabled = false;
+  }
 }
 </script>
 {% endblock %}

@@ -397,6 +397,97 @@ def visit_photo_upload(schedule_id):
         return jsonify({'error': str(e)}), 500
 
 
+@photos_bp.route('/leistung-upload', methods=['POST'])
+@login_required
+def leistung_photo_upload():
+    """
+    Foto-Upload beim Ausfüllen eines Leistungsnachweises.
+    Zugriff: jeder authentifizierte Mitarbeiter der gleichen Company.
+    Der patient_id wird aus dem Formular gelesen und auf Company geprüft.
+    """
+    patient_id = request.form.get('patient_id', '').strip()
+    if not patient_id:
+        return jsonify({'error': 'patient_id fehlt'}), 400
+
+    # Sicherstellen, dass Patient zur Company gehört
+    from app.models import Patient
+    patient = Patient.query.filter_by(
+        id=patient_id,
+        company_id=current_user.company_id,
+        deleted_at=None
+    ).first()
+    if not patient:
+        return jsonify({'error': 'Patient nicht gefunden'}), 404
+
+    if 'photo' not in request.files:
+        return jsonify({'error': 'Kein Foto übermittelt'}), 400
+
+    file = request.files['photo']
+    if not file or file.filename == '':
+        return jsonify({'error': 'Keine Datei ausgewählt'}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'Dateityp nicht erlaubt (JPG, PNG, WEBP)'}), 400
+
+    try:
+        file_path = save_upload(file, subfolder=f'photos/{current_user.company_id}/leistung')
+        if not file_path:
+            return jsonify({'error': 'Fehler beim Speichern'}), 500
+
+        full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], file_path)
+        exif_meta = extract_exif_data(full_path)
+
+        geo_lat  = request.form.get('geo_lat',  type=float) or exif_meta.get('geo_lat')
+        geo_lng  = request.form.get('geo_lng',  type=float) or exif_meta.get('geo_lng')
+        geo_acc  = request.form.get('geo_accuracy', type=float)
+        nfc_tag  = request.form.get('nfc_tag_id', '').strip() or None
+        photo_type = request.form.get('photo_type', 'GENERAL')
+        valid_types = ['GENERAL', 'WOUND', 'PRESSURE_ULCER', 'INSPECTION', 'BEFORE', 'AFTER']
+        if photo_type not in valid_types:
+            photo_type = 'GENERAL'
+
+        file_size = os.path.getsize(full_path) if os.path.exists(full_path) else 0
+
+        tags_list = ['leistung:pending']
+        if nfc_tag:
+            tags_list.append(f'nfc:{nfc_tag}')
+
+        photo = PatientPhoto(
+            company_id=current_user.company_id,
+            patient_id=patient_id,
+            employee_id=current_user.id,
+            file_path=file_path,
+            file_size=file_size,
+            mime_type=file.content_type or 'image/jpeg',
+            geo_lat=geo_lat,
+            geo_lng=geo_lng,
+            geo_accuracy=geo_acc,
+            device_model=exif_meta.get('device_model', ''),
+            device_mac=request.form.get('device_mac', '').strip(),
+            photo_type=photo_type,
+            description=request.form.get('description', '').strip() or f'Leistungsnachweis-Foto',
+            tags=','.join(tags_list),
+        )
+        db.session.add(photo)
+        db.session.commit()
+
+        log_action('LEISTUNG_PHOTO_UPLOADED', 'PatientPhoto', photo.id, new_values={
+            'patient': patient.full_name,
+            'gps': f'{geo_lat},{geo_lng}' if geo_lat else 'kein GPS',
+        })
+
+        return jsonify({
+            'success':     True,
+            'photo_id':    photo.id,
+            'preview_url': url_for('photos.view_photo_file', photo_id=photo.id),
+            'has_gps':     bool(geo_lat and geo_lng),
+        }), 201
+
+    except Exception as e:
+        current_app.logger.error(f'leistung_photo_upload error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 @photos_bp.route('/api/patient/<patient_id>/photos')
 @login_required
 @patient_access_required()

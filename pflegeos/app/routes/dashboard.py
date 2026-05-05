@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template
 from flask_login import login_required, current_user
-from app.models import Patient, SisAssessment, MedicationAdministration, Leistungsnachweis, MedicationPlan, WoundDoc
+from app.models import Patient, SisAssessment, MedicationAdministration, Leistungsnachweis, MedicationPlan, WoundDoc, EmployeeSchedule
 from datetime import date, timedelta, datetime
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -69,16 +69,36 @@ def index():
         ).count(),
     }
 
-    # Пациенты требующие внимания (риски)
-    risiko_patienten = Patient.query.filter_by(
-        company_id=cid, status='AKTIV', deleted_at=None
-    ).filter(
-        (Patient.sturzrisiko == True) |
-        (Patient.dekubitusrisiko == True)
-    ).limit(5).all()
+    if current_user.is_admin:
+        # Пациенты требующие внимания (риски) — только для админа
+        risiko_patienten = Patient.query.filter_by(
+            company_id=cid, status='AKTIV', deleted_at=None
+        ).filter(
+            (Patient.sturzrisiko == True) |
+            (Patient.dekubitusrisiko == True)
+        ).limit(5).all()
 
-    # Пациенты с недостающей документацией
-    docs_missing = get_missing_docs()
+        # Пациенты с недостающей документацией — только для админа
+        docs_missing = get_missing_docs()
+
+        nurse_schedule_today = []
+    else:
+        # Для полевого персонала — план на сегодня
+        risiko_patienten = []
+        docs_missing = []
+        nurse_schedule_today = EmployeeSchedule.query.filter_by(
+            employee_id=current_user.id,
+            company_id=cid,
+            scheduled_date=today,
+            is_active=True
+        ).order_by(EmployeeSchedule.scheduled_time).all()
+
+        # Nur eigene Leistungen heute zählen
+        stats['leistungen_heute'] = Leistungsnachweis.query.filter(
+            Leistungsnachweis.company_id == cid,
+            Leistungsnachweis.employee_id == current_user.id,
+            Leistungsnachweis.durchgefuehrt_am == today
+        ).count()
 
     # Check if user is on first login
     is_first_login = current_user.last_login_at is None or (
@@ -90,5 +110,6 @@ def index():
                            stats=stats,
                            risiko_patienten=risiko_patienten,
                            docs_missing=docs_missing,
+                           nurse_schedule_today=nurse_schedule_today,
                            is_first_login=is_first_login,
                            today=today)
