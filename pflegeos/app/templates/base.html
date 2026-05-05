@@ -89,12 +89,6 @@
           </a>
         </li>
         <li class="nav-item">
-          <a href="{{ url_for('leistung.new') }}"
-             class="nav-link {% if 'leistung' in request.endpoint and request.endpoint != 'leistung.katalog_manage' %}active{% endif %}">
-            <i class="bi bi-clipboard2-check-fill"></i> Leistungsnachweis
-          </a>
-        </li>
-        <li class="nav-item">
           <a href="{{ url_for('medications.btm_buch') }}"
              class="nav-link {% if 'medications' in request.endpoint %}active{% endif %}">
             <i class="bi bi-capsule-pill"></i> BtM-Buch
