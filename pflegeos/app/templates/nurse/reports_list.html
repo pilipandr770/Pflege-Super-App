@@ -12,65 +12,90 @@
   <div class="row mb-4">
     <div class="col-md-12">
       <h2><i class="bi bi-file-text"></i> Meine Berichte</h2>
-      <small class="text-muted">Übersicht aller eingereichten Visitenberichte</small>
+      <small class="text-muted">Übersicht aller Visitenberichte und Leistungsnachweise</small>
     </div>
   </div>
 
-  <!-- Filter -->
+  <!-- Статистика -->
   <div class="row mb-4">
-    <div class="col-md-12">
-      <div class="card">
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-md-3">
-              <select class="form-select form-select-sm" id="statusFilter" onchange="applyFilters()">
-                <option value="">Alle Status</option>
-                <option value="DRAFT">Entwurf</option>
-                <option value="SUBMITTED">Eingereicht</option>
-                <option value="VERIFIED">Genehmigt</option>
-                <option value="LOCKED">Gesperrt</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <input type="date" class="form-control form-control-sm" id="dateFrom" onchange="applyFilters()">
-            </div>
-            <div class="col-md-3">
-              <input type="date" class="form-control form-control-sm" id="dateTo" onchange="applyFilters()">
-            </div>
-            <div class="col-md-3">
-              <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetFilters()">
-                <i class="bi bi-arrow-clockwise"></i> Zurücksetzen
-              </button>
-            </div>
-          </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center border-0 bg-light">
+        <div class="card-body py-3">
+          <div class="display-6 text-primary">{{ visit_reports|length }}</div>
+          <small class="text-muted">Visitenberichte</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center border-0 bg-light">
+        <div class="card-body py-3">
+          <div class="display-6 text-success">{{ visit_reports|selectattr('status','equalto','VERIFIED')|list|length }}</div>
+          <small class="text-muted">Genehmigt</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center border-0 bg-light">
+        <div class="card-body py-3">
+          <div class="display-6 text-info">{{ leistungen|length }}</div>
+          <small class="text-muted">Leistungsnachweise</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center border-0 bg-light">
+        <div class="card-body py-3">
+          <div class="display-6 text-warning">{{ leistungen|selectattr('abgerechnet','equalto',False)|list|length }}</div>
+          <small class="text-muted">Noch nicht abgerechnet</small>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Таблица отчетов -->
-  <div class="row">
-    <div class="col-md-12">
-      {% if reports.items %}
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3" id="reportTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="visits-tab" data-bs-toggle="tab" data-bs-target="#visits-pane"
+              type="button" role="tab">
+        <i class="bi bi-clipboard-check"></i> Visitenberichte
+        <span class="badge bg-primary ms-1">{{ visit_reports|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="leistung-tab" data-bs-toggle="tab" data-bs-target="#leistung-pane"
+              type="button" role="tab">
+        <i class="bi bi-list-check"></i> Leistungsnachweise
+        <span class="badge bg-info ms-1">{{ leistungen|length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="reportTabContent">
+
+    <!-- ===== Tab 1: Visitenberichte ===== -->
+    <div class="tab-pane fade show active" id="visits-pane" role="tabpanel">
+      {% if visit_reports %}
         <div class="table-responsive">
-          <table class="table table-hover">
+          <table class="table table-hover align-middle">
             <thead class="table-light">
               <tr>
                 <th>Datum</th>
                 <th>Patient</th>
                 <th>Dauer</th>
                 <th>Zustand</th>
+                <th>Fotos</th>
                 <th>Status</th>
-                <th>Billable</th>
                 <th>Aktion</th>
               </tr>
             </thead>
             <tbody>
-              {% for report in reports.items %}
+              {% for report in visit_reports %}
               <tr>
                 <td>
                   <strong>{{ report.visit_date|datefmt }}</strong><br>
-                  <small class="text-muted">{{ report.visit_start_time.strftime('%H:%M') if report.visit_start_time else '—' }}</small>
+                  <small class="text-muted">
+                    {{ report.visit_start_time.strftime('%H:%M') if report.visit_start_time else '—' }}
+                  </small>
                 </td>
                 <td>
                   <strong>{{ report.patient.full_name }}</strong><br>
@@ -95,7 +120,26 @@
                   {% elif report.patient_condition == 'DETERIORATED' %}
                     <span class="badge bg-danger">Verschlechtert</span>
                   {% else %}
-                    —
+                    <span class="badge bg-secondary">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% set photos = visit_photo_map.get(report.id, []) %}
+                  {% if photos %}
+                    <div class="d-flex gap-1 flex-wrap">
+                      {% for photo in photos[:3] %}
+                        <a href="/photos/{{ photo.id }}/view-file" target="_blank"
+                           class="d-inline-block" style="width:40px;height:40px;overflow:hidden;border-radius:4px;">
+                          <img src="/photos/{{ photo.id }}/view-file"
+                               style="width:40px;height:40px;object-fit:cover;" alt="foto">
+                        </a>
+                      {% endfor %}
+                      {% if photos|length > 3 %}
+                        <span class="badge bg-secondary align-self-center">+{{ photos|length - 3 }}</span>
+                      {% endif %}
+                    </div>
+                  {% else %}
+                    <small class="text-muted">—</small>
                   {% endif %}
                 </td>
                 <td>
@@ -112,15 +156,9 @@
                   {% endif %}
                 </td>
                 <td>
-                  {% if report.billable_minutes %}
-                    <strong>{{ report.billable_minutes }} min</strong>
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
-                <td>
-                  <a href="{{ url_for('nurse.view_report', report_id=report.id) }}" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-eye"></i> Anschauen
+                  <a href="{{ url_for('nurse.view_report', report_id=report.id) }}"
+                     class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye"></i>
                   </a>
                 </td>
               </tr>
@@ -128,123 +166,95 @@
             </tbody>
           </table>
         </div>
-
-        <!-- Пагинация -->
-        {% if reports.pages > 1 %}
-        <nav aria-label="Page navigation">
-          <ul class="pagination justify-content-center">
-            {% if reports.has_prev %}
-              <li class="page-item">
-                <a class="page-link" href="{{ url_for('nurse.my_reports', page=reports.prev_num) }}">← Vorherige</a>
-              </li>
-            {% else %}
-              <li class="page-item disabled">
-                <span class="page-link">← Vorherige</span>
-              </li>
-            {% endif %}
-
-            {% for page_num in reports.iter_pages() %}
-              {% if page_num %}
-                {% if page_num == reports.page %}
-                  <li class="page-item active">
-                    <span class="page-link">{{ page_num }}</span>
-                  </li>
-                {% else %}
-                  <li class="page-item">
-                    <a class="page-link" href="{{ url_for('nurse.my_reports', page=page_num) }}">{{ page_num }}</a>
-                  </li>
-                {% endif %}
-              {% else %}
-                <li class="page-item disabled">
-                  <span class="page-link">…</span>
-                </li>
-              {% endif %}
-            {% endfor %}
-
-            {% if reports.has_next %}
-              <li class="page-item">
-                <a class="page-link" href="{{ url_for('nurse.my_reports', page=reports.next_num) }}">Nächste →</a>
-              </li>
-            {% else %}
-              <li class="page-item disabled">
-                <span class="page-link">Nächste →</span>
-              </li>
-            {% endif %}
-          </ul>
-        </nav>
-        {% endif %}
-
-        <!-- Статистика -->
-        <div class="row mt-4">
-          <div class="col-md-3">
-            <div class="card text-center">
-              <div class="card-body">
-                <div class="display-6 text-primary">{{ reports.total }}</div>
-                <small class="text-muted">Berichte insgesamt</small>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card text-center">
-              <div class="card-body">
-                <div class="display-6 text-success">{{ reports.items|selectattr('status', 'equalto', 'VERIFIED')|list|length }}</div>
-                <small class="text-muted">Genehmigt</small>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card text-center">
-              <div class="card-body">
-                <div class="display-6 text-warning">{{ reports.items|selectattr('status', 'equalto', 'SUBMITTED')|list|length }}</div>
-                <small class="text-muted">Eingereicht</small>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card text-center">
-              <div class="card-body">
-                <div class="display-6 text-secondary">{{ reports.items|selectattr('status', 'equalto', 'DRAFT')|list|length }}</div>
-                <small class="text-muted">Entwurf</small>
-              </div>
-            </div>
-          </div>
-        </div>
-
       {% else %}
         <div class="alert alert-info">
-          <i class="bi bi-info-circle"></i> Keine Berichte vorhanden. Starten Sie einen Besuch von Ihrem Dashboard aus.
+          <i class="bi bi-info-circle"></i>
+          Noch keine Visitenberichte vorhanden. Starten Sie einen Besuch über Ihr
+          <a href="{{ url_for('nurse.dashboard') }}">Dashboard</a>.
         </div>
       {% endif %}
     </div>
-  </div>
+
+    <!-- ===== Tab 2: Leistungsnachweise ===== -->
+    <div class="tab-pane fade" id="leistung-pane" role="tabpanel">
+      {% if leistungen %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Datum / Uhrzeit</th>
+                <th>Patient</th>
+                <th>Leistung</th>
+                <th>Dauer</th>
+                <th>Verifikation</th>
+                <th>Abgerechnet</th>
+                <th>Bemerkungen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ln in leistungen %}
+              <tr>
+                <td>
+                  <strong>{{ ln.durchgefuehrt_am|datefmt }}</strong><br>
+                  <small class="text-muted">
+                    {{ ln.durchgefuehrt_um.strftime('%H:%M') if ln.durchgefuehrt_um else '—' }}
+                  </small>
+                </td>
+                <td>
+                  <strong>{{ ln.patient.full_name }}</strong>
+                </td>
+                <td>
+                  {% if ln.leistung %}
+                    <span class="badge bg-light text-dark border me-1">{{ ln.leistung.leistung_nr }}</span>
+                    {{ ln.leistung.bezeichnung }}
+                  {% else %}
+                    <small class="text-muted">—</small>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if ln.dauer_minuten %}
+                    {{ ln.dauer_minuten }} min
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>
+                  {% if ln.geo_lat and ln.geo_lng %}
+                    <i class="bi bi-geo-alt-fill text-success" title="GPS vorhanden"></i>
+                  {% endif %}
+                  {% if ln.nfc_tag_id %}
+                    <i class="bi bi-broadcast text-primary" title="NFC: {{ ln.nfc_tag_id }}"></i>
+                  {% endif %}
+                  {% if ln.device_mac %}
+                    <i class="bi bi-phone text-secondary" title="MAC: {{ ln.device_mac }}"></i>
+                  {% endif %}
+                  {% if not ln.geo_lat and not ln.nfc_tag_id and not ln.device_mac %}
+                    <small class="text-muted">—</small>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if ln.abgerechnet %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Ja</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark">Nein</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <small class="text-muted">{{ ln.bemerkungen or '—' }}</small>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i>
+          Noch keine Leistungsnachweise vorhanden.
+        </div>
+      {% endif %}
+    </div>
+
+  </div>{# /tab-content #}
 </div>
-
-<script>
-function applyFilters() {
-  const status = document.getElementById('statusFilter').value;
-  const dateFrom = document.getElementById('dateFrom').value;
-  const dateTo = document.getElementById('dateTo').value;
-
-  let url = '{{ url_for("nurse.my_reports") }}?';
-  const params = [];
-
-  if (status) params.push(`status=${encodeURIComponent(status)}`);
-  if (dateFrom) params.push(`date_from=${encodeURIComponent(dateFrom)}`);
-  if (dateTo) params.push(`date_to=${encodeURIComponent(dateTo)}`);
-
-  if (params.length > 0) {
-    url += params.join('&');
-  }
-
-  window.location.href = url;
-}
-
-function resetFilters() {
-  document.getElementById('statusFilter').value = '';
-  document.getElementById('dateFrom').value = '';
-  document.getElementById('dateTo').value = '';
-
-  window.location.href = '{{ url_for("nurse.my_reports") }}';
-}
-</script>
 {% endblock %}

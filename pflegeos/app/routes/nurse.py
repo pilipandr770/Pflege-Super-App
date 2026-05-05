@@ -7,7 +7,7 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models import (
     Employee, Patient, EmployeeSchedule, VisitReport, PatientPhoto,
-    EmployeePatientAssignment, Company
+    EmployeePatientAssignment, Company, Leistungsnachweis
 )
 from app.utils.auth import log_action
 from datetime import datetime, date, timedelta
@@ -205,16 +205,41 @@ def cancel_visit(schedule_id):
 @nurse_bp.route('/reports')
 @login_required
 def my_reports():
-    """Мои отчеты (история)"""
+    """Мои отчеты — VisitReports + Leistungsnachweise kombiniert"""
     page = request.args.get('page', 1, type=int)
 
-    reports = VisitReport.query.filter_by(
+    visit_reports = VisitReport.query.filter_by(
         employee_id=current_user.id,
         company_id=current_user.company_id,
         is_active=True
-    ).order_by(VisitReport.visit_date.desc()).paginate(page=page, per_page=20)
+    ).order_by(VisitReport.visit_date.desc()).all()
 
-    return render_template('nurse/reports_list.html', reports=reports)
+    leistungen = Leistungsnachweis.query.filter_by(
+        employee_id=current_user.id,
+        company_id=current_user.company_id,
+    ).order_by(Leistungsnachweis.durchgefuehrt_am.desc()).all()
+
+    # Fotos für jeden Einsatz laden
+    visit_photo_map = {}
+    if visit_reports:
+        from app.models import PatientPhoto
+        import json
+        for vr in visit_reports:
+            try:
+                photo_ids = json.loads(vr.photo_ids or '[]')
+                if photo_ids:
+                    photos = PatientPhoto.query.filter(
+                        PatientPhoto.id.in_(photo_ids),
+                        PatientPhoto.is_active == True
+                    ).all()
+                    visit_photo_map[vr.id] = photos
+            except Exception:
+                pass
+
+    return render_template('nurse/reports_list.html',
+                           visit_reports=visit_reports,
+                           leistungen=leistungen,
+                           visit_photo_map=visit_photo_map)
 
 
 @nurse_bp.route('/reports/<report_id>')
