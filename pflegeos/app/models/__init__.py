@@ -135,6 +135,48 @@ class Employee(db.Model, UserMixin):
     def is_admin(self):
         return self.role == 'ADMIN'
 
+    # --- Rolle-Helfer für Template-Navigation ---
+
+    @property
+    def is_field_staff(self):
+        """Außendienstmitarbeiter — brauchen Dienstplan + Berichte."""
+        return self.role in (
+            'PFLEGEFACHKRAFT', 'PFLEGEHILFSKRAFT',
+            'BEHANDLUNGSPFLEGE', 'HAUSWIRTSCHAFT', 'FAHRER'
+        )
+
+    @property
+    def is_care_role(self):
+        """Pflegende Rollen — dürfen Leistungsnachweise erfassen."""
+        return self.role in (
+            'PFLEGEFACHKRAFT', 'PFLEGEHILFSKRAFT', 'BEHANDLUNGSPFLEGE'
+        )
+
+    @property
+    def is_office_role(self):
+        """Verwaltung — Lesezugriff auf Patienten / Mitarbeiter."""
+        return self.role == 'VERWALTUNG'
+
+    @property
+    def can_see_btm(self):
+        """BtM-Buch: Admins, Fachkräfte und wer die Berechtigung hat."""
+        return self.role in ('ADMIN', 'PFLEGEFACHKRAFT', 'BEHANDLUNGSPFLEGE') \
+               or bool(self.can_administer_btm)
+
+    @property
+    def role_label(self):
+        """Lesbarer Rollenname für die UI."""
+        labels = {
+            'ADMIN':             'Administrator',
+            'PFLEGEFACHKRAFT':   'Pflegefachkraft',
+            'PFLEGEHILFSKRAFT':  'Pflegehilfskraft',
+            'BEHANDLUNGSPFLEGE': 'Behandlungspflege',
+            'HAUSWIRTSCHAFT':    'Hauswirtschaft',
+            'FAHRER':            'Fahrer/in',
+            'VERWALTUNG':        'Verwaltung',
+        }
+        return labels.get(self.role, self.role)
+
     def __repr__(self):
         return f'<Employee {self.full_name}>'
 

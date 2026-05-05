@@ -69,86 +69,149 @@
     </div>
     <hr class="text-white-50 my-1">
     <ul class="nav flex-column flex-grow-1">
+
+      {# ── DASHBOARD — alle Rollen ── #}
       <li class="nav-item">
         <a href="{{ url_for('dashboard.index') }}"
            class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
           <i class="bi bi-grid-fill"></i> Dashboard
         </a>
       </li>
-      <li class="nav-item">
-        <a href="{{ url_for('patients.index') }}"
-           class="nav-link {% if 'patients' in request.endpoint %}active{% endif %}">
-          <i class="bi bi-people-fill"></i> Patienten
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="{{ url_for('leistung.new') }}"
-           class="nav-link {% if 'leistung' in request.endpoint %}active{% endif %}">
-          <i class="bi bi-clipboard2-check-fill"></i> Leistungsnachweis
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="{{ url_for('medications.btm_buch') }}"
-           class="nav-link {% if 'medications' in request.endpoint %}active{% endif %}">
-          <i class="bi bi-capsule-pill"></i> BtM-Buch
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="{{ url_for('leistung.katalog_manage') }}"
-           class="nav-link {% if request.endpoint == 'leistung.katalog_manage' %}active{% endif %}">
-          <i class="bi bi-list-check"></i> Leistungskatalog
-        </a>
-      </li>
 
-      <!-- Mein Plan — für Pflegekräfte -->
-      {% if not current_user.is_admin %}
-      <hr class="text-white-50 my-1">
-      <li class="nav-item">
-        <a href="{{ url_for('nurse.dashboard') }}"
-           class="nav-link {% if 'nurse' in request.endpoint %}active{% endif %}">
-          <i class="bi bi-calendar2-check-fill"></i> Mein Dienstplan
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="{{ url_for('nurse.my_reports') }}"
-           class="nav-link {% if request.endpoint == 'nurse.my_reports' %}active{% endif %}">
-          <i class="bi bi-journal-check"></i> Meine Berichte
-        </a>
-      </li>
-      {% endif %}
-
+      {# ── ADMIN — vollständiger Zugriff ── #}
       {% if current_user.is_admin %}
-      <hr class="text-white-50 my-1">
-      <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Administration</small></li>
-      <li class="nav-item">
-        <a href="{{ url_for('admin.schedules_list') }}"
-           class="nav-link {% if 'admin' in request.endpoint and 'schedule' in request.endpoint %}active{% endif %}">
-          <i class="bi bi-calendar2-week-fill"></i> Dienstpläne (AI)
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="{{ url_for('assignments.index') }}"
-           class="nav-link {% if 'assignments' in request.endpoint %}active{% endif %}">
-          <i class="bi bi-diagram-3"></i> Zuweisungen
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="{{ url_for('company.employees') }}"
-           class="nav-link {% if 'employees' in request.endpoint %}active{% endif %}">
-          <i class="bi bi-person-badge"></i> Mitarbeiter
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="{{ url_for('company.settings') }}"
-           class="nav-link {% if request.endpoint == 'company.settings' %}active{% endif %}">
-          <i class="bi bi-gear-fill"></i> Einstellungen
-        </a>
-      </li>
+
+        <li class="nav-item">
+          <a href="{{ url_for('patients.index') }}"
+             class="nav-link {% if 'patients' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-people-fill"></i> Patienten
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('leistung.new') }}"
+             class="nav-link {% if 'leistung' in request.endpoint and request.endpoint != 'leistung.katalog_manage' %}active{% endif %}">
+            <i class="bi bi-clipboard2-check-fill"></i> Leistungsnachweis
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('medications.btm_buch') }}"
+             class="nav-link {% if 'medications' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-capsule-pill"></i> BtM-Buch
+          </a>
+        </li>
+
+        <hr class="text-white-50 my-1">
+        <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Administration</small></li>
+        <li class="nav-item">
+          <a href="{{ url_for('admin.schedules_list') }}"
+             class="nav-link {% if 'admin' in request.endpoint and 'schedule' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-calendar2-week-fill"></i> Dienstpläne (AI)
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('leistung.katalog_manage') }}"
+             class="nav-link {% if request.endpoint == 'leistung.katalog_manage' %}active{% endif %}">
+            <i class="bi bi-list-check"></i> Leistungskatalog
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('assignments.index') }}"
+             class="nav-link {% if 'assignments' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-diagram-3"></i> Zuweisungen
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('company.employees') }}"
+             class="nav-link {% if 'employees' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-person-badge"></i> Mitarbeiter
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('company.settings') }}"
+             class="nav-link {% if request.endpoint == 'company.settings' %}active{% endif %}">
+            <i class="bi bi-gear-fill"></i> Einstellungen
+          </a>
+        </li>
+
+      {# ── PFLEGEKRÄFTE — Außendienst mit Patientenpflege ── #}
+      {% elif current_user.is_care_role %}
+
+        <li class="nav-item">
+          <a href="{{ url_for('leistung.new') }}"
+             class="nav-link {% if 'leistung' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-clipboard2-check-fill"></i> Leistungsnachweis
+          </a>
+        </li>
+        {% if current_user.can_see_btm %}
+        <li class="nav-item">
+          <a href="{{ url_for('medications.btm_buch') }}"
+             class="nav-link {% if 'medications' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-capsule-pill"></i> BtM-Buch
+          </a>
+        </li>
+        {% endif %}
+
+        <hr class="text-white-50 my-1">
+        <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Mein Bereich</small></li>
+        <li class="nav-item">
+          <a href="{{ url_for('nurse.dashboard') }}"
+             class="nav-link {% if 'nurse' in request.endpoint and request.endpoint != 'nurse.my_reports' %}active{% endif %}">
+            <i class="bi bi-calendar2-check-fill"></i> Mein Dienstplan
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('nurse.my_reports') }}"
+             class="nav-link {% if request.endpoint == 'nurse.my_reports' %}active{% endif %}">
+            <i class="bi bi-journal-check"></i> Meine Berichte
+          </a>
+        </li>
+
+      {# ── HAUSWIRTSCHAFT / FAHRER — Dienstplan-basiert ── #}
+      {% elif current_user.is_field_staff %}
+
+        <hr class="text-white-50 my-1">
+        <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Mein Bereich</small></li>
+        <li class="nav-item">
+          <a href="{{ url_for('nurse.dashboard') }}"
+             class="nav-link {% if 'nurse' in request.endpoint and request.endpoint != 'nurse.my_reports' %}active{% endif %}">
+            <i class="bi bi-calendar2-check-fill"></i> Mein Dienstplan
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('nurse.my_reports') }}"
+             class="nav-link {% if request.endpoint == 'nurse.my_reports' %}active{% endif %}">
+            <i class="bi bi-journal-check"></i> Meine Berichte
+          </a>
+        </li>
+
+      {# ── VERWALTUNG — Lesezugriff ── #}
+      {% elif current_user.is_office_role %}
+
+        <li class="nav-item">
+          <a href="{{ url_for('patients.index') }}"
+             class="nav-link {% if 'patients' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-people-fill"></i> Patienten
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('company.employees') }}"
+             class="nav-link {% if 'employees' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-person-badge"></i> Mitarbeiter
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('leistung.new') }}"
+             class="nav-link {% if 'leistung' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-clipboard2-check-fill"></i> Leistungsnachweis
+          </a>
+        </li>
+
       {% endif %}
+
     </ul>
     <div class="px-3 mt-auto">
       <small class="text-white-50 d-block">{{ current_user.full_name }}</small>
-      <small class="text-white-50">{{ current_user.role }}</small>
+      <small class="text-white-50">{{ current_user.role_label }}</small>
       <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-light mt-2 w-100">
         <i class="bi bi-box-arrow-right"></i> Abmelden
       </a>
