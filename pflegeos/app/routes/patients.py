@@ -76,6 +76,7 @@ def new():
                 betreuer_verhaeltnis=form_data.get('betreuer_verhaeltnis', '').strip(),
                 betreuer_email=form_data.get('betreuer_email', '').strip(),
                 portal_enabled='portal_enabled' in form_data,
+                arzt_portal_enabled='arzt_portal_enabled' in form_data,
                 hausarzt_name=form_data.get('hausarzt_name', '').strip(),
                 hausarzt_telefon=form_data.get('hausarzt_telefon', '').strip(),
                 pflegegrad=form_data.get('pflegegrad'),
@@ -161,6 +162,7 @@ def edit(patient_id):
         p.betreuer_telefon = form_data.get('betreuer_telefon', '').strip()
         p.betreuer_email = form_data.get('betreuer_email', '').strip()
         p.portal_enabled = 'portal_enabled' in form_data
+        p.arzt_portal_enabled = 'arzt_portal_enabled' in form_data
         p.hausarzt_name = form_data.get('hausarzt_name', '').strip()
         p.hausarzt_telefon = form_data.get('hausarzt_telefon', '').strip()
         p.allergien = form_data.get('allergien', '').strip()
@@ -185,6 +187,7 @@ def edit(patient_id):
         'zimmer_nr': p.zimmer_nr or '', 'bett_nr': p.bett_nr or '',
         'betreuer_name': p.betreuer_name or '', 'betreuer_telefon': p.betreuer_telefon or '',
         'betreuer_email': p.betreuer_email or '', 'portal_enabled': p.portal_enabled,
+        'arzt_portal_enabled': p.arzt_portal_enabled,
         'hausarzt_name': p.hausarzt_name or '', 'hausarzt_telefon': p.hausarzt_telefon or '',
         'allergien': p.allergien or '', 'status': p.status,
         'sturzrisiko': p.sturzrisiko, 'dekubitusrisiko': p.dekubitusrisiko,

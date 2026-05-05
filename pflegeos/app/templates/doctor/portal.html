@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medikamentenplan – {{ patient.vorname }} {{ patient.nachname }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root { --brand: #0d6efd; --danger: #dc3545; }
+    body { background: #f4f6fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .portal-header { background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); color: #fff; padding: 1.75rem 1.5rem 1.25rem; }
+    .card { border: none; box-shadow: 0 1px 6px rgba(0,0,0,.08); border-radius: 12px; }
+    .med-row { border-left: 4px solid #0d6efd; transition: background .15s; }
+    .med-row:hover { background: #f8f9ff; }
+    .med-row.stopped { border-left-color: #6c757d; opacity: .65; }
+    .btm-badge { background: #fff3cd; color: #856404; border: 1px solid #ffc107; border-radius: 4px; font-size: .7rem; padding: 1px 6px; }
+    .dosage-cell { font-size: .8rem; }
+    .dosage-pill { display: inline-block; background: #e8f4fd; color: #0d6efd; border-radius: 10px; padding: 2px 8px; font-size: .75rem; }
+    .section-label { font-size: .72rem; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: .08em; }
+    .stop-btn { font-size: .75rem; padding: 2px 8px; }
+    textarea.form-control { resize: vertical; }
+    .warning-btm { border-left: 4px solid #ffc107; }
+    @media (max-width: 576px) { .portal-header { padding: 1.25rem 1rem 1rem; } }
+  </style>
+</head>
+<body>
+
+{# ── Header ── #}
+<div class="portal-header mb-4">
+  <div class="container-sm">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-hospital fs-5 opacity-75"></i>
+      <small class="opacity-75">{{ patient.company.name }} · Medikamentenplan</small>
+    </div>
+    <h4 class="fw-bold mb-0">{{ patient.vorname }} {{ patient.nachname }}</h4>
+    <div class="small opacity-80 mt-1">
+      {% if patient.geburtsdatum %}
+        <i class="bi bi-calendar3"></i> geb. {{ patient.geburtsdatum.strftime('%d.%m.%Y') }}
+        &nbsp;·&nbsp;
+      {% endif %}
+      {% if patient.pflegegrad %}Pflegegrad {{ patient.pflegegrad }} &nbsp;·&nbsp; {% endif %}
+      Stand: {{ today.strftime('%d.%m.%Y') }}
+    </div>
+  </div>
+</div>
+
+<div class="container-sm pb-5">
+
+  {# Flash-Meldungen #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ 'success' if cat == 'success' else 'warning' }} alert-dismissible fade show mb-3 py-2">
+      {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  {# ── Aktueller Plan ── #}
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="section-label">Aktuelle Medikamente</span>
+    {% if plan %}
+    <small class="text-muted">
+      Plan vom {{ plan.valid_from.strftime('%d.%m.%Y') }}
+      {% if plan.prescribed_by %} · {{ plan.prescribed_by[:50] }}{% endif %}
+    </small>
+    {% endif %}
+  </div>
+
+  {% if meds %}
+  <div class="card mb-4">
+    {% for med in meds %}
+    <div class="med-row p-3 {% if not loop.last %}border-bottom{% endif %}">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="flex-grow-1 me-2">
+          <div class="fw-semibold">
+            {{ med.handelsname }}
+            {% if med.is_btm %}<span class="btm-badge ms-1">BtM</span>{% endif %}
+          </div>
+          <div class="small text-muted">
+            {% if med.wirkstoff %}{{ med.wirkstoff }}{% endif %}
+            {% if med.staerke %} · {{ med.staerke }}{% endif %}
+            {% if med.darreichungsform %} · {{ med.darreichungsform }}{% endif %}
+            {% if med.pzn %} · PZN: {{ med.pzn }}{% endif %}
+          </div>
+
+          {# Dosierung #}
+          <div class="dosage-cell mt-1">
+            {% if med.morgens %}<span class="dosage-pill me-1">🌅 {{ med.morgens }}</span>{% endif %}
+            {% if med.mittags %}<span class="dosage-pill me-1">☀️ {{ med.mittags }}</span>{% endif %}
+            {% if med.abends %}<span class="dosage-pill me-1">🌆 {{ med.abends }}</span>{% endif %}
+            {% if med.nachts %}<span class="dosage-pill me-1">🌙 {{ med.nachts }}</span>{% endif %}
+            {% if med.bei_bedarf %}<span class="dosage-pill bg-warning-subtle text-warning me-1">⚡ Bei Bedarf{% if med.bei_bedarf_max %} max. {{ med.bei_bedarf_max }}{% endif %}</span>{% endif %}
+          </div>
+
+          {% if med.einnahmehinweis %}
+          <div class="small text-muted mt-1 fst-italic">{{ med.einnahmehinweis }}</div>
+          {% endif %}
+        </div>
+
+        {# Absetzen — nur wenn kein BtM #}
+        {% if not med.is_btm %}
+        <button class="btn btn-outline-danger stop-btn flex-shrink-0"
+                data-bs-toggle="collapse"
+                data-bs-target="#stop-{{ med.id }}">
+          <i class="bi bi-x-circle"></i> Absetzen
+        </button>
+        {% else %}
+        <span class="badge bg-warning text-dark flex-shrink-0">
+          <i class="bi bi-lock"></i> Nur intern absetzbar
+        </span>
+        {% endif %}
+      </div>
+
+      {# Absetzen-Formular (versteckt) #}
+      {% if not med.is_btm %}
+      <div class="collapse mt-2" id="stop-{{ med.id }}">
+        <form method="POST" action="{{ url_for('doctor.stop_medication', token=token, med_id=med.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="input-group input-group-sm">
+            <input type="text" name="reason" class="form-control"
+                   placeholder="Grund (optional, z.B. Wechsel auf anderes Präparat)">
+            <button type="submit" class="btn btn-danger">
+              <i class="bi bi-check-lg"></i> Absetzen bestätigen
+            </button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="card mb-4 p-3 text-muted text-center">
+    <i class="bi bi-capsule fs-2 d-block mb-1 opacity-25"></i>
+    Noch keine Medikamente im aktiven Plan.
+  </div>
+  {% endif %}
+
+  {# BtM-Hinweis #}
+  {% if meds|selectattr('is_btm')|list %}
+  <div class="alert alert-warning warning-btm py-2 mb-4 small">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <strong>Betäubungsmittel (BtM)</strong> können nur durch autorisiertes Pflegepersonal
+    nach §13 BtMG abgesetzt werden. Bitte wenden Sie sich direkt an {{ patient.company.name }}.
+  </div>
+  {% endif %}
+
+  {# ── Neues Medikament hinzufügen ── #}
+  <div class="section-label mb-2">Medikament hinzufügen</div>
+  <div class="card mb-4">
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('doctor.add_medication', token=token) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+
+          <div class="col-12 col-md-6">
+            <label class="form-label form-label-sm fw-semibold">Handelsname <span class="text-danger">*</span></label>
+            <input type="text" name="handelsname" class="form-control form-control-sm"
+                   placeholder="z.B. Metformin 500 Hexal" required>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label form-label-sm fw-semibold">Wirkstoff</label>
+            <input type="text" name="wirkstoff" class="form-control form-control-sm"
+                   placeholder="z.B. Metformin">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label form-label-sm fw-semibold">Stärke</label>
+            <input type="text" name="staerke" class="form-control form-control-sm"
+                   placeholder="z.B. 500 mg">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label form-label-sm fw-semibold">Darreichungsform</label>
+            <select name="darreichungsform" class="form-select form-select-sm">
+              <option value="">— wählen —</option>
+              <option>Tablette</option>
+              <option>Kapsel</option>
+              <option>Tropfen</option>
+              <option>Lösung</option>
+              <option>Pflaster</option>
+              <option>Injektion</option>
+              <option>Salbe</option>
+              <option>Zäpfchen</option>
+              <option>Inhalat</option>
+              <option>Sonstige</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label form-label-sm fw-semibold">PZN</label>
+            <input type="text" name="pzn" class="form-control form-control-sm"
+                   placeholder="Pharmazentralnummer">
+          </div>
+
+          {# Dosierung #}
+          <div class="col-12">
+            <label class="form-label form-label-sm fw-semibold">Dosierung (Stück / ml / Einheiten)</label>
+            <div class="row g-2">
+              <div class="col-6 col-md-3">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">🌅</span>
+                  <input type="text" name="morgens" class="form-control" placeholder="Morgens">
+                </div>
+              </div>
+              <div class="col-6 col-md-3">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">☀️</span>
+                  <input type="text" name="mittags" class="form-control" placeholder="Mittags">
+                </div>
+              </div>
+              <div class="col-6 col-md-3">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">🌆</span>
+                  <input type="text" name="abends" class="form-control" placeholder="Abends">
+                </div>
+              </div>
+              <div class="col-6 col-md-3">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">🌙</span>
+                  <input type="text" name="nachts" class="form-control" placeholder="Nachts">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <div class="form-check">
+              <input type="checkbox" name="bei_bedarf" id="bei_bedarf" class="form-check-input"
+                     onchange="document.getElementById('bei_bedarf_max').classList.toggle('d-none',!this.checked)">
+              <label class="form-check-label form-label-sm" for="bei_bedarf">⚡ Bei Bedarf</label>
+            </div>
+            <input type="text" name="bei_bedarf_max" id="bei_bedarf_max"
+                   class="form-control form-control-sm mt-1 d-none"
+                   placeholder="Maximaldosis (z.B. 2× täglich)">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label form-label-sm fw-semibold">Einnahmehinweis / Bemerkungen</label>
+            <textarea name="einnahmehinweis" class="form-control form-control-sm" rows="2"
+                      placeholder="z.B. zum Essen einnehmen, auf nüchternen Magen, nicht mit Milch..."></textarea>
+          </div>
+
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary btn-sm px-4">
+              <i class="bi bi-plus-circle"></i> Medikament hinzufügen
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ── Allgemeine Hinweise für Pflegepersonal ── #}
+  <div class="section-label mb-2">Hinweis an das Pflegepersonal</div>
+  <div class="card mb-4">
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('doctor.save_note', token=token) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <textarea name="arzt_hinweis" class="form-control form-control-sm mb-2" rows="3"
+                  placeholder="z.B. Blutdruck täglich messen, Blutzucker vor dem Frühstück kontrollieren, bei Ödemen sofort melden..."></textarea>
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-send"></i> Hinweis speichern
+        </button>
+      </form>
+      {% if plan and plan.prescribed_by and 'Hinweis' in plan.prescribed_by %}
+      <div class="alert alert-info py-2 mt-2 small mb-0">
+        <i class="bi bi-info-circle"></i> Letzter Hinweis gespeichert — sichtbar für Pflegepersonal.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Abgesetzte Medikamente ── #}
+  {% if stopped %}
+  <details class="mb-4">
+    <summary class="section-label" style="cursor:pointer;">
+      Abgesetzte Medikamente ({{ stopped|length }})
+    </summary>
+    <div class="card mt-2">
+      {% for med in stopped %}
+      <div class="med-row stopped p-3 {% if not loop.last %}border-bottom{% endif %}">
+        <div class="fw-semibold text-muted text-decoration-line-through">{{ med.handelsname }}</div>
+        <div class="small text-muted">
+          {% if med.wirkstoff %}{{ med.wirkstoff }}{% endif %}
+          {% if med.staerke %} · {{ med.staerke }}{% endif %}
+        </div>
+        {% if med.einnahmehinweis %}
+        <div class="small text-muted fst-italic">{{ med.einnahmehinweis }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+
+  {# ── Footer ── #}
+  <div class="text-center mt-4" style="font-size:.75rem;color:#9ca3af;">
+    <p class="mb-1">Dieses Portal ist ausschließlich für den behandelnden Hausarzt bestimmt.</p>
+    <p class="mb-0">Alle Änderungen werden protokolliert und sind sofort für das Pflegepersonal sichtbar.</p>
+    <p class="mt-1">Bei Fragen: {{ patient.company.name }}</p>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

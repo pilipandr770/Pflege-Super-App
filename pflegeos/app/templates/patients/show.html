@@ -157,7 +157,45 @@
         {% elif not patient.portal_enabled %}
         <div class="mt-3">
           <small class="text-muted">
-            <i class="bi bi-lock"></i> Portal nicht aktiviert.
+            <i class="bi bi-lock"></i> Angehörigen-Portal nicht aktiviert.
+            <a href="{{ url_for('patients.edit', patient_id=patient.id) }}">Einstellungen</a>
+          </small>
+        </div>
+        {% endif %}
+
+        {# ── Hausarzt-Portal ── #}
+        {% if patient.arzt_portal_enabled and patient.arzt_token %}
+        <div class="mt-3 p-2 rounded border border-primary bg-primary bg-opacity-10">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <small class="fw-semibold text-primary">🩺 Hausarzt-Portal aktiv</small>
+            <span class="badge bg-primary">Online</span>
+          </div>
+          {% if patient.arzt_last_update %}
+          <div class="small text-muted mb-1">
+            Letzte Aktualisierung: {{ patient.arzt_last_update.strftime('%d.%m.%Y %H:%M') }}
+          </div>
+          {% endif %}
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control form-control-sm"
+                   id="arztPortalLink"
+                   value="{{ request.host_url }}arzt/{{ patient.arzt_token }}"
+                   readonly>
+            <button class="btn btn-outline-primary btn-sm"
+                    onclick="copyArztLink()" title="Link kopieren">
+              <i class="bi bi-clipboard" id="copyArztIcon"></i>
+            </button>
+          </div>
+          <div class="mt-1">
+            <a href="{{ url_for('doctor.portal', token=patient.arzt_token) }}"
+               target="_blank" class="small text-primary">
+              <i class="bi bi-box-arrow-up-right"></i> Vorschau öffnen
+            </a>
+          </div>
+        </div>
+        {% elif not patient.arzt_portal_enabled %}
+        <div class="mt-3">
+          <small class="text-muted">
+            <i class="bi bi-lock"></i> Hausarzt-Portal nicht aktiviert.
             <a href="{{ url_for('patients.edit', patient_id=patient.id) }}">Einstellungen</a>
           </small>
         </div>
@@ -210,6 +248,18 @@ function copyPortalLink() {
   if (!input) return;
   navigator.clipboard.writeText(input.value).then(() => {
     const icon = document.getElementById('copyIcon');
+    icon.className = 'bi bi-clipboard-check';
+    setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
+  }).catch(() => {
+    input.select();
+    document.execCommand('copy');
+  });
+}
+function copyArztLink() {
+  const input = document.getElementById('arztPortalLink');
+  if (!input) return;
+  navigator.clipboard.writeText(input.value).then(() => {
+    const icon = document.getElementById('copyArztIcon');
     icon.className = 'bi bi-clipboard-check';
     setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
   }).catch(() => {

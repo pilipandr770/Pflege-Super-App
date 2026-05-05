@@ -246,6 +246,11 @@ class Patient(db.Model):
     portal_enabled = db.Column(db.Boolean, default=False)
     portal_sprache = db.Column(db.String(5), default='de')  # de / ru / en
 
+    # Hausarzt-Portal (Magic-Link für externen Arzt)
+    arzt_token = db.Column(db.String(36), default=gen_uuid, unique=True)
+    arzt_portal_enabled = db.Column(db.Boolean, default=False)
+    arzt_last_update = db.Column(db.DateTime)   # letzter Arzt-Eingriff
+
     # Тип обслуживания (домашний уход или стационар)
     care_type = db.Column(db.String(30), default='HOME_CARE')  # HOME_CARE | INPATIENT
 
@@ -427,7 +432,7 @@ class MedicationPlan(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
     company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
     patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
-    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=True)
     prescribed_by = db.Column(db.String(255))
 
     valid_from = db.Column(db.Date, nullable=False, default=date.today)

@@ -269,8 +269,15 @@
               🔗 Angehörigen-Portal aktivieren
             </label>
           </div>
+          <div class="form-check form-switch mt-2">
+            <input type="checkbox" name="arzt_portal_enabled" class="form-check-input" id="arzt_portal_enabled"
+                   {% if form_data.get('arzt_portal_enabled') %}checked{% endif %}>
+            <label class="form-check-label" for="arzt_portal_enabled">
+              🩺 Hausarzt-Portal aktivieren (Medikamentenplan bearbeiten)
+            </label>
+          </div>
           <div class="form-text ms-4">
-            Nach dem Speichern erscheint ein Link, den Sie an Angehörige weitergeben können.
+            Nach dem Speichern erscheinen Links, die Sie per WhatsApp/E-Mail weiterleiten können.
           </div>
         </div>
       </div>

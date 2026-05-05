@@ -47,6 +47,7 @@ def create_app(config_name=None):
     from app.routes.admin import admin_bp
     from app.routes.nurse import nurse_bp
     from app.routes.family import family_bp
+    from app.routes.doctor import doctor_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/')
@@ -63,6 +64,7 @@ def create_app(config_name=None):
     app.register_blueprint(tracking_bp, url_prefix='/tracking')
     app.register_blueprint(nurse_bp, url_prefix='/nurse')
     app.register_blueprint(family_bp)
+    app.register_blueprint(doctor_bp)
     app.register_blueprint(export_bp)
 
     # Глобальные template filters
