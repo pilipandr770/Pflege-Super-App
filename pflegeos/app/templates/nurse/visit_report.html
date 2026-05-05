@@ -89,31 +89,73 @@
                         placeholder="z.B. Patient war nicht zu Hause, Verband musste gewechselt werden, Schmerzen geäußert..."></textarea>
             </div>
 
-            <!-- Фото -->
+            <!-- ═══════════════════════════════════════════════
+                 FOTO-UPLOAD — Besuchsnachweis
+                 ═══════════════════════════════════════════════ -->
             <div class="mb-4">
-              <label class="form-label"><strong>Fotos</strong></label>
-              <div class="mb-3">
-                <div class="input-group">
-                  <input type="file" class="form-control" id="photoInput" name="photo" accept="image/*" capture="environment">
-                  <button class="btn btn-outline-secondary" type="button" onclick="openCamera()">
-                    <i class="bi bi-camera-fill"></i> Kamera
-                  </button>
-                </div>
-                <small class="text-muted">JPG, PNG (max 10MB)</small>
+              <label class="form-label">
+                <strong><i class="bi bi-camera-fill text-primary"></i> Fotos als Besuchsnachweis</strong>
+                <span class="badge bg-primary ms-2" id="photoCountBadge">0 / 5</span>
+              </label>
+              <small class="text-muted d-block mb-2">
+                Fotos werden automatisch mit GPS-Koordinaten gespeichert.
+                Min. 1 Foto empfohlen für die Compliance-Dokumentation.
+              </small>
+
+              <!-- Foto-Typ Auswahl -->
+              <div class="mb-2">
+                <select class="form-select form-select-sm" id="photoTypeSelect" style="max-width: 220px;">
+                  <option value="VISIT">📋 Allgemeiner Besuch</option>
+                  <option value="WOUND">🩹 Wunde / Wundversorgung</option>
+                  <option value="INSPECTION">🔍 Kontrolle / Inspektion</option>
+                  <option value="BEFORE">⏮ Vor der Behandlung</option>
+                  <option value="AFTER">⏭ Nach der Behandlung</option>
+                  <option value="PRESSURE_ULCER">⚠️ Dekubitus</option>
+                </select>
               </div>
 
-              <!-- Превью загруженного фото -->
-              <div id="photoPreview" style="display: none;" class="mb-3">
-                <img id="previewImg" class="img-fluid rounded border" style="max-height: 200px;">
-                <button type="button" class="btn btn-sm btn-danger mt-2" onclick="clearPhoto()">
-                  <i class="bi bi-x"></i> Foto löschen
+              <!-- Upload-Buttons -->
+              <div class="d-flex gap-2 flex-wrap mb-3">
+                <!-- Kamera (direkt) -->
+                <button type="button" class="btn btn-primary"
+                        onclick="triggerCamera()" id="cameraBtn">
+                  <i class="bi bi-camera-fill"></i> Kamera
                 </button>
+                <!-- Galerie -->
+                <button type="button" class="btn btn-outline-primary"
+                        onclick="triggerGallery()">
+                  <i class="bi bi-images"></i> Galerie
+                </button>
+                <!-- Versteckte Inputs -->
+                <input type="file" id="cameraInput"  accept="image/*" capture="environment" style="display:none" onchange="handlePhotoSelected(this)">
+                <input type="file" id="galleryInput" accept="image/*" multiple style="display:none" onchange="handlePhotoSelected(this)">
               </div>
 
-              <!-- Список загруженных фото -->
-              <div id="photosList" class="mb-3"></div>
+              <!-- Upload-Fortschrittsanzeige -->
+              <div id="uploadProgress" class="d-none mb-2">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="spinner-border spinner-border-sm text-primary"></span>
+                  <small class="text-muted">Foto wird hochgeladen...</small>
+                </div>
+              </div>
 
-              <!-- Скрытые поля для ID фото -->
+              <!-- Foto-Galerie (Thumbnails) -->
+              <div id="photoGrid" class="row g-2 mb-2"></div>
+
+              <!-- NFC-Tag -->
+              <div class="mt-3 border-top pt-3">
+                <label class="form-label small fw-semibold">
+                  <i class="bi bi-tag-fill text-secondary"></i> NFC-Tag ID
+                  <span class="text-muted fw-normal">(optional — für stationäre Pflege)</span>
+                </label>
+                <input type="text" class="form-control form-control-sm" id="nfcTagId"
+                       placeholder="z.B. NFC:A1B2C3D4" style="max-width: 280px;"
+                       oninput="document.getElementById('nfcTagIdHidden').value = this.value">
+                <input type="hidden" id="nfcTagIdHidden" name="nfc_tag_id">
+                <small class="text-muted">Zimmer-NFC-Chip scannen oder manuell eingeben</small>
+              </div>
+
+              <!-- Versteckte Felder mit gespeicherten Foto-IDs -->
               <input type="hidden" id="photoIds" name="photo_ids" value="[]">
             </div>
 
@@ -234,144 +276,194 @@
   </div>
 </div>
 
-<!-- Скрытый input для камеры -->
-<input type="file" id="cameraInputHidden" accept="image/*" style="display:none;">
-
 <script>
-// Валидация фотографии
-let uploadedPhotoFile = null;
+// ═══════════════════════════════════════════════════════
+// GPS — live tracking
+// ═══════════════════════════════════════════════════════
+let currentGps = { lat: null, lng: null, accuracy: null };
 
-document.getElementById('photoInput').addEventListener('change', function(e) {
-  const file = e.target.files[0];
-  if (file) {
-    uploadedPhotoFile = file;
-    const reader = new FileReader();
-    reader.onload = function(event) {
-      document.getElementById('previewImg').src = event.target.result;
-      document.getElementById('photoPreview').style.display = 'block';
-    };
-    reader.readAsDataURL(file);
+function captureGps() {
+  if (!navigator.geolocation) {
+    setGpsStatus('warning', 'GPS nicht verfügbar');
+    return;
   }
-});
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      currentGps.lat      = pos.coords.latitude.toFixed(6);
+      currentGps.lng      = pos.coords.longitude.toFixed(6);
+      currentGps.accuracy = pos.coords.accuracy;
 
-function openCamera() {
-  const input = document.getElementById('photoInput');
-  input.setAttribute('capture', 'environment');
-  input.click();
-  input.addEventListener('change', function restoreInput() {
-    input.removeAttribute('capture');
-    input.removeEventListener('change', restoreInput);
-  });
+      document.getElementById('geoLat').value      = currentGps.lat;
+      document.getElementById('geoLng').value      = currentGps.lng;
+      document.getElementById('geoAccuracy').value = currentGps.accuracy;
+
+      setGpsStatus('success', `GPS ✓  ${currentGps.lat}, ${currentGps.lng}  (±${Math.round(currentGps.accuracy)} m)`);
+      document.getElementById('gpsCoords').textContent  = `${currentGps.lat}, ${currentGps.lng}`;
+      document.getElementById('gpsAccuracy').textContent = `Genauigkeit: ±${Math.round(currentGps.accuracy)} m`;
+    },
+    () => setGpsStatus('warning', 'GPS-Signal schwach — bitte Standortzugriff erlauben'),
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
 }
 
-function clearPhoto() {
-  uploadedPhotoFile = null;
-  document.getElementById('photoInput').value = '';
-  document.getElementById('photoPreview').style.display = 'none';
+function setGpsStatus(level, msg) {
+  const el = document.getElementById('gpsStatus');
+  const icons = { success: 'check-circle text-success', warning: 'exclamation-triangle text-warning', info: 'hourglass-split text-muted' };
+  el.innerHTML = `<i class="bi bi-${icons[level] || icons.info}"></i> ${msg}`;
 }
 
-// GPS-отслеживание
-async function updateGPS() {
-  if (typeof window.Capacitor !== 'undefined') {
-    try {
-      const { Geolocation } = window.Capacitor.Plugins;
-      const coordinates = await Geolocation.getCurrentPosition();
+// ═══════════════════════════════════════════════════════
+// Foto-Upload — Multi-Foto System
+// ═══════════════════════════════════════════════════════
+const MAX_PHOTOS = 5;
+let uploadedPhotoIds = [];
 
-      document.getElementById('geoLat').value = coordinates.coords.latitude.toFixed(6);
-      document.getElementById('geoLng').value = coordinates.coords.longitude.toFixed(6);
-      document.getElementById('geoAccuracy').value = coordinates.coords.accuracy;
+function triggerCamera()  { document.getElementById('cameraInput').click(); }
+function triggerGallery() { document.getElementById('galleryInput').click(); }
 
-      document.getElementById('gpsStatus').innerHTML = '<i class="bi bi-check-circle text-success"></i> GPS erfasst';
-      document.getElementById('gpsCoords').textContent = `${coordinates.coords.latitude.toFixed(6)}, ${coordinates.coords.longitude.toFixed(6)}`;
-      document.getElementById('gpsAccuracy').textContent = `Genauigkeit: ±${Math.round(coordinates.coords.accuracy)} m`;
-    } catch (error) {
-      console.log('Capacitor Geolocation nicht verfügbar, verwende Browser API');
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          function(position) {
-            document.getElementById('geoLat').value = position.coords.latitude.toFixed(6);
-            document.getElementById('geoLng').value = position.coords.longitude.toFixed(6);
-            document.getElementById('geoAccuracy').value = position.coords.accuracy;
+async function handlePhotoSelected(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
 
-            document.getElementById('gpsStatus').innerHTML = '<i class="bi bi-check-circle text-success"></i> GPS erfasst';
-            document.getElementById('gpsCoords').textContent = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
-            document.getElementById('gpsAccuracy').textContent = `Genauigkeit: ±${Math.round(position.coords.accuracy)} m`;
-          },
-          function(error) {
-            document.getElementById('gpsStatus').innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> GPS nicht verfügbar';
-          }
-        );
-      }
+  for (const file of files) {
+    if (uploadedPhotoIds.length >= MAX_PHOTOS) {
+      showAlert(`Maximal ${MAX_PHOTOS} Fotos pro Bericht`, 'warning');
+      break;
     }
+    await uploadPhoto(file);
+  }
+  input.value = ''; // reset so same file can be re-selected
+}
+
+async function uploadPhoto(file) {
+  // Validierung
+  if (file.size > 15 * 1024 * 1024) {
+    showAlert('Foto zu groß (max 15 MB)', 'warning');
+    return;
+  }
+
+  const progress = document.getElementById('uploadProgress');
+  progress.classList.remove('d-none');
+
+  const fd = new FormData();
+  fd.append('photo',        file);
+  fd.append('photo_type',   document.getElementById('photoTypeSelect').value);
+  fd.append('geo_lat',      currentGps.lat   || '');
+  fd.append('geo_lng',      currentGps.lng   || '');
+  fd.append('geo_accuracy', currentGps.accuracy || '');
+  fd.append('nfc_tag_id',   document.getElementById('nfcTagId').value.trim());
+
+  try {
+    const res  = await fetch('{{ url_for("photos.visit_photo_upload", schedule_id=schedule.id) }}', {
+      method: 'POST', body: fd
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      uploadedPhotoIds.push(data.photo_id);
+      document.getElementById('photoIds').value = JSON.stringify(uploadedPhotoIds);
+      addPhotoThumbnail(data.photo_id, data.preview_url, data.has_gps, file.name);
+      updatePhotoCounter();
+    } else {
+      showAlert('Foto-Upload fehlgeschlagen: ' + (data.error || 'Unbekannter Fehler'), 'danger');
+    }
+  } catch (err) {
+    showAlert('Netzwerkfehler beim Upload: ' + err.message, 'danger');
+  } finally {
+    progress.classList.add('d-none');
+  }
+}
+
+function addPhotoThumbnail(photoId, previewUrl, hasGps, filename) {
+  const grid = document.getElementById('photoGrid');
+  const col  = document.createElement('div');
+  col.className = 'col-6 col-md-4 col-lg-3';
+  col.id = `photo-col-${photoId}`;
+
+  const typeLabel = document.getElementById('photoTypeSelect').options[document.getElementById('photoTypeSelect').selectedIndex].text;
+
+  col.innerHTML = `
+    <div class="card h-100 border-success">
+      <div style="height:120px;overflow:hidden;background:#f8f9fa;border-radius:4px 4px 0 0;">
+        <img src="${previewUrl}" class="w-100 h-100" style="object-fit:cover;"
+             onerror="this.src='data:image/svg+xml,<svg xmlns=\\'http://www.w3.org/2000/svg\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23dee2e6\\'/></svg>'">
+      </div>
+      <div class="card-body p-1">
+        <div class="d-flex justify-content-between align-items-center">
+          <small class="text-muted text-truncate" style="max-width:80px" title="${filename}">${filename}</small>
+          <button type="button" class="btn btn-link btn-sm p-0 text-danger" onclick="removePhoto('${photoId}')">
+            <i class="bi bi-x-circle-fill"></i>
+          </button>
+        </div>
+        <div class="mt-1">
+          ${hasGps
+            ? '<span class="badge bg-success" style="font-size:0.65rem"><i class="bi bi-geo-alt-fill"></i> GPS</span>'
+            : '<span class="badge bg-secondary" style="font-size:0.65rem"><i class="bi bi-geo-alt"></i> kein GPS</span>'}
+          <span class="badge bg-primary ms-1" style="font-size:0.65rem">${typeLabel.replace(/^[^ ]+ /,'')}</span>
+        </div>
+      </div>
+    </div>`;
+  grid.appendChild(col);
+}
+
+function removePhoto(photoId) {
+  uploadedPhotoIds = uploadedPhotoIds.filter(id => id !== photoId);
+  document.getElementById('photoIds').value = JSON.stringify(uploadedPhotoIds);
+  const col = document.getElementById(`photo-col-${photoId}`);
+  if (col) col.remove();
+  updatePhotoCounter();
+}
+
+function updatePhotoCounter() {
+  document.getElementById('photoCountBadge').textContent = `${uploadedPhotoIds.length} / ${MAX_PHOTOS}`;
+  const cameraBtn = document.getElementById('cameraBtn');
+  if (uploadedPhotoIds.length >= MAX_PHOTOS) {
+    cameraBtn.disabled = true;
+    cameraBtn.innerHTML = '<i class="bi bi-camera-fill"></i> Limit erreicht';
   } else {
-    // Browser Geolocation fallback
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        function(position) {
-          document.getElementById('geoLat').value = position.coords.latitude.toFixed(6);
-          document.getElementById('geoLng').value = position.coords.longitude.toFixed(6);
-          document.getElementById('geoAccuracy').value = position.coords.accuracy;
-
-          document.getElementById('gpsStatus').innerHTML = '<i class="bi bi-check-circle text-success"></i> GPS erfasst';
-          document.getElementById('gpsCoords').textContent = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
-          document.getElementById('gpsAccuracy').textContent = `Genauigkeit: ±${Math.round(position.coords.accuracy)} m`;
-        },
-        function(error) {
-          document.getElementById('gpsStatus').innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> GPS nicht verfügbar';
-        }
-      );
-    }
+    cameraBtn.disabled = false;
+    cameraBtn.innerHTML = '<i class="bi bi-camera-fill"></i> Kamera';
   }
 }
 
-// Device информация
-function updateDeviceInfo() {
-  if (typeof window.Capacitor !== 'undefined') {
-    try {
-      const { Device } = window.Capacitor.Plugins;
-      Device.getInfo().then(info => {
-        document.getElementById('deviceInfo').textContent = `Gerät: ${info.model || 'Unbekannt'}`;
-        // MAC-адрес был бы здесь, но Capacitor не предоставляет его напрямую
-        // это должно быть получено в capture.html при загрузке фото
-      });
-    } catch (error) {
-      console.log('Device info nicht verfügbar');
-    }
-  }
-}
-
-// Время визита
+// ═══════════════════════════════════════════════════════
+// Besuchszeit-Anzeige
+// ═══════════════════════════════════════════════════════
 function updateVisitTime() {
   const now = new Date();
-  document.getElementById('visitTime').textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('visitTime').textContent = timeStr;
+
+  const startKey = 'visit_start_{{ schedule.id }}';
+  if (!sessionStorage.getItem(startKey)) sessionStorage.setItem(startKey, now.toISOString());
+  const startTime = new Date(sessionStorage.getItem(startKey));
+  const mins = Math.floor((now - startTime) / 60000);
+  if (mins > 0) document.getElementById('visitDuration').textContent = mins;
 }
 
-// Инициализация
+// ═══════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', function() {
-  updateGPS();
-  updateDeviceInfo();
+  captureGps();
   updateVisitTime();
-
-  // Обновлять GPS каждые 30 секунд
-  setInterval(updateGPS, 30000);
-
-  // Обновлять время каждую минуту
+  setInterval(captureGps, 30000);
   setInterval(updateVisitTime, 60000);
 });
 
-// Отправка формы
+// ═══════════════════════════════════════════════════════
+// Formular absenden
+// ═══════════════════════════════════════════════════════
 document.getElementById('reportForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
-  // Валидация
   const observations = document.getElementById('observations').value.trim();
   if (observations.length < 20) {
     showAlert('Beobachtungen müssen mindestens 20 Zeichen lang sein', 'danger');
     return;
   }
-
   if (!document.getElementById('signatureConfirmed').checked) {
-    showAlert('Sie müssen die digitale Signatur bestätigen', 'danger');
+    showAlert('Bitte bestätigen Sie die digitale Signatur', 'danger');
     return;
   }
 
@@ -382,64 +474,45 @@ document.getElementById('reportForm').addEventListener('submit', async function(
   try {
     const formData = new FormData(this);
 
-    // Получить ID выбранных процедур
-    const procedureIds = [];
-    document.querySelectorAll('input[name="procedures_completed"]:checked').forEach(cb => {
-      procedureIds.push(cb.value);
-    });
+    // Prozeduren als JSON
+    const procedureIds = [...document.querySelectorAll('input[name="procedures_completed"]:checked')]
+                         .map(cb => cb.value);
     formData.set('procedures_completed', JSON.stringify(procedureIds));
 
-    // Если есть загруженное фото, загрузить его отдельно
-    if (uploadedPhotoFile) {
-      const photoFormData = new FormData();
-      photoFormData.append('photo', uploadedPhotoFile);
-
-      const photoRes = await fetch('{{ url_for("photos.capture", patient_id=patient.id) }}', {
-        method: 'POST',
-        body: photoFormData
-      });
-
-      const photoResult = await photoRes.json();
-      if (photoRes.ok) {
-        formData.set('photo_ids', JSON.stringify([photoResult.photo_id]));
-      }
-    }
+    // Foto-IDs sicherstellen
+    formData.set('photo_ids', JSON.stringify(uploadedPhotoIds));
 
     const response = await fetch('{{ url_for("nurse.visit_report", schedule_id=schedule.id) }}', {
-      method: 'POST',
-      body: formData
+      method: 'POST', body: formData
     });
-
     const result = await response.json();
 
     if (response.ok) {
-      showAlert('Bericht erfolgreich gespeichert', 'success');
-      setTimeout(() => {
-        window.location.href = '{{ url_for("nurse.dashboard") }}';
-      }, 1500);
+      showAlert(`✓ Bericht gespeichert${uploadedPhotoIds.length ? ` (${uploadedPhotoIds.length} Foto${uploadedPhotoIds.length > 1 ? 's' : ''})` : ''}`, 'success');
+      setTimeout(() => { window.location.href = '{{ url_for("nurse.dashboard") }}'; }, 1800);
     } else {
       showAlert(result.error || 'Fehler beim Speichern', 'danger');
       submitBtn.disabled = false;
       submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Bericht speichern';
     }
-  } catch (error) {
-    showAlert('Netzwerkfehler: ' + error.message, 'danger');
+  } catch (err) {
+    showAlert('Netzwerkfehler: ' + err.message, 'danger');
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Bericht speichern';
   }
 });
 
+// ═══════════════════════════════════════════════════════
+// Alert-Helper
+// ═══════════════════════════════════════════════════════
 function showAlert(message, type) {
-  const alertDiv = document.createElement('div');
-  alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-  alertDiv.role = 'alert';
-  alertDiv.innerHTML = `
-    ${message}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-  `;
-  document.querySelector('.card-body').insertBefore(alertDiv, document.querySelector('#reportForm'));
-
-  setTimeout(() => alertDiv.remove(), 5000);
+  const div = Object.assign(document.createElement('div'), {
+    className: `alert alert-${type} alert-dismissible fade show`,
+    role: 'alert',
+    innerHTML: `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`
+  });
+  document.querySelector('.card-body').prepend(div);
+  setTimeout(() => div.remove(), 5000);
 }
 </script>
 {% endblock %}

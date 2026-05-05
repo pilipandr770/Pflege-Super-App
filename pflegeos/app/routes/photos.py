@@ -293,6 +293,110 @@ def delete_photo(photo_id):
     return redirect(url_for('photos.list_photos', patient_id=patient.id))
 
 
+@photos_bp.route('/visit/<schedule_id>/upload', methods=['POST'])
+@login_required
+def visit_photo_upload(schedule_id):
+    """
+    Foto-Upload durch Pflegekraft während eines Besuchs.
+    Zugriff wird über den EmployeeSchedule geprüft (nicht über Patientenzuweisung).
+    Unterstützt mehrere Fotos, GPS-Daten und Fototyp.
+    """
+    from app.models import EmployeeSchedule
+
+    # Zugriff: Nur die zuständige Pflegekraft darf hochladen
+    schedule = EmployeeSchedule.query.filter_by(
+        id=schedule_id,
+        employee_id=current_user.id,
+        company_id=current_user.company_id,
+        is_active=True
+    ).first_or_404()
+
+    if 'photo' not in request.files:
+        return jsonify({'error': 'Kein Foto übermittelt'}), 400
+
+    file = request.files['photo']
+    if not file or file.filename == '':
+        return jsonify({'error': 'Keine Datei ausgewählt'}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'Dateityp nicht erlaubt (JPG, PNG, WEBP)'}), 400
+
+    try:
+        # Datei speichern
+        file_path = save_upload(file, subfolder=f'photos/{current_user.company_id}/visits')
+        if not file_path:
+            return jsonify({'error': 'Fehler beim Speichern der Datei'}), 500
+
+        full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], file_path)
+
+        # EXIF-Metadaten extrahieren (GPS aus Kamera-App)
+        exif_meta = extract_exif_data(full_path)
+
+        # GPS: zuerst aus Formular (Browser-GPS), dann aus EXIF
+        geo_lat  = request.form.get('geo_lat',  type=float) or exif_meta.get('geo_lat')
+        geo_lng  = request.form.get('geo_lng',  type=float) or exif_meta.get('geo_lng')
+        geo_acc  = request.form.get('geo_accuracy', type=float)
+
+        photo_type  = request.form.get('photo_type', 'VISIT')
+        description = request.form.get('description', '').strip()
+        device_mac  = request.form.get('device_mac', '').strip()
+        nfc_tag_id  = request.form.get('nfc_tag_id', '').strip() or None
+
+        # Gültigen Fototyp sicherstellen
+        valid_types = ['VISIT', 'GENERAL', 'WOUND', 'PRESSURE_ULCER', 'INSPECTION', 'BEFORE', 'AFTER']
+        if photo_type not in valid_types:
+            photo_type = 'VISIT'
+
+        file_size = os.path.getsize(full_path) if os.path.exists(full_path) else 0
+
+        # Tags: visit-ID + optionaler NFC-Tag
+        tags_list = [f'visit:{schedule_id}']
+        if nfc_tag_id:
+            tags_list.append(f'nfc:{nfc_tag_id}')
+        tags_str = ','.join(tags_list)
+
+        photo = PatientPhoto(
+            company_id=current_user.company_id,
+            patient_id=schedule.patient_id,
+            employee_id=current_user.id,
+            file_path=file_path,
+            file_size=file_size,
+            mime_type=file.content_type or 'image/jpeg',
+            geo_lat=geo_lat,
+            geo_lng=geo_lng,
+            geo_accuracy=geo_acc,
+            device_model=exif_meta.get('device_model', ''),
+            device_mac=device_mac,
+            photo_type=photo_type,
+            description=description or f'Besuchsfoto — {schedule.scheduled_date}',
+            tags=tags_str,
+        )
+
+        db.session.add(photo)
+        db.session.commit()
+
+        log_action('VISIT_PHOTO_UPLOADED', 'PatientPhoto', photo.id, new_values={
+            'schedule_id': schedule_id,
+            'patient': schedule.patient.full_name,
+            'type': photo_type,
+            'gps': f'{geo_lat},{geo_lng}' if geo_lat else 'kein GPS',
+        })
+
+        return jsonify({
+            'success':     True,
+            'photo_id':    photo.id,
+            'preview_url': url_for('photos.view_photo_file', photo_id=photo.id),
+            'type':        photo_type,
+            'has_gps':     bool(geo_lat and geo_lng),
+            'geo_lat':     geo_lat,
+            'geo_lng':     geo_lng,
+        }), 201
+
+    except Exception as e:
+        current_app.logger.error(f'visit_photo_upload error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 @photos_bp.route('/api/patient/<patient_id>/photos')
 @login_required
 @patient_access_required()
