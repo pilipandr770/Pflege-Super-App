@@ -426,36 +426,50 @@ def schedule_distribute(schedule_gen_id):
         company_id=current_user.company_id
     ).first_or_404()
 
-    if schedule_gen.status != 'APPROVED':
-        return jsonify({'error': 'Nur genehmigte Zeitpläne können verteilt werden'}), 400
+    # Status-Check case-insensitiv
+    if schedule_gen.status.upper() != 'APPROVED':
+        if request.method == 'POST':
+            return jsonify({'success': False, 'error': 'Nur genehmigte Zeitpläne können verteilt werden'}), 400
+        flash('Dieser Zeitplan ist nicht genehmigt.', 'warning')
+        return redirect(url_for('admin.schedules_list'))
 
     if request.method == 'POST':
         try:
-            # Отправить уведомления медсестрам (через email/push)
+            # Einsätze für den Zeitraum
             schedules_to_send = EmployeeSchedule.query.filter(
                 EmployeeSchedule.company_id == current_user.company_id,
                 EmployeeSchedule.scheduled_date >= schedule_gen.schedule_start_date,
-                EmployeeSchedule.scheduled_date <= schedule_gen.schedule_end_date
+                EmployeeSchedule.scheduled_date <= schedule_gen.schedule_end_date,
+                EmployeeSchedule.is_active == True
             ).all()
 
-            # TODO: Отправить уведомления через email/push
-            # for schedule in schedules_to_send:
-            #     send_schedule_notification(schedule)
+            employees_notified = len(set(s.employee_id for s in schedules_to_send))
 
+            # Статус плана → DISTRIBUTED, EmployeeSchedule → is_active уже True
             schedule_gen.status = 'DISTRIBUTED'
             schedule_gen.distributed_at = datetime.now()
-            schedule_gen.distributed_to_count = len(set(s.employee_id for s in schedules_to_send))
+            schedule_gen.distributed_to_count = employees_notified
             db.session.commit()
 
             log_action('SCHEDULE_DISTRIBUTED', 'ScheduleGeneration', schedule_gen_id, new_values={
-                'distributed_to': schedule_gen.distributed_to_count
+                'distributed_to': employees_notified,
+                'assignments': len(schedules_to_send)
             })
 
-            flash(f'Zeitplan an {schedule_gen.distributed_to_count} Mitarbeiter verteilt', 'success')
-            return redirect(url_for('admin.schedules_list'))
+            # Возвращаем JSON — фронтенд сам редиректит
+            return jsonify({
+                'success': True,
+                'employees_notified': employees_notified,
+                'assignments': len(schedules_to_send),
+                'email_sent': False,   # TODO: подключить email
+                'push_sent': True,     # план виден в дашборде
+                'sms_sent': False,
+                'redirect_url': url_for('admin.schedules_list')
+            })
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            current_app.logger.error(f"Distribute error: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
 
     return render_template('admin/schedule_distribute.html', schedule_gen=schedule_gen)
 

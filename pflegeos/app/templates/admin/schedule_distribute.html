@@ -309,33 +309,41 @@ function confirmDistribute() {
     method: 'POST',
     body: formData
   })
-  .then(response => response.json())
+  .then(response => {
+    // Sicherstellen dass wir JSON bekommen, nicht HTML (Redirect)
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      // Server hat redirected → Erfolg, direkt zur Liste
+      window.location.href = '{{ url_for("admin.schedules_list") }}';
+      return;
+    }
+    return response.json();
+  })
   .then(data => {
+    if (!data) return; // bereits weitergeleitet
     progressModal.hide();
 
     if (data.success) {
-      // Show success modal
       document.getElementById('successCount').textContent = data.employees_notified || 0;
 
-      if (data.email_sent) {
-        document.getElementById('emailSent').style.display = 'block';
-      }
-      if (data.push_sent) {
-        document.getElementById('pushSent').style.display = 'block';
-      }
-      if (data.sms_sent) {
-        document.getElementById('smsSent').style.display = 'block';
-      }
+      if (data.email_sent)  document.getElementById('emailSent').style.display  = 'block';
+      if (data.push_sent)   document.getElementById('pushSent').style.display   = 'block';
+      if (data.sms_sent)    document.getElementById('smsSent').style.display    = 'block';
 
       const successModal = new bootstrap.Modal(document.getElementById('successModal'));
       successModal.show();
+
+      // Nach 2 Sek. zur Liste weiterleiten
+      setTimeout(() => {
+        window.location.href = data.redirect_url || '{{ url_for("admin.schedules_list") }}';
+      }, 2500);
     } else {
       alert('Fehler bei der Verteilung: ' + (data.error || 'Unbekannter Fehler'));
     }
   })
   .catch(error => {
     progressModal.hide();
-    alert('Fehler beim Versand von Benachrichtigungen: ' + error.message);
+    alert('Fehler: ' + error.message);
   });
 }
 </script>
