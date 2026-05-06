@@ -100,6 +100,10 @@ class Employee(db.Model, UserMixin):
     einstellungsdatum = db.Column(db.Date)
     personalnummer = db.Column(db.String(50))
 
+    # Führerschein
+    fuehrerschein_klasse = db.Column(db.String(30))   # z.B. "B, BE"
+    fuehrerschein_bis    = db.Column(db.Date)
+
     # Auth
     password_hash = db.Column(db.Text)
     pin_hash = db.Column(db.Text)
@@ -176,6 +180,21 @@ class Employee(db.Model, UserMixin):
             'VERWALTUNG':        'Verwaltung',
         }
         return labels.get(self.role, self.role)
+
+    @property
+    def fuehrerschein_tage(self):
+        if not self.fuehrerschein_bis:
+            return None
+        return (self.fuehrerschein_bis - date.today()).days
+
+    @property
+    def fuehrerschein_status(self):
+        t = self.fuehrerschein_tage
+        if t is None:   return 'unknown'
+        if t < 0:       return 'expired'
+        if t <= 30:     return 'critical'
+        if t <= 90:     return 'warning'
+        return 'ok'
 
     def __repr__(self):
         return f'<Employee {self.full_name}>'
@@ -1279,3 +1298,67 @@ class Schadensmeldung(db.Model):
 
     def __repr__(self):
         return f"<Schadensmeldung {self.fahrzeug_id} {self.datum}>"
+
+
+class Wartungseintrag(db.Model):
+    """Wartungs- und Serviceprotokoll für ein Fahrzeug."""
+    __tablename__ = 'wartungsprotokoll'
+
+    id          = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id  = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    fahrzeug_id = db.Column(db.String(36), db.ForeignKey('fahrzeuge.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'))  # wer eingetragen hat
+
+    datum       = db.Column(db.Date, nullable=False, default=date.today)
+    # OELWECHSEL | REIFEN | BREMSEN | INSPEKTION | HU_VORBEREITUNG | KLIMAANLAGE | SONSTIGES
+    art         = db.Column(db.String(30), nullable=False)
+    beschreibung = db.Column(db.Text)
+    werkstatt   = db.Column(db.String(200))
+    km_stand    = db.Column(db.Integer)
+    kosten      = db.Column(db.Numeric(10, 2))
+
+    # Nächste Fälligkeit
+    naechster_termin = db.Column(db.Date)
+    naechste_km      = db.Column(db.Integer)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    fahrzeug  = db.relationship('Fahrzeug',  backref=db.backref('wartungen',  lazy='dynamic'))
+    erfasser  = db.relationship('Employee',  backref='wartungseintraege')
+
+    __table_args__ = (
+        db.Index('ix_wartungsprotokoll_fahrzeug_id', 'fahrzeug_id'),
+        db.Index('ix_wartungsprotokoll_datum',       'datum'),
+    )
+
+    ART_LABELS = {
+        'OELWECHSEL':      '🔧 Ölwechsel',
+        'REIFEN':          '🔄 Reifenwechsel',
+        'BREMSEN':         '🛑 Bremsen',
+        'INSPEKTION':      '🔍 Inspektion',
+        'HU_VORBEREITUNG': '📋 HU-Vorbereitung',
+        'KLIMAANLAGE':     '❄️ Klimaanlage',
+        'SONSTIGES':       '📝 Sonstiges',
+    }
+
+    @property
+    def art_label(self):
+        return self.ART_LABELS.get(self.art, self.art)
+
+    @property
+    def faellig_tage(self):
+        if not self.naechster_termin:
+            return None
+        return (self.naechster_termin - date.today()).days
+
+    @property
+    def faellig_status(self):
+        t = self.faellig_tage
+        if t is None:  return 'unknown'
+        if t < 0:      return 'expired'
+        if t <= 14:    return 'critical'
+        if t <= 30:    return 'warning'
+        return 'ok'
+
+    def __repr__(self):
+        return f"<Wartungseintrag {self.fahrzeug_id} {self.art} {self.datum}>"

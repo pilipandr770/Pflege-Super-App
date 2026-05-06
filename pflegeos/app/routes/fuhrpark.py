@@ -3,11 +3,13 @@ Fuhrpark — Fahrzeugflotten-Verwaltung für ambulante Pflegedienste.
 Admin: volle Verwaltung (Kartei, Berichte, Schäden)
 FAHRER: eigene Fahrten eintragen + Schäden melden
 """
+import csv
+import io
 from flask import (Blueprint, render_template, request, redirect,
-                   url_for, flash, abort, jsonify)
+                   url_for, flash, abort, jsonify, Response)
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import Fahrzeug, Kilometerbuch, Schadensmeldung, Employee, Patient
+from app.models import Fahrzeug, Kilometerbuch, Schadensmeldung, Wartungseintrag, Employee, Patient
 from app.utils.auth import admin_required, log_action
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -211,10 +213,14 @@ def detail(fahrzeug_id):
         ).all()
     )
 
+    wartungen = Wartungseintrag.query.filter_by(fahrzeug_id=f.id)\
+        .order_by(Wartungseintrag.datum.desc()).limit(10).all()
+
     return render_template('fuhrpark/detail.html',
                            fahrzeug=f,
                            fahrten=fahrten,
                            schaeden=schaeden,
+                           wartungen=wartungen,
                            km_monat=km_monat,
                            heute=date.today())
 
@@ -449,3 +455,299 @@ def bericht():
                            gesamt_km=gesamt_km,
                            gesamt_kosten=gesamt_kosten,
                            monat=monat, von=von, bis=bis)
+
+
+# ─────────────────────────────────────────────────────────────
+# PHASE 2: WARTUNGSPROTOKOLL
+# ─────────────────────────────────────────────────────────────
+
+@fuhrpark_bp.route('/<fahrzeug_id>/wartung/neu', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def wartung_neu(fahrzeug_id):
+    f = Fahrzeug.query.filter_by(
+        id=fahrzeug_id, company_id=current_user.company_id, deleted_at=None
+    ).first_or_404()
+
+    if request.method == 'POST':
+        art = request.form.get('art', '').strip()
+        if not art:
+            flash('Art der Wartung ist erforderlich.', 'danger')
+        else:
+            w = Wartungseintrag(
+                company_id=current_user.company_id,
+                fahrzeug_id=f.id,
+                employee_id=current_user.id,
+                datum=_parse_date(request.form.get('datum')) or date.today(),
+                art=art,
+                beschreibung=request.form.get('beschreibung', '').strip(),
+                werkstatt=request.form.get('werkstatt', '').strip(),
+                km_stand=_parse_int(request.form.get('km_stand')),
+                kosten=_parse_decimal(request.form.get('kosten')),
+                naechster_termin=_parse_date(request.form.get('naechster_termin')),
+                naechste_km=_parse_int(request.form.get('naechste_km')),
+            )
+            db.session.add(w)
+            # Kilometerstand aktualisieren wenn angegeben
+            if w.km_stand and (not f.km_stand or w.km_stand > f.km_stand):
+                f.km_stand = w.km_stand
+                f.km_stand_datum = w.datum
+            db.session.commit()
+            log_action('CREATE', 'Wartungseintrag', w.id)
+            flash(f'✓ Wartungseintrag ({w.art_label}) gespeichert.', 'success')
+            return redirect(url_for('fuhrpark.detail', fahrzeug_id=f.id))
+
+    return render_template('fuhrpark/wartung_form.html',
+                           fahrzeug=f,
+                           heute=date.today().strftime('%Y-%m-%d'),
+                           art_choices=Wartungseintrag.ART_LABELS)
+
+
+@fuhrpark_bp.route('/wartung')
+@login_required
+@admin_required
+def wartung_uebersicht():
+    """Wartungsübersicht — alle fälligen/überfälligen Wartungen der Flotte."""
+    cid = current_user.company_id
+    # Alle letzten Wartungseinträge pro Fahrzeug+Art, sortiert nach nächstem Termin
+    faellig = Wartungseintrag.query.join(Fahrzeug).filter(
+        Fahrzeug.company_id == cid,
+        Fahrzeug.deleted_at == None,
+        Wartungseintrag.naechster_termin != None,
+    ).order_by(Wartungseintrag.naechster_termin.asc()).all()
+
+    # Nur den jeweils neuesten Eintrag pro (fahrzeug_id, art) behalten
+    seen = set()
+    upcoming = []
+    for w in faellig:
+        key = (w.fahrzeug_id, w.art)
+        if key not in seen:
+            seen.add(key)
+            upcoming.append(w)
+
+    # Letzte 20 Einträge (Aktivität)
+    recent = Wartungseintrag.query.join(Fahrzeug).filter(
+        Fahrzeug.company_id == cid
+    ).order_by(Wartungseintrag.datum.desc()).limit(20).all()
+
+    return render_template('fuhrpark/wartung_liste.html',
+                           upcoming=upcoming,
+                           recent=recent)
+
+
+# ─────────────────────────────────────────────────────────────
+# PHASE 2: KOSTEN-DASHBOARD
+# ─────────────────────────────────────────────────────────────
+
+@fuhrpark_bp.route('/kosten')
+@login_required
+@admin_required
+def kosten():
+    cid   = current_user.company_id
+    # Letzter 6 Monate
+    heute = date.today()
+    von   = (heute.replace(day=1) - timedelta(days=150)).replace(day=1)
+
+    fahrten = Kilometerbuch.query.filter(
+        Kilometerbuch.company_id == cid,
+        Kilometerbuch.datum >= von,
+    ).all()
+
+    wartungen = Wartungseintrag.query.join(Fahrzeug).filter(
+        Fahrzeug.company_id == cid,
+        Wartungseintrag.datum >= von,
+    ).all()
+
+    schaeden = Schadensmeldung.query.filter(
+        Schadensmeldung.company_id == cid,
+        Schadensmeldung.datum >= von,
+    ).all()
+
+    # ── Monatliche Aggregation ──
+    # Erzeugt 6 Monats-Labels für Chart.js
+    monate = []
+    for i in range(5, -1, -1):
+        d = heute.replace(day=1)
+        # Rückwärts gehen
+        m = d.month - i
+        y = d.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        monate.append((y, m))
+
+    def monat_key(d):
+        return (d.year, d.month)
+
+    tank_by_monat    = {m: 0.0 for m in monate}
+    wartung_by_monat = {m: 0.0 for m in monate}
+    schaden_by_monat = {m: 0.0 for m in monate}
+    km_by_monat      = {m: 0   for m in monate}
+
+    for e in fahrten:
+        k = monat_key(e.datum)
+        if k in tank_by_monat:
+            if e.kraftstoff_kosten:
+                tank_by_monat[k] += float(e.kraftstoff_kosten)
+            km_by_monat[k] += e.km_gesamt
+
+    for w in wartungen:
+        k = monat_key(w.datum)
+        if k in wartung_by_monat and w.kosten:
+            wartung_by_monat[k] += float(w.kosten)
+
+    for s in schaeden:
+        k = monat_key(s.datum)
+        if k in schaden_by_monat and s.reparatur_kosten:
+            schaden_by_monat[k] += float(s.reparatur_kosten)
+
+    labels = [f"{m:02d}/{y%100:02d}" for y, m in monate]
+
+    # ── Pro Fahrzeug ──
+    fahrzeuge = Fahrzeug.query.filter_by(company_id=cid, deleted_at=None).all()
+    fzg_kosten = []
+    for fz in fahrzeuge:
+        tank    = sum(float(e.kraftstoff_kosten) for e in fahrten
+                      if e.fahrzeug_id == fz.id and e.kraftstoff_kosten)
+        service = sum(float(w.kosten) for w in wartungen
+                      if w.fahrzeug_id == fz.id and w.kosten)
+        rep     = sum(float(s.reparatur_kosten) for s in schaeden
+                      if s.fahrzeug_id == fz.id and s.reparatur_kosten)
+        km_total = sum(e.km_gesamt for e in fahrten if e.fahrzeug_id == fz.id)
+        total = tank + service + rep
+        fzg_kosten.append({
+            'fahrzeug': fz,
+            'tank': tank,
+            'service': service,
+            'reparatur': rep,
+            'total': total,
+            'km': km_total,
+            'kosten_pro_km': round(total / km_total, 2) if km_total > 0 else 0,
+        })
+    fzg_kosten.sort(key=lambda x: x['total'], reverse=True)
+
+    gesamt_tank    = sum(float(e.kraftstoff_kosten) for e in fahrten if e.kraftstoff_kosten)
+    gesamt_service = sum(float(w.kosten) for w in wartungen if w.kosten)
+    gesamt_rep     = sum(float(s.reparatur_kosten) for s in schaeden if s.reparatur_kosten)
+
+    return render_template('fuhrpark/kosten.html',
+                           labels=labels,
+                           tank_data=   [round(tank_by_monat[m], 2)    for m in monate],
+                           wartung_data=[round(wartung_by_monat[m], 2) for m in monate],
+                           schaden_data=[round(schaden_by_monat[m], 2) for m in monate],
+                           km_data=     [km_by_monat[m]                for m in monate],
+                           fzg_kosten=fzg_kosten,
+                           gesamt_tank=gesamt_tank,
+                           gesamt_service=gesamt_service,
+                           gesamt_rep=gesamt_rep,
+                           von=von, bis=heute)
+
+
+# ─────────────────────────────────────────────────────────────
+# PHASE 2: CSV EXPORT
+# ─────────────────────────────────────────────────────────────
+
+@fuhrpark_bp.route('/<fahrzeug_id>/export.csv')
+@login_required
+@admin_required
+def export_csv(fahrzeug_id):
+    f = Fahrzeug.query.filter_by(
+        id=fahrzeug_id, company_id=current_user.company_id, deleted_at=None
+    ).first_or_404()
+
+    monat = request.args.get('monat')
+    query = Kilometerbuch.query.filter_by(fahrzeug_id=f.id)
+
+    if monat:
+        try:
+            y, m = int(monat[:4]), int(monat[5:7])
+            von = date(y, m, 1)
+            bis = date(y, m+1, 1) - timedelta(days=1) if m < 12 else date(y, 12, 31)
+            query = query.filter(Kilometerbuch.datum >= von, Kilometerbuch.datum <= bis)
+        except Exception:
+            pass
+
+    fahrten = query.order_by(Kilometerbuch.datum.asc()).all()
+
+    si  = io.StringIO()
+    cw  = csv.writer(si, delimiter=';')
+    cw.writerow([
+        'Datum', 'Fahrer', 'Abfahrtsort', 'Zielort',
+        'Zweck', 'km-Start', 'km-Ende', 'km gesamt',
+        'Kraftstoff L', 'Kraftstoff €', 'Bemerkungen'
+    ])
+    for e in fahrten:
+        zweck_labels = {
+            'PATIENTENBESUCH': 'Patientenbesuch',
+            'BESORGUNG': 'Besorgung',
+            'WERKSTATT': 'Werkstatt',
+            'SONSTIGES': 'Sonstiges',
+        }
+        cw.writerow([
+            e.datum.strftime('%d.%m.%Y'),
+            e.fahrer.full_name,
+            e.abfahrt_ort or '',
+            e.ziel_ort or '',
+            zweck_labels.get(e.zweck, e.zweck),
+            e.km_start,
+            e.km_end,
+            e.km_gesamt,
+            str(e.kraftstoff_liter).replace('.', ',') if e.kraftstoff_liter else '',
+            str(e.kraftstoff_kosten).replace('.', ',') if e.kraftstoff_kosten else '',
+            e.bemerkungen or '',
+        ])
+
+    filename = f"Fahrtenbuch_{f.kennzeichen}_{monat or date.today().strftime('%Y-%m')}.csv"
+    output   = si.getvalue()
+    return Response(
+        '﻿' + output,  # BOM für Excel-Kompatibilität
+        mimetype='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# PHASE 2: FÜHRERSCHEINKONTROLLE
+# ─────────────────────────────────────────────────────────────
+
+@fuhrpark_bp.route('/fahrer')
+@login_required
+@admin_required
+def fahrer_liste():
+    """Führerscheinkontrolle — alle Fahrer mit Ablaufdatum."""
+    cid = current_user.company_id
+    fahrer = Employee.query.filter(
+        Employee.company_id == cid,
+        Employee.role == 'FAHRER',
+        Employee.is_active == True,
+        Employee.deleted_at == None,
+    ).order_by(Employee.nachname).all()
+
+    # Auch andere Rollen, die Fahrzeuge fahren könnten (Pflegefachkraft etc.)
+    alle_mit_fs = Employee.query.filter(
+        Employee.company_id == cid,
+        Employee.is_active == True,
+        Employee.deleted_at == None,
+        Employee.fuehrerschein_bis != None,
+        Employee.role != 'FAHRER',
+    ).order_by(Employee.nachname).all()
+
+    return render_template('fuhrpark/fahrer.html',
+                           fahrer=fahrer,
+                           alle_mit_fs=alle_mit_fs)
+
+
+@fuhrpark_bp.route('/fahrer/<employee_id>/fuehrerschein', methods=['POST'])
+@login_required
+@admin_required
+def fahrer_fuehrerschein_update(employee_id):
+    """Führerscheindaten aktualisieren."""
+    emp = Employee.query.filter_by(
+        id=employee_id, company_id=current_user.company_id
+    ).first_or_404()
+
+    emp.fuehrerschein_klasse = request.form.get('fuehrerschein_klasse', '').strip()
+    emp.fuehrerschein_bis    = _parse_date(request.form.get('fuehrerschein_bis'))
+    db.session.commit()
+    flash(f'✓ Führerscheindaten für {emp.full_name} aktualisiert.', 'success')
+    return redirect(url_for('fuhrpark.fahrer_liste'))

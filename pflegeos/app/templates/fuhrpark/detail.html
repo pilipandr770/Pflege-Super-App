@@ -13,16 +13,26 @@
       {% if fahrzeug.baujahr %} · BJ {{ fahrzeug.baujahr }}{% endif %}
     </div>
   </div>
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 flex-wrap">
     <a href="{{ url_for('fuhrpark.km_neu', fahrzeug_id=fahrzeug.id) }}"
        class="btn btn-success btn-sm">
       <i class="bi bi-speedometer2"></i> Fahrt eintragen
     </a>
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('fuhrpark.wartung_neu', fahrzeug_id=fahrzeug.id) }}"
+       class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-tools"></i> Wartung
+    </a>
+    {% endif %}
     <a href="{{ url_for('fuhrpark.schaden_neu', fahrzeug_id=fahrzeug.id) }}"
        class="btn btn-outline-danger btn-sm">
-      <i class="bi bi-exclamation-triangle"></i> Schaden melden
+      <i class="bi bi-exclamation-triangle"></i> Schaden
     </a>
     {% if current_user.is_admin %}
+    <a href="{{ url_for('fuhrpark.export_csv', fahrzeug_id=fahrzeug.id) }}"
+       class="btn btn-outline-success btn-sm">
+      <i class="bi bi-filetype-csv"></i> Export
+    </a>
     <a href="{{ url_for('fuhrpark.bearbeiten', fahrzeug_id=fahrzeug.id) }}"
        class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-pencil"></i>
@@ -232,6 +242,64 @@
     Noch keine Fahrten eingetragen.
   </div>
 </div>
+{% endif %}
+
+{# ── Wartungsprotokoll ── #}
+{% if current_user.is_admin %}
+<div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+  <h6 class="fw-semibold mb-0">🔧 Wartungsprotokoll</h6>
+  <a href="{{ url_for('fuhrpark.wartung_neu', fahrzeug_id=fahrzeug.id) }}"
+     class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-plus-lg"></i> Wartung eintragen
+  </a>
+</div>
+
+{% if wartungen %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th><th>Art</th><th>Werkstatt</th>
+          <th class="text-end">km-Stand</th><th class="text-end">Kosten</th>
+          <th>Nächste Fälligkeit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in wartungen %}
+        {% set st = w.faellig_status %}
+        <tr>
+          <td>{{ w.datum.strftime('%d.%m.%Y') }}</td>
+          <td>{{ w.art_label }}</td>
+          <td class="text-muted small">{{ w.werkstatt or '—' }}</td>
+          <td class="text-end text-muted small">
+            {% if w.km_stand %}{{ '{:,}'.format(w.km_stand).replace(',','.') }} km{% else %}—{% endif %}
+          </td>
+          <td class="text-end">
+            {% if w.kosten %}<span class="text-warning fw-semibold">{{ "%.2f"|format(w.kosten) }} €</span>{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if w.naechster_termin %}
+              <span class="badge {% if st == 'expired' %}bg-danger{% elif st == 'critical' %}bg-danger{% elif st == 'warning' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                {{ w.naechster_termin.strftime('%d.%m.%Y') }}
+                {% if w.faellig_tage is not none and w.faellig_tage >= 0 %} · {{ w.faellig_tage }}T{% endif %}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card mb-4">
+  <div class="card-body text-center text-muted py-3 small">
+    <i class="bi bi-tools opacity-25 fs-3 d-block mb-1"></i>
+    Noch keine Wartungen eingetragen.
+  </div>
+</div>
+{% endif %}
 {% endif %}
 
 {% endblock %}

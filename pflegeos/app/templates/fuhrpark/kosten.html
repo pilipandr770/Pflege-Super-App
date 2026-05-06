@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Kostenanalyse Fuhrpark{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('fuhrpark.index') }}">Fuhrpark</a></li>
+<li class="breadcrumb-item active">Kostenanalyse</li>
+{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">💶 Kostenanalyse Fuhrpark</h4>
+  <small class="text-muted">{{ von.strftime('%d.%m.%Y') }} – {{ bis.strftime('%d.%m.%Y') }}</small>
+</div>
+
+{# ── Gesamt-KPIs ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-warning bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-warning mb-0">{{ "%.0f"|format(gesamt_tank) }} €</div>
+        <small class="text-muted">⛽ Kraftstoff gesamt</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-primary bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-primary mb-0">{{ "%.0f"|format(gesamt_service) }} €</div>
+        <small class="text-muted">🔧 Wartung gesamt</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-danger bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-danger mb-0">{{ "%.0f"|format(gesamt_rep) }} €</div>
+        <small class="text-muted">🔨 Reparaturen gesamt</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-success bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-success mb-0">{{ "%.0f"|format(gesamt_tank + gesamt_service + gesamt_rep) }} €</div>
+        <small class="text-muted">💶 Gesamtkosten 6 Monate</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+
+  {# ── Monats-Trend-Chart ── #}
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">📈 Kostenverlauf (letzte 6 Monate)</div>
+      <div class="card-body">
+        <canvas id="kostenChart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+  {# ── km-Chart ── #}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">🛣️ Kilometer / Monat</div>
+      <div class="card-body">
+        <canvas id="kmChart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── Pro Fahrzeug ── #}
+<div class="card">
+  <div class="card-header fw-semibold">🚗 Kosten pro Fahrzeug (6 Monate)</div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Fahrzeug</th>
+          <th class="text-end">⛽ Kraftstoff</th>
+          <th class="text-end">🔧 Wartung</th>
+          <th class="text-end">🔨 Reparatur</th>
+          <th class="text-end">km gesamt</th>
+          <th class="text-end">€ / km</th>
+          <th class="text-end fw-bold">Gesamt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in fzg_kosten %}
+        <tr>
+          <td>
+            <a href="{{ url_for('fuhrpark.detail', fahrzeug_id=item.fahrzeug.id) }}" class="fw-semibold text-decoration-none">
+              {{ item.fahrzeug.kennzeichen }}
+            </a>
+            {% if item.fahrzeug.marke %}<small class="text-muted"> · {{ item.fahrzeug.marke }} {{ item.fahrzeug.modell or '' }}</small>{% endif %}
+          </td>
+          <td class="text-end">{{ "%.2f"|format(item.tank) }} €</td>
+          <td class="text-end">{{ "%.2f"|format(item.service) }} €</td>
+          <td class="text-end">{{ "%.2f"|format(item.reparatur) }} €</td>
+          <td class="text-end text-muted">{{ '{:,}'.format(item.km).replace(',','.') }} km</td>
+          <td class="text-end">
+            {% if item.kosten_pro_km > 0 %}
+              <span class="badge {% if item.kosten_pro_km > 0.5 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                {{ "%.2f"|format(item.kosten_pro_km) }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-end fw-bold">{{ "%.2f"|format(item.total) }} €</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-3">Keine Daten im Zeitraum.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if fzg_kosten %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td>Gesamt</td>
+          <td class="text-end">{{ "%.2f"|format(gesamt_tank) }} €</td>
+          <td class="text-end">{{ "%.2f"|format(gesamt_service) }} €</td>
+          <td class="text-end">{{ "%.2f"|format(gesamt_rep) }} €</td>
+          <td class="text-end text-muted">{{ '{:,}'.format(fzg_kosten|sum(attribute='km')).replace(',','.') }} km</td>
+          <td></td>
+          <td class="text-end">{{ "%.2f"|format(gesamt_tank + gesamt_service + gesamt_rep) }} €</td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const labels = {{ labels | tojson }};
+
+// ── Kostenverlauf ──
+new Chart(document.getElementById('kostenChart'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [
+      {
+        label: '⛽ Kraftstoff',
+        data: {{ tank_data | tojson }},
+        backgroundColor: 'rgba(255,193,7,0.7)',
+        borderColor: '#ffc107',
+        borderWidth: 1,
+      },
+      {
+        label: '🔧 Wartung',
+        data: {{ wartung_data | tojson }},
+        backgroundColor: 'rgba(13,110,253,0.7)',
+        borderColor: '#0d6efd',
+        borderWidth: 1,
+      },
+      {
+        label: '🔨 Reparatur',
+        data: {{ schaden_data | tojson }},
+        backgroundColor: 'rgba(220,53,69,0.7)',
+        borderColor: '#dc3545',
+        borderWidth: 1,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { stacked: true },
+      y: {
+        stacked: true,
+        ticks: { callback: v => v + ' €' }
+      }
+    }
+  }
+});
+
+// ── km-Verlauf ──
+new Chart(document.getElementById('kmChart'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [{
+      label: 'km',
+      data: {{ km_data | tojson }},
+      borderColor: '#159895',
+      backgroundColor: 'rgba(21,152,149,0.15)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { ticks: { callback: v => v + ' km' } }
+    }
+  }
+});
+</script>
+{% endblock %}

@@ -139,6 +139,24 @@
             <i class="bi bi-car-front-fill"></i> Fuhrpark
           </a>
         </li>
+        <li class="nav-item ms-3">
+          <a href="{{ url_for('fuhrpark.kosten') }}"
+             class="nav-link py-1 {% if request.endpoint == 'fuhrpark.kosten' %}active{% endif %}" style="font-size:.82rem">
+            <i class="bi bi-graph-up-arrow"></i> Kostenanalyse
+          </a>
+        </li>
+        <li class="nav-item ms-3">
+          <a href="{{ url_for('fuhrpark.wartung_uebersicht') }}"
+             class="nav-link py-1 {% if request.endpoint == 'fuhrpark.wartung_uebersicht' %}active{% endif %}" style="font-size:.82rem">
+            <i class="bi bi-tools"></i> Wartungsplan
+          </a>
+        </li>
+        <li class="nav-item ms-3">
+          <a href="{{ url_for('fuhrpark.fahrer_liste') }}"
+             class="nav-link py-1 {% if request.endpoint == 'fuhrpark.fahrer_liste' %}active{% endif %}" style="font-size:.82rem">
+            <i class="bi bi-person-badge"></i> Führerscheine
+          </a>
+        </li>
 
       {# ── PFLEGEKRÄFTE — Außendienst mit Patientenpflege ── #}
       {% elif current_user.is_care_role %}

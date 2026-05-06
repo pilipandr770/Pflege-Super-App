@@ -91,6 +91,27 @@ def run_fuhrpark_alerts_check(app):
 
         # Sammle Probleme pro Company
         company_problems: dict = {}  # company_id → list of (fahrzeug, label, msg)
+        # Auch überfällige Wartungen prüfen
+        from app.models import Wartungseintrag
+        seen_w = set()
+        for w in Wartungseintrag.query.join(Fahrzeug).filter(
+            Fahrzeug.company_id.in_([fz.company_id for fz in fahrzeuge]),
+            Fahrzeug.deleted_at == None,
+            Wartungseintrag.naechster_termin != None,
+        ).all():
+            if w.faellig_status in ('expired', 'critical', 'warning'):
+                key = (w.fahrzeug_id, w.art)
+                if key not in seen_w:
+                    seen_w.add(key)
+                    if w.faellig_status == 'expired':
+                        company_problems.setdefault(w.fahrzeug.company_id, []).append(
+                            f"{w.fahrzeug.kennzeichen}: Wartung '{w.art_label}' überfällig seit {w.naechster_termin.strftime('%d.%m.%Y')}!"
+                        )
+                    else:
+                        company_problems.setdefault(w.fahrzeug.company_id, []).append(
+                            f"{w.fahrzeug.kennzeichen}: Wartung '{w.art_label}' fällig in {w.faellig_tage} Tagen ({w.naechster_termin.strftime('%d.%m.%Y')})"
+                        )
+
         for fz in fahrzeuge:
             checks = [
                 ('TÜV/HU', fz.tuev_bis, fz.tuev_tage, fz.tuev_status),

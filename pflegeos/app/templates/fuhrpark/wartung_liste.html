@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Wartungsübersicht{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('fuhrpark.index') }}">Fuhrpark</a></li>
+<li class="breadcrumb-item active">Wartungsübersicht</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">🔧 Wartungsübersicht</h4>
+</div>
+
+{# ── Fällige / kommende Wartungen ── #}
+<h6 class="fw-semibold mb-3 text-muted text-uppercase" style="font-size:.75rem">Anstehende Wartungen</h6>
+
+{% if upcoming %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Fahrzeug</th>
+          <th>Art</th>
+          <th>Nächster Termin</th>
+          <th>Nächste km</th>
+          <th>Status</th>
+          <th>Zuletzt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in upcoming %}
+        {% set st = w.faellig_status %}
+        {% set tage = w.faellig_tage %}
+        <tr class="{% if st == 'expired' %}table-danger{% elif st == 'critical' %}table-warning{% elif st == 'warning' %}table-warning bg-opacity-50{% endif %}">
+          <td>
+            <a href="{{ url_for('fuhrpark.detail', fahrzeug_id=w.fahrzeug_id) }}" class="fw-semibold text-decoration-none">
+              {{ w.fahrzeug.kennzeichen }}
+            </a>
+            {% if w.fahrzeug.marke %}<small class="text-muted"> · {{ w.fahrzeug.marke }}</small>{% endif %}
+          </td>
+          <td>{{ w.art_label }}</td>
+          <td>
+            {% if w.naechster_termin %}
+              <span class="{% if st in ('expired','critical') %}text-danger fw-semibold{% elif st == 'warning' %}text-warning{% else %}text-success{% endif %}">
+                {{ w.naechster_termin.strftime('%d.%m.%Y') }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if w.naechste_km %}
+              {{ '{:,}'.format(w.naechste_km).replace(',','.') }} km
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if st == 'expired' %}
+              <span class="badge bg-danger">Überfällig</span>
+            {% elif st == 'critical' %}
+              <span class="badge bg-danger">in {{ tage }} Tagen</span>
+            {% elif st == 'warning' %}
+              <span class="badge bg-warning text-dark">in {{ tage }} Tagen</span>
+            {% elif st == 'ok' %}
+              <span class="badge bg-success">in {{ tage }} Tagen</span>
+            {% else %}
+              <span class="badge bg-secondary">–</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ w.datum.strftime('%d.%m.%Y') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card mb-4">
+  <div class="card-body text-center text-muted py-4">
+    <i class="bi bi-tools fs-2 d-block mb-2 opacity-25"></i>
+    Keine anstehenden Wartungen eingetragen.
+  </div>
+</div>
+{% endif %}
+
+{# ── Zuletzt durchgeführt ── #}
+<h6 class="fw-semibold mb-3 text-muted text-uppercase" style="font-size:.75rem">Zuletzt durchgeführt</h6>
+
+{% if recent %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th><th>Fahrzeug</th><th>Art</th>
+          <th>Werkstatt</th><th class="text-end">km-Stand</th><th class="text-end">Kosten</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in recent %}
+        <tr>
+          <td>{{ w.datum.strftime('%d.%m.%Y') }}</td>
+          <td>
+            <a href="{{ url_for('fuhrpark.detail', fahrzeug_id=w.fahrzeug_id) }}" class="fw-semibold text-decoration-none">
+              {{ w.fahrzeug.kennzeichen }}
+            </a>
+          </td>
+          <td>{{ w.art_label }}</td>
+          <td class="text-muted small">{{ w.werkstatt or '—' }}</td>
+          <td class="text-end text-muted small">
+            {% if w.km_stand %}{{ '{:,}'.format(w.km_stand).replace(',','.') }} km{% else %}—{% endif %}
+          </td>
+          <td class="text-end">
+            {% if w.kosten %}<span class="text-warning fw-semibold">{{ "%.2f"|format(w.kosten) }} €</span>{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-3 small">Noch keine Wartungen eingetragen.</div>
+</div>
+{% endif %}
+
+{% endblock %}
