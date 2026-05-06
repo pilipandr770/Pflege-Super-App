@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Fuhrpark{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">🚗 Fuhrpark</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">🚗 Fuhrpark</h4>
+    <small class="text-muted">{{ aktiv }} aktive · {{ werkstatt }} in Werkstatt</small>
+  </div>
+  {% if current_user.is_admin %}
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('fuhrpark.bericht') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-bar-chart-line"></i> Monatsbericht
+    </a>
+    <a href="{{ url_for('fuhrpark.neu') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg"></i> Fahrzeug anlegen
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+{# ── Alerts ── #}
+{% if alerts %}
+<div class="alert alert-warning border-start border-warning border-4 mb-4 py-2">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <strong>{{ alerts|length }} Fahrzeug{{ 'e benötigen' if alerts|length > 1 else ' benötigt' }} Aufmerksamkeit:</strong>
+  {% for f in alerts %}
+    <span class="ms-2">
+      <a href="{{ url_for('fuhrpark.detail', fahrzeug_id=f.id) }}" class="text-warning fw-semibold">{{ f.kennzeichen }}</a>
+      {% if f.tuev_status in ('expired','critical','warning') %}
+        <span class="badge bg-danger ms-1">TÜV {{ f.tuev_bis.strftime('%d.%m.%Y') if f.tuev_bis }}</span>
+      {% endif %}
+      {% if f.versicherung_status in ('expired','critical','warning') %}
+        <span class="badge bg-danger ms-1">Vers. {{ f.versicherung_bis.strftime('%d.%m.%Y') if f.versicherung_bis }}</span>
+      {% endif %}
+    </span>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Fahrzeug-Karten ── #}
+{% if fahrzeuge %}
+<div class="row g-3">
+  {% for f in fahrzeuge %}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card h-100"
+         style="border-left: 4px solid
+           {% if f.status == 'WERKSTATT' %}#ffc107
+           {% elif f.status == 'AUSSER_BETRIEB' %}#6c757d
+           {% elif f.hat_alerts %}#dc3545
+           {% else %}#198754{% endif %};">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h6 class="fw-bold mb-0">{{ f.kennzeichen }}</h6>
+            <small class="text-muted">{{ f.marke or '' }} {{ f.modell or '' }}</small>
+          </div>
+          <span class="badge
+            {% if f.status == 'AKTIV' %}bg-success
+            {% elif f.status == 'WERKSTATT' %}bg-warning text-dark
+            {% else %}bg-secondary{% endif %}">
+            {{ f.status }}
+          </span>
+        </div>
+
+        <div class="row g-1 mb-2" style="font-size:.82rem;">
+          <div class="col-6 text-muted">⛽ {{ f.kraftstoff or '—' }}</div>
+          <div class="col-6 text-muted">📅 BJ {{ f.baujahr or '—' }}</div>
+          <div class="col-6 text-muted">🔢 {{ '{:,}'.format(f.km_stand).replace(',','.') if f.km_stand else '—' }} km</div>
+          <div class="col-6 text-muted">🎨 {{ f.farbe or '—' }}</div>
+        </div>
+
+        {# Dokument-Status #}
+        <div class="d-flex gap-1 flex-wrap mb-2">
+          {% macro doc_badge(label, status, datum) %}
+            <span class="badge
+              {% if status == 'ok' %}bg-success
+              {% elif status == 'warning' %}bg-warning text-dark
+              {% elif status in ('critical','expired') %}bg-danger
+              {% else %}bg-secondary{% endif %}">
+              {{ label }}
+              {% if datum %} {{ datum.strftime('%m/%y') }}{% endif %}
+            </span>
+          {% endmacro %}
+          {{ doc_badge('TÜV', f.tuev_status, f.tuev_bis) }}
+          {{ doc_badge('Vers.', f.versicherung_status, f.versicherung_bis) }}
+        </div>
+
+        <div class="d-flex gap-2 mt-auto">
+          <a href="{{ url_for('fuhrpark.detail', fahrzeug_id=f.id) }}"
+             class="btn btn-sm btn-outline-primary flex-grow-1">
+            <i class="bi bi-eye"></i> Details
+          </a>
+          <a href="{{ url_for('fuhrpark.km_neu', fahrzeug_id=f.id) }}"
+             class="btn btn-sm btn-outline-success">
+            <i class="bi bi-speedometer2"></i> km
+          </a>
+          {% if current_user.is_admin %}
+          <a href="{{ url_for('fuhrpark.bearbeiten', fahrzeug_id=f.id) }}"
+             class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-pencil"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-car-front fs-1 d-block mb-3 opacity-25"></i>
+    <p class="mb-2">Noch keine Fahrzeuge angelegt.</p>
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('fuhrpark.neu') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg"></i> Erstes Fahrzeug anlegen
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Schnellzugriff Fahrer ── #}
+{% if current_user.role == 'FAHRER' %}
+<div class="mt-4">
+  <a href="{{ url_for('fuhrpark.km_neu') }}" class="btn btn-success me-2">
+    <i class="bi bi-speedometer2"></i> Fahrt eintragen
+  </a>
+  <a href="{{ url_for('fuhrpark.meine_fahrten') }}" class="btn btn-outline-primary">
+    <i class="bi bi-list-ul"></i> Meine Fahrten
+  </a>
+</div>
+{% endif %}
+{% endblock %}

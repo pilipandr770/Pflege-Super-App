@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Meine Fahrten{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('fuhrpark.index') }}">Fuhrpark</a></li>
+<li class="breadcrumb-item active">Meine Fahrten</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">🛣️ Meine Fahrten</h4>
+  <a href="{{ url_for('fuhrpark.km_neu') }}" class="btn btn-success btn-sm">
+    <i class="bi bi-plus-lg"></i> Fahrt eintragen
+  </a>
+</div>
+
+{# Monat-Filter #}
+<form method="GET" class="d-flex gap-2 mb-4">
+  <input type="month" name="monat" class="form-control form-control-sm w-auto"
+         value="{{ monat }}">
+  <button type="submit" class="btn btn-outline-primary btn-sm">
+    <i class="bi bi-filter"></i> Anzeigen
+  </button>
+</form>
+
+{# Stats #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-primary mb-0">{{ fahrten|length }}</div>
+        <small class="text-muted">Fahrten</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-success mb-0">{{ '{:,}'.format(km_gesamt).replace(',','.') }}</div>
+        <small class="text-muted">km gesamt</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-warning mb-0">{{ "%.2f"|format(tankkosten) }} €</div>
+        <small class="text-muted">Tankkosten</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-info mb-0">
+          {{ von.strftime('%d.%m') }} – {{ bis.strftime('%d.%m.%Y') }}
+        </div>
+        <small class="text-muted">Zeitraum</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if fahrten %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Fahrzeug</th>
+          <th>Von → Nach</th>
+          <th>Zweck</th>
+          <th class="text-end">km</th>
+          <th class="text-end">Tank</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in fahrten %}
+        <tr>
+          <td>{{ e.datum.strftime('%d.%m.%Y') }}</td>
+          <td><strong>{{ e.fahrzeug.kennzeichen }}</strong></td>
+          <td class="small">
+            {{ e.abfahrt_ort or '—' }}
+            {% if e.ziel_ort %} → {{ e.ziel_ort }}{% endif %}
+            {% if e.patient %}
+            <br><span class="text-primary"><i class="bi bi-person"></i> {{ e.patient.full_name }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge
+              {% if e.zweck == 'PATIENTENBESUCH' %}bg-primary
+              {% elif e.zweck == 'WERKSTATT' %}bg-warning text-dark
+              {% else %}bg-secondary{% endif %}"
+              style="font-size:.7rem;">
+              {{ {'PATIENTENBESUCH':'Patient','BESORGUNG':'Besorgung',
+                  'WERKSTATT':'Werkstatt','SONSTIGES':'Sonst.'}.get(e.zweck, e.zweck) }}
+            </span>
+          </td>
+          <td class="text-end fw-semibold">{{ e.km_gesamt }}</td>
+          <td class="text-end small text-muted">
+            {% if e.kraftstoff_kosten %}{{ "%.2f"|format(e.kraftstoff_kosten) }} €{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="4" class="text-muted">Gesamt</td>
+          <td class="text-end">{{ km_gesamt }}</td>
+          <td class="text-end">{{ "%.2f"|format(tankkosten) }} €</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-4">
+    <i class="bi bi-speedometer2 fs-2 d-block mb-2 opacity-25"></i>
+    Keine Fahrten im gewählten Monat.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

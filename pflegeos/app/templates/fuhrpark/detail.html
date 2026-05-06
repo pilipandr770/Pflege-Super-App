@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}{{ fahrzeug.kennzeichen }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('fuhrpark.index') }}">Fuhrpark</a></li>
+<li class="breadcrumb-item active">{{ fahrzeug.kennzeichen }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">🚗 {{ fahrzeug.kennzeichen }}</h4>
+    <div class="text-muted">{{ fahrzeug.marke or '' }} {{ fahrzeug.modell or '' }}
+      {% if fahrzeug.baujahr %} · BJ {{ fahrzeug.baujahr }}{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('fuhrpark.km_neu', fahrzeug_id=fahrzeug.id) }}"
+       class="btn btn-success btn-sm">
+      <i class="bi bi-speedometer2"></i> Fahrt eintragen
+    </a>
+    <a href="{{ url_for('fuhrpark.schaden_neu', fahrzeug_id=fahrzeug.id) }}"
+       class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-exclamation-triangle"></i> Schaden melden
+    </a>
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('fuhrpark.bearbeiten', fahrzeug_id=fahrzeug.id) }}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil"></i>
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<div class="row g-3 mb-4">
+
+  {# ── Stammdaten ── #}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Fahrzeugdaten</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted ps-3">Status</td>
+            <td><span class="badge
+              {% if fahrzeug.status == 'AKTIV' %}bg-success
+              {% elif fahrzeug.status == 'WERKSTATT' %}bg-warning text-dark
+              {% else %}bg-secondary{% endif %}">
+              {{ fahrzeug.status }}
+            </span></td></tr>
+          <tr><td class="text-muted ps-3">Kraftstoff</td><td>{{ fahrzeug.kraftstoff or '—' }}</td></tr>
+          <tr><td class="text-muted ps-3">Farbe</td><td>{{ fahrzeug.farbe or '—' }}</td></tr>
+          <tr><td class="text-muted ps-3">km-Stand</td>
+            <td><strong>{{ '{:,}'.format(fahrzeug.km_stand).replace(',','.') if fahrzeug.km_stand else '—' }} km</strong>
+              {% if fahrzeug.km_stand_datum %}
+              <br><small class="text-muted">{{ fahrzeug.km_stand_datum.strftime('%d.%m.%Y') }}</small>
+              {% endif %}
+            </td></tr>
+          <tr><td class="text-muted ps-3">km diesen Monat</td>
+            <td class="text-primary fw-semibold">{{ '{:,}'.format(km_monat).replace(',','.') }} km</td></tr>
+          {% if fahrzeug.anschaffungsdatum %}
+          <tr><td class="text-muted ps-3">In Betrieb seit</td>
+            <td>{{ fahrzeug.anschaffungsdatum.strftime('%d.%m.%Y') }}</td></tr>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# ── Fristen ── #}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">📋 Fristen & Versicherung</div>
+      <div class="card-body">
+
+        {% macro frist_row(label, status, datum, tage) %}
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded
+          {% if status == 'expired' %}bg-danger bg-opacity-10
+          {% elif status == 'critical' %}bg-danger bg-opacity-10
+          {% elif status == 'warning' %}bg-warning bg-opacity-10
+          {% else %}bg-light{% endif %}">
+          <span>{{ label }}</span>
+          <div class="text-end">
+            {% if datum %}
+            <div class="fw-semibold
+              {% if status in ('expired','critical') %}text-danger
+              {% elif status == 'warning' %}text-warning
+              {% else %}text-success{% endif %}">
+              {{ datum.strftime('%d.%m.%Y') }}
+            </div>
+            <small class="text-muted">
+              {% if status == 'expired' %}⛔ abgelaufen
+              {% elif tage is not none %}noch {{ tage }} Tage
+              {% endif %}
+            </small>
+            {% else %}
+            <span class="text-muted">nicht eingetragen</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endmacro %}
+
+        {{ frist_row('🔧 TÜV / HU', fahrzeug.tuev_status, fahrzeug.tuev_bis, fahrzeug.tuev_tage) }}
+        {{ frist_row('🛡️ Versicherung', fahrzeug.versicherung_status, fahrzeug.versicherung_bis, fahrzeug.versicherung_tage) }}
+
+        {% if fahrzeug.versicherung_gesellschaft %}
+        <div class="mt-2 small text-muted">
+          {{ fahrzeug.versicherung_gesellschaft }}
+          {% if fahrzeug.versicherung_nr %} · Nr. {{ fahrzeug.versicherung_nr }}{% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Offene Schäden ── #}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold d-flex justify-content-between">
+        🔨 Schäden
+        <a href="{{ url_for('fuhrpark.schaden_neu', fahrzeug_id=fahrzeug.id) }}"
+           class="btn btn-sm btn-outline-danger py-0">+ Melden</a>
+      </div>
+      <div class="card-body p-0">
+        {% if schaeden %}
+          {% for s in schaeden[:5] %}
+          <div class="px-3 py-2 border-bottom">
+            <div class="d-flex justify-content-between">
+              <span class="badge
+                {% if s.status == 'OFFEN' %}bg-danger
+                {% elif s.status == 'IN_REPARATUR' %}bg-warning text-dark
+                {% else %}bg-success{% endif %} me-1">{{ s.status }}</span>
+              <small class="text-muted">{{ s.datum.strftime('%d.%m.%Y') }}</small>
+            </div>
+            <div class="small mt-1">{{ s.beschreibung[:80] }}{% if s.beschreibung|length > 80 %}…{% endif %}</div>
+            {% if current_user.is_admin and s.status != 'ERLEDIGT' %}
+            <form method="POST" action="{{ url_for('fuhrpark.schaden_status', schaden_id=s.id) }}"
+                  class="mt-1 d-flex gap-1">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% if s.status == 'OFFEN' %}
+              <button name="status" value="IN_REPARATUR"
+                      class="btn btn-xs btn-outline-warning" style="font-size:.7rem;padding:1px 6px;">In Reparatur</button>
+              {% endif %}
+              <button name="status" value="ERLEDIGT"
+                      class="btn btn-xs btn-outline-success" style="font-size:.7rem;padding:1px 6px;">Erledigt</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% if schaeden|length > 5 %}
+          <div class="text-center p-2 small text-muted">+ {{ schaeden|length - 5 }} weitere</div>
+          {% endif %}
+        {% else %}
+          <div class="text-muted text-center py-3 small">Keine Schäden gemeldet</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>{# /row #}
+
+{# ── Fahrtenbuch ── #}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h6 class="fw-semibold mb-0">📖 Fahrtenbuch</h6>
+  <a href="{{ url_for('fuhrpark.km_neu', fahrzeug_id=fahrzeug.id) }}"
+     class="btn btn-sm btn-outline-success">
+    <i class="bi bi-plus-lg"></i> Fahrt eintragen
+  </a>
+</div>
+
+{% if fahrten %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Fahrer</th>
+          <th>Von → Nach</th>
+          <th>Zweck</th>
+          <th class="text-end">km</th>
+          <th class="text-end">Tankkosten</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in fahrten %}
+        <tr>
+          <td>{{ e.datum.strftime('%d.%m.%Y') }}</td>
+          <td>{{ e.fahrer.vorname }} {{ e.fahrer.nachname[0] }}.</td>
+          <td class="small">
+            {{ e.abfahrt_ort or '—' }}
+            {% if e.ziel_ort %} → {{ e.ziel_ort }}{% endif %}
+          </td>
+          <td>
+            <span class="badge
+              {% if e.zweck == 'PATIENTENBESUCH' %}bg-primary
+              {% elif e.zweck == 'WERKSTATT' %}bg-warning text-dark
+              {% else %}bg-secondary{% endif %}"
+              style="font-size:.7rem;">
+              {{ {'PATIENTENBESUCH':'Patient','BESORGUNG':'Besorgung',
+                  'WERKSTATT':'Werkstatt','SONSTIGES':'Sonst.'}.get(e.zweck, e.zweck) }}
+            </span>
+            {% if e.patient %}<small class="text-muted ms-1">{{ e.patient.nachname }}</small>{% endif %}
+          </td>
+          <td class="text-end fw-semibold">{{ e.km_gesamt }}</td>
+          <td class="text-end small text-muted">
+            {% if e.kraftstoff_kosten %}{{ "%.2f"|format(e.kraftstoff_kosten) }} €{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="4" class="text-muted small">{{ fahrten|length }} Einträge (letzte 50)</td>
+          <td class="text-end fw-bold">{{ fahrten|sum(attribute='km_gesamt') }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-4">
+    <i class="bi bi-speedometer2 fs-2 d-block mb-2 opacity-25"></i>
+    Noch keine Fahrten eingetragen.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

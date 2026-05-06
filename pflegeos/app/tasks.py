@@ -1,8 +1,9 @@
 """
 Geplante Aufgaben für PflegeOS.
-Läuft täglich um 08:00 Uhr und prüft Geburtstage + religiöse Feiertage.
+Läuft täglich um 08:00 Uhr und prüft:
+  • Geburtstage + religiöse Feiertage → KI-Glückwünsche
+  • TÜV/HU-Frist & Versicherung Ablauf (≤ 30 Tage) → Admin-Alerts
 
-In Produktion (gunicorn): APScheduler wird genutzt.
 In Entwicklung (flask run): manueller Trigger über /greetings/trigger-check.
 """
 import logging
@@ -68,6 +69,77 @@ def run_morning_greetings_check(app):
             logger.error(f"[Morning Check] DB-Fehler beim Commit: {e}")
 
         logger.info(f"[Morning Check] Abgeschlossen: {generated} neue Grüße generiert.")
+        run_fuhrpark_alerts_check(app)
+
+
+# ── Fuhrpark-Frist-Check ──────────────────────────────────────────────────────
+
+def run_fuhrpark_alerts_check(app):
+    """
+    Prüft für alle Fahrzeuge ob TÜV/HU oder Versicherung in ≤ 30 Tagen abläuft
+    bzw. bereits abgelaufen ist → sendet E-Mail-Alerts an alle Admins der Company.
+    """
+    with app.app_context():
+        from app.models import Fahrzeug, Employee
+        from app.extensions import mail
+        from flask_mail import Message
+
+        today = date.today()
+        logger.info(f"[Fuhrpark-Check] Starte Frist-Prüfung für {today}")
+
+        fahrzeuge = Fahrzeug.query.filter_by(deleted_at=None).all()
+
+        # Sammle Probleme pro Company
+        company_problems: dict = {}  # company_id → list of (fahrzeug, label, msg)
+        for fz in fahrzeuge:
+            checks = [
+                ('TÜV/HU', fz.tuev_bis, fz.tuev_tage, fz.tuev_status),
+                ('Versicherung', fz.versicherung_bis, fz.versicherung_tage, fz.versicherung_status),
+            ]
+            for label, ablauf_datum, tage, status in checks:
+                if ablauf_datum is None or status not in ('expired', 'critical', 'warning'):
+                    continue
+
+                if status == 'expired':
+                    msg = (f"{fz.kennzeichen}: {label} abgelaufen am "
+                           f"{ablauf_datum.strftime('%d.%m.%Y')}!")
+                else:
+                    msg = (f"{fz.kennzeichen}: {label} läuft in {tage} Tagen ab "
+                           f"({ablauf_datum.strftime('%d.%m.%Y')})")
+
+                company_problems.setdefault(fz.company_id, []).append(msg)
+                logger.warning(f"[Fuhrpark-Check] {msg}")
+
+        if not company_problems:
+            logger.info("[Fuhrpark-Check] Keine ablaufenden Fristen heute.")
+            return
+
+        emails_sent = 0
+        for company_id, problems in company_problems.items():
+            admins = Employee.query.filter_by(
+                company_id=company_id,
+                role='ADMIN',
+                is_active=True
+            ).filter(Employee.email.isnot(None)).all()
+
+            body_lines = [f"⚠️  Fuhrpark-Frist-Warnung — {today.strftime('%d.%m.%Y')}", ""]
+            body_lines += [f"• {p}" for p in problems]
+            body_lines += ["", "Bitte die betroffenen Fahrzeuge im Fuhrpark-Modul prüfen."]
+            body = "\n".join(body_lines)
+
+            for admin in admins:
+                try:
+                    msg_obj = Message(
+                        subject=f"⚠️ Fuhrpark-Alert: {len(problems)} Frist(en) ablaufend",
+                        recipients=[admin.email],
+                        body=body,
+                    )
+                    mail.send(msg_obj)
+                    emails_sent += 1
+                except Exception as e:
+                    logger.error(f"[Fuhrpark-Check] E-Mail-Fehler an {admin.email}: {e}")
+
+        logger.info(f"[Fuhrpark-Check] Abgeschlossen: {emails_sent} Alerts versendet.")
 
 
 # ── Täglicher Schlaf-Loop ─────────────────────────────────────────────────────

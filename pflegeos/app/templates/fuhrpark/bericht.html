@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Fuhrpark-Monatsbericht{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('fuhrpark.index') }}">Fuhrpark</a></li>
+<li class="breadcrumb-item active">Monatsbericht</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">📊 Fuhrpark-Monatsbericht</h4>
+</div>
+
+<form method="GET" class="d-flex gap-2 mb-4 no-print">
+  <input type="month" name="monat" class="form-control form-control-sm w-auto"
+         value="{{ monat }}">
+  <button type="submit" class="btn btn-outline-primary btn-sm">
+    <i class="bi bi-filter"></i> Anzeigen
+  </button>
+  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+    <i class="bi bi-printer"></i> Drucken
+  </button>
+</form>
+
+{# Gesamt-Stats #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-primary mb-0">{{ fahrten|length }}</div>
+        <small class="text-muted">Fahrten gesamt</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-success mb-0">{{ '{:,}'.format(gesamt_km).replace(',','.') }}</div>
+        <small class="text-muted">km gesamt</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-warning mb-0">{{ "%.2f"|format(gesamt_kosten) }} €</div>
+        <small class="text-muted">Tankkosten</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-info mb-0">{{ by_fzg|length }}</div>
+        <small class="text-muted">Fahrzeuge genutzt</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Pro Fahrzeug #}
+{% for fid, data in by_fzg.items() %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">🚗 {{ data.fahrzeug.kennzeichen }}
+      {% if data.fahrzeug.marke %} · {{ data.fahrzeug.marke }} {{ data.fahrzeug.modell or '' }}{% endif %}
+    </span>
+    <span>
+      <span class="badge bg-primary me-1">{{ data.km }} km</span>
+      {% if data.kosten > 0 %}
+      <span class="badge bg-warning text-dark">{{ "%.2f"|format(data.kosten) }} €</span>
+      {% endif %}
+    </span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th><th>Fahrer</th><th>Von → Nach</th><th>Zweck</th>
+          <th class="text-end">km</th><th class="text-end">Tank €</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in data.fahrten %}
+        <tr>
+          <td>{{ e.datum.strftime('%d.%m.%Y') }}</td>
+          <td>{{ e.fahrer.vorname }} {{ e.fahrer.nachname[0] }}.</td>
+          <td class="small">{{ e.abfahrt_ort or '—' }}{% if e.ziel_ort %} → {{ e.ziel_ort }}{% endif %}</td>
+          <td><span class="badge bg-secondary" style="font-size:.7rem;">
+            {{ {'PATIENTENBESUCH':'Patient','BESORGUNG':'Besorgung',
+                'WERKSTATT':'Werkstatt','SONSTIGES':'Sonst.'}.get(e.zweck, e.zweck) }}
+          </span></td>
+          <td class="text-end">{{ e.km_gesamt }}</td>
+          <td class="text-end text-muted small">{% if e.kraftstoff_kosten %}{{ "%.2f"|format(e.kraftstoff_kosten) }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-4">Keine Fahrten im gewählten Monat.</div>
+</div>
+{% endfor %}
+
+{% endblock %}

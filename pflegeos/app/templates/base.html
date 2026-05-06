@@ -133,6 +133,12 @@
             <i class="bi bi-gear-fill"></i> Einstellungen
           </a>
         </li>
+        <li class="nav-item">
+          <a href="{{ url_for('fuhrpark.index') }}"
+             class="nav-link {% if request.endpoint and 'fuhrpark' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-car-front-fill"></i> Fuhrpark
+          </a>
+        </li>
 
       {# ── PFLEGEKRÄFTE — Außendienst mit Patientenpflege ── #}
       {% elif current_user.is_care_role %}
@@ -184,6 +190,22 @@
             <i class="bi bi-journal-check"></i> Meine Berichte
           </a>
         </li>
+        {% if current_user.role == 'FAHRER' %}
+        <hr class="text-white-50 my-1">
+        <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Fuhrpark</small></li>
+        <li class="nav-item">
+          <a href="{{ url_for('fuhrpark.meine_fahrten') }}"
+             class="nav-link {% if request.endpoint == 'fuhrpark.meine_fahrten' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i> Mein Fahrtenbuch
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('fuhrpark.index') }}"
+             class="nav-link {% if request.endpoint == 'fuhrpark.index' %}active{% endif %}">
+            <i class="bi bi-car-front-fill"></i> Fahrzeuge
+          </a>
+        </li>
+        {% endif %}
 
       {# ── VERWALTUNG — Lesezugriff ── #}
       {% elif current_user.is_office_role %}

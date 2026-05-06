@@ -1119,3 +1119,163 @@ class PatientGreeting(db.Model):
 
     def __repr__(self):
         return f"<PatientGreeting {self.patient_id} – {self.occasion}>"
+
+
+# ============================================================
+# FUHRPARK
+# ============================================================
+
+class Fahrzeug(db.Model):
+    """Fahrzeugkartei — jedes Fahrzeug des Pflegedienstes."""
+    __tablename__ = 'fahrzeuge'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+
+    kennzeichen            = db.Column(db.String(20),  nullable=False)   # z.B. "B-PF 1234"
+    marke                  = db.Column(db.String(50))                    # VW, Citroën …
+    modell                 = db.Column(db.String(100))                   # Caddy, Berlingo …
+    baujahr                = db.Column(db.Integer)
+    farbe                  = db.Column(db.String(30))
+    kraftstoff             = db.Column(db.String(20), default='Diesel')  # Benzin/Diesel/Elektro/Hybrid
+    fahrgestellnummer      = db.Column(db.String(50))
+
+    tuev_bis               = db.Column(db.Date)    # HU / TÜV-Ablauf
+    versicherung_bis       = db.Column(db.Date)    # Versicherungsablauf
+    versicherung_nr        = db.Column(db.String(50))
+    versicherung_gesellschaft = db.Column(db.String(100))
+
+    km_stand               = db.Column(db.Integer)   # aktueller Kilometerstand
+    km_stand_datum         = db.Column(db.Date)      # wann abgelesen
+
+    anschaffungsdatum      = db.Column(db.Date)
+
+    # AKTIV | WERKSTATT | AUSSER_BETRIEB
+    status    = db.Column(db.String(20), default='AKTIV')
+    notizen   = db.Column(db.Text)
+
+    deleted_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    company = db.relationship('Company', backref='fahrzeuge')
+
+    __table_args__ = (
+        db.Index('ix_fahrzeuge_company_id', 'company_id'),
+        db.Index('ix_fahrzeuge_status', 'status'),
+    )
+
+    # ── Hilfseigenschaften ────────────────────────────────────
+    @property
+    def tuev_tage(self):
+        if not self.tuev_bis:
+            return None
+        return (self.tuev_bis - date.today()).days
+
+    @property
+    def versicherung_tage(self):
+        if not self.versicherung_bis:
+            return None
+        return (self.versicherung_bis - date.today()).days
+
+    def _doc_status(self, tage):
+        if tage is None:  return 'unknown'
+        if tage < 0:      return 'expired'
+        if tage <= 14:    return 'critical'
+        if tage <= 30:    return 'warning'
+        return 'ok'
+
+    @property
+    def tuev_status(self):
+        return self._doc_status(self.tuev_tage)
+
+    @property
+    def versicherung_status(self):
+        return self._doc_status(self.versicherung_tage)
+
+    @property
+    def hat_alerts(self):
+        return self.tuev_status in ('expired', 'critical', 'warning') or \
+               self.versicherung_status in ('expired', 'critical', 'warning')
+
+    @property
+    def display_name(self):
+        parts = [p for p in [self.marke, self.modell, self.kennzeichen] if p]
+        return ' · '.join(parts) if parts else self.kennzeichen
+
+    def __repr__(self):
+        return f"<Fahrzeug {self.kennzeichen}>"
+
+
+class Kilometerbuch(db.Model):
+    """Fahrtenbucheintrag — jede Tour eines Fahrers."""
+    __tablename__ = 'kilometerbuch'
+
+    id          = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id  = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    fahrzeug_id = db.Column(db.String(36), db.ForeignKey('fahrzeuge.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+    patient_id  = db.Column(db.String(36), db.ForeignKey('patients.id'))  # optional
+
+    datum       = db.Column(db.Date, nullable=False, default=date.today)
+    km_start    = db.Column(db.Integer, nullable=False)
+    km_end      = db.Column(db.Integer, nullable=False)
+
+    abfahrt_ort = db.Column(db.String(200))
+    ziel_ort    = db.Column(db.String(200))
+    # PATIENTENBESUCH | BESORGUNG | WERKSTATT | SONSTIGES
+    zweck       = db.Column(db.String(30), default='PATIENTENBESUCH')
+
+    kraftstoff_kosten = db.Column(db.Numeric(8, 2))
+    kraftstoff_liter  = db.Column(db.Numeric(6, 2))
+    bemerkungen       = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    fahrzeug = db.relationship('Fahrzeug', backref=db.backref('fahrten', lazy='dynamic'))
+    fahrer   = db.relationship('Employee', backref='fahrten')
+    patient  = db.relationship('Patient',  backref='fahrten')
+
+    __table_args__ = (
+        db.Index('ix_kilometerbuch_fahrzeug_id', 'fahrzeug_id'),
+        db.Index('ix_kilometerbuch_employee_id', 'employee_id'),
+        db.Index('ix_kilometerbuch_datum',       'datum'),
+    )
+
+    @property
+    def km_gesamt(self):
+        return max(0, (self.km_end or 0) - (self.km_start or 0))
+
+    def __repr__(self):
+        return f"<Kilometerbuch {self.datum} {self.km_gesamt}km>"
+
+
+class Schadensmeldung(db.Model):
+    """Schadensmeldung für ein Fahrzeug."""
+    __tablename__ = 'schadensmeldungen'
+
+    id          = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id  = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    fahrzeug_id = db.Column(db.String(36), db.ForeignKey('fahrzeuge.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    datum       = db.Column(db.Date, nullable=False, default=date.today)
+    beschreibung = db.Column(db.Text, nullable=False)
+    ort         = db.Column(db.String(200))
+
+    versicherung_gemeldet = db.Column(db.Boolean, default=False)
+    reparatur_kosten      = db.Column(db.Numeric(10, 2))
+
+    # OFFEN | IN_REPARATUR | ERLEDIGT
+    status     = db.Column(db.String(20), default='OFFEN')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    fahrzeug = db.relationship('Fahrzeug', backref=db.backref('schaeden', lazy='dynamic'))
+    melder   = db.relationship('Employee', backref='schadensmeldungen')
+
+    __table_args__ = (
+        db.Index('ix_schadensmeldungen_fahrzeug_id', 'fahrzeug_id'),
+    )
+
+    def __repr__(self):
+        return f"<Schadensmeldung {self.fahrzeug_id} {self.datum}>"

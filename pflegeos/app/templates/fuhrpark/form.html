@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('fuhrpark.index') }}">Fuhrpark</a></li>
+<li class="breadcrumb-item active">{{ title }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">🚗 {{ title }}</h4>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-4">
+
+    {# ── Fahrzeugdaten ── #}
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold">🚗 Fahrzeugdaten</div>
+        <div class="card-body">
+          <div class="row g-3">
+
+            <div class="col-6 col-md-3">
+              <label class="form-label fw-semibold">Kennzeichen <span class="text-danger">*</span></label>
+              <input type="text" name="kennzeichen" class="form-control text-uppercase
+                {% if errors.get('kennzeichen') %}is-invalid{% endif %}"
+                value="{{ form_data.get('kennzeichen','') }}"
+                placeholder="B-PF 1234" required
+                oninput="this.value=this.value.toUpperCase()">
+              {% if errors.get('kennzeichen') %}
+              <div class="invalid-feedback">{{ errors.kennzeichen }}</div>
+              {% endif %}
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label fw-semibold">Marke</label>
+              <input type="text" name="marke" class="form-control"
+                value="{{ form_data.get('marke','') }}" placeholder="VW, Citroën …">
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label fw-semibold">Modell</label>
+              <input type="text" name="modell" class="form-control"
+                value="{{ form_data.get('modell','') }}" placeholder="Caddy, Berlingo …">
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label fw-semibold">Baujahr</label>
+              <input type="number" name="baujahr" class="form-control"
+                value="{{ form_data.get('baujahr','') }}" placeholder="2020" min="1990" max="2030">
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label fw-semibold">Farbe</label>
+              <input type="text" name="farbe" class="form-control"
+                value="{{ form_data.get('farbe','') }}" placeholder="Weiß, Silber …">
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label fw-semibold">Kraftstoff</label>
+              <select name="kraftstoff" class="form-select">
+                {% for k in ['Diesel','Benzin','Elektro','Hybrid','Erdgas'] %}
+                <option value="{{ k }}" {% if form_data.get('kraftstoff','Diesel') == k %}selected{% endif %}>{{ k }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label fw-semibold">Fahrgestellnummer (VIN)</label>
+              <input type="text" name="fahrgestellnummer" class="form-control"
+                value="{{ form_data.get('fahrgestellnummer','') }}" placeholder="WV…">
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label fw-semibold">Status</label>
+              <select name="status" class="form-select">
+                <option value="AKTIV" {% if form_data.get('status','AKTIV') == 'AKTIV' %}selected{% endif %}>✅ Aktiv</option>
+                <option value="WERKSTATT" {% if form_data.get('status') == 'WERKSTATT' %}selected{% endif %}>🔧 Werkstatt</option>
+                <option value="AUSSER_BETRIEB" {% if form_data.get('status') == 'AUSSER_BETRIEB' %}selected{% endif %}>⛔ Außer Betrieb</option>
+              </select>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── Fristen & Versicherung ── #}
+    <div class="col-12 col-md-6">
+      <div class="card h-100">
+        <div class="card-header fw-semibold">📋 Fristen & Dokumente</div>
+        <div class="card-body">
+          <div class="row g-3">
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">TÜV / HU gültig bis</label>
+              <input type="date" name="tuev_bis" class="form-control"
+                value="{{ form_data.get('tuev_bis','') }}">
+              <div class="form-text">⚠️ Alert 30 Tage vorher automatisch</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Versicherung gültig bis</label>
+              <input type="date" name="versicherung_bis" class="form-control"
+                value="{{ form_data.get('versicherung_bis','') }}">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Versicherungsgesellschaft</label>
+              <input type="text" name="versicherung_gesellschaft" class="form-control"
+                value="{{ form_data.get('versicherung_gesellschaft','') }}"
+                placeholder="ADAC, HUK, Allianz …">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Versicherungsnummer</label>
+              <input type="text" name="versicherung_nr" class="form-control"
+                value="{{ form_data.get('versicherung_nr','') }}">
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── Kilometerstand ── #}
+    <div class="col-12 col-md-6">
+      <div class="card h-100">
+        <div class="card-header fw-semibold">🔢 Kilometerstand & Anschaffung</div>
+        <div class="card-body">
+          <div class="row g-3">
+
+            <div class="col-6">
+              <label class="form-label fw-semibold">Aktueller km-Stand</label>
+              <div class="input-group">
+                <input type="number" name="km_stand" class="form-control"
+                  value="{{ form_data.get('km_stand','') }}" placeholder="75000">
+                <span class="input-group-text">km</span>
+              </div>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label fw-semibold">Abgelesen am</label>
+              <input type="date" name="km_stand_datum" class="form-control"
+                value="{{ form_data.get('km_stand_datum','') }}">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Anschaffungsdatum</label>
+              <input type="date" name="anschaffungsdatum" class="form-control"
+                value="{{ form_data.get('anschaffungsdatum','') }}">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Notizen</label>
+              <textarea name="notizen" class="form-control" rows="3"
+                placeholder="Besonderheiten, Ausstattung …">{{ form_data.get('notizen','') }}</textarea>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>{# /row #}
+
+  <div class="d-flex gap-2 mt-4">
+    <button type="submit" class="btn btn-primary px-4">
+      <i class="bi bi-check-lg"></i>
+      {% if fahrzeug %}Speichern{% else %}Fahrzeug anlegen{% endif %}
+    </button>
+    <a href="{{ url_for('fuhrpark.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+
+</form>
+{% endblock %}
