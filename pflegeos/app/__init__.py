@@ -48,6 +48,7 @@ def create_app(config_name=None):
     from app.routes.nurse import nurse_bp
     from app.routes.family import family_bp
     from app.routes.doctor import doctor_bp
+    from app.routes.greetings import greetings_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/')
@@ -66,6 +67,11 @@ def create_app(config_name=None):
     app.register_blueprint(family_bp)
     app.register_blueprint(doctor_bp)
     app.register_blueprint(export_bp)
+    app.register_blueprint(greetings_bp)
+
+    # Планировщик задач (утренняя проверка поздравлений)
+    from app.tasks import init_scheduler
+    init_scheduler(app)
 
     # Глобальные template filters
     def _fmt(value, fmt='%d.%m.%Y'):

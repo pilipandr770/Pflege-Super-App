@@ -98,6 +98,12 @@
         <hr class="text-white-50 my-1">
         <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Administration</small></li>
         <li class="nav-item">
+          <a href="{{ url_for('greetings.today') }}"
+             class="nav-link {% if request.endpoint and 'greetings' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-emoji-smile-fill"></i> Glückwünsche
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('admin.schedules_list') }}"
              class="nav-link {% if 'admin' in request.endpoint and 'schedule' in request.endpoint %}active{% endif %}">
             <i class="bi bi-calendar2-week-fill"></i> Dienstpläne (AI)

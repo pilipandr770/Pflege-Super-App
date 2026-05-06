@@ -1072,3 +1072,50 @@ class ScheduleGeneration(db.Model):
 
     def __repr__(self):
         return f"<ScheduleGeneration {self.schedule_start_date} to {self.schedule_end_date}>"
+
+
+# ============================================================
+# PATIENT GREETINGS
+# ============================================================
+class PatientGreeting(db.Model):
+    """KI-generierte Glückwünsche für Patienten (Geburtstag + religiöse Feiertage)."""
+    __tablename__ = 'patient_greetings'
+
+    id          = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    patient_id  = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+    company_id  = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+
+    # Anlass
+    occasion      = db.Column(db.String(200), nullable=False)   # z.B. "Ostersonntag", "Geburtstag (83. Geburtstag)"
+    occasion_type = db.Column(db.String(50),  nullable=False)   # 'birthday' | 'religious' | 'national'
+
+    # KI-generierter Text
+    message = db.Column(db.Text, nullable=False)
+
+    # E-Mail-Status
+    sent_email = db.Column(db.Boolean, default=False)
+    sent_at    = db.Column(db.DateTime)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    patient = db.relationship('Patient', backref=db.backref('greetings', lazy='dynamic'))
+    company = db.relationship('Company', backref='greetings')
+
+    __table_args__ = (
+        db.Index('ix_patient_greetings_patient_id', 'patient_id'),
+        db.Index('ix_patient_greetings_company_id', 'company_id'),
+        db.Index('ix_patient_greetings_created_at', 'created_at'),
+    )
+
+    @property
+    def occasion_icon(self):
+        icons = {
+            'birthday':  '🎂',
+            'religious': '🙏',
+            'national':  '🎉',
+        }
+        return icons.get(self.occasion_type, '🌸')
+
+    def __repr__(self):
+        return f"<PatientGreeting {self.patient_id} – {self.occasion}>"

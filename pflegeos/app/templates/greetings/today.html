@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Glückwünsche{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">🎉 Glückwünsche</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">🎉 Glückwunsch-Center</h4>
+    <small class="text-muted">
+      KI-generierte Grüße für Patienten — Geburtstage &amp; religiöse Feiertage
+    </small>
+  </div>
+  <div class="d-flex gap-2">
+    {# Manueller Auslöser #}
+    <form method="POST" action="{{ url_for('greetings.trigger_check') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-outline-secondary btn-sm"
+              onclick="return confirm('Prüfung jetzt manuell starten?')">
+        <i class="bi bi-arrow-clockwise"></i> Jetzt prüfen
+      </button>
+    </form>
+  </div>
+</div>
+
+{# Flash-Meldungen #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+{# ── Zeitraum-Filter ── #}
+<div class="d-flex gap-2 mb-4">
+  <a href="{{ url_for('greetings.today', period='today') }}"
+     class="btn btn-sm {% if period == 'today' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+    <i class="bi bi-calendar-day"></i> Heute
+  </a>
+  <a href="{{ url_for('greetings.today', period='week') }}"
+     class="btn btn-sm {% if period == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+    <i class="bi bi-calendar-week"></i> Letzte 7 Tage
+  </a>
+</div>
+
+{# ── Kein Ergebnis ── #}
+{% if not greetings %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-emoji-smile fs-1 d-block mb-3 opacity-25"></i>
+    <p class="mb-1">Heute keine besonderen Anlässe.</p>
+    <small>Geburtstage und religiöse Feiertage werden automatisch täglich um 08:00 geprüft.</small>
+  </div>
+</div>
+{% else %}
+
+{# ── Statistik-Zeile ── #}
+{% set birthdays = greetings | selectattr('occasion_type','equalto','birthday') | list %}
+{% set religious = greetings | selectattr('occasion_type','equalto','religious') | list %}
+{% set sent      = greetings | selectattr('sent_email','equalto',true) | list %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-primary mb-0">{{ greetings|length }}</div>
+        <small class="text-muted">Grüße gesamt</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-warning mb-0">{{ birthdays|length }}</div>
+        <small class="text-muted">🎂 Geburtstage</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-info mb-0">{{ religious|length }}</div>
+        <small class="text-muted">🙏 Feiertage</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-light text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-success mb-0">{{ sent|length }}</div>
+        <small class="text-muted">✉️ E-Mails gesendet</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Grüße-Liste ── #}
+<div class="row g-3">
+  {% for g in greetings %}
+  <div class="col-12 col-md-6">
+    <div class="card h-100"
+         style="border-left: 4px solid
+           {% if g.occasion_type == 'birthday' %}#ffc107
+           {% elif g.occasion_type == 'religious' %}#0d6efd
+           {% else %}#198754{% endif %};">
+      <div class="card-body">
+
+        {# Header #}
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <span class="fs-5">{{ g.occasion_icon }}</span>
+            <strong class="ms-1">{{ g.patient.vorname }} {{ g.patient.nachname }}</strong>
+            {% if g.patient.pflegegrad %}
+              <span class="badge bg-primary ms-1">PG {{ g.patient.pflegegrad }}</span>
+            {% endif %}
+          </div>
+          <small class="text-muted">
+            {{ g.created_at.strftime('%d.%m. %H:%M') }}
+          </small>
+        </div>
+
+        {# Anlass #}
+        <div class="mb-2">
+          <span class="badge
+            {% if g.occasion_type == 'birthday' %}bg-warning text-dark
+            {% elif g.occasion_type == 'religious' %}bg-primary
+            {% else %}bg-success{% endif %}
+            me-1">
+            {{ g.occasion }}
+          </span>
+          {% if g.patient.religion %}
+            <small class="text-muted">· {{ g.patient.religion }}</small>
+          {% endif %}
+        </div>
+
+        {# KI-Nachricht #}
+        <div class="bg-light rounded p-2 mb-3"
+             style="font-size:.9rem; line-height:1.5; font-style:italic;">
+          "{{ g.message }}"
+        </div>
+
+        {# Aktionen #}
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            {% if g.patient.betreuer_email %}
+              <small class="text-muted">
+                <i class="bi bi-envelope"></i>
+                {{ g.patient.betreuer_email[:35] }}{% if g.patient.betreuer_email|length > 35 %}…{% endif %}
+              </small>
+            {% else %}
+              <small class="text-muted"><i class="bi bi-envelope-slash"></i> Keine Betreuer-E-Mail</small>
+            {% endif %}
+          </div>
+
+          {% if g.patient.betreuer_email %}
+            {% if g.sent_email %}
+              <span class="badge bg-success">
+                <i class="bi bi-check-circle-fill"></i> Gesendet
+                {% if g.sent_at %} {{ g.sent_at.strftime('%H:%M') }}{% endif %}
+              </span>
+            {% else %}
+              <form method="POST"
+                    action="{{ url_for('greetings.send_email', greeting_id=g.id) }}"
+                    class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-envelope-arrow-up"></i> Senden
+                </button>
+              </form>
+            {% endif %}
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+
+{# ── Info-Box ── #}
+<div class="alert alert-light border mt-4 small">
+  <i class="bi bi-info-circle text-primary"></i>
+  <strong>Wie funktioniert es?</strong>
+  Täglich um <strong>08:00 Uhr</strong> prüft PflegeOS automatisch alle aktiven Patienten auf Geburtstage
+  und religiöse Feiertage (basierend auf Religion und Nationalität).
+  Claude AI generiert dann eine persönliche, kulturell passende Nachricht.
+  Sie können die Nachricht per Klick an den Betreuer per E-Mail weiterleiten.
+</div>
+
+{% endblock %}
