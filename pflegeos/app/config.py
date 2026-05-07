@@ -22,9 +22,11 @@ class Config:
         os.environ.get('DATABASE_URL', 'postgresql+psycopg://pflegeos:pflegeos_passwort@localhost:5432/pflegeos_db')
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    DB_SCHEMA = os.environ.get('DB_SCHEMA', 'public')
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 300,
+        'connect_args': {'options': f'-c search_path={os.environ.get("DB_SCHEMA", "public")}'},
     }
 
     # Uploads

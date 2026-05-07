@@ -2,6 +2,7 @@ import logging
 from logging.config import fileConfig
 
 from flask import current_app
+from sqlalchemy import text
 
 from alembic import context
 
@@ -94,12 +95,19 @@ def run_migrations_online():
     if conf_args.get("process_revision_directives") is None:
         conf_args["process_revision_directives"] = process_revision_directives
 
+    db_schema = current_app.config.get('DB_SCHEMA', 'public')
     connectable = get_engine()
+
+    # Ensure the target schema exists (safe for both 'public' and custom schemas)
+    if db_schema != 'public':
+        with connectable.begin() as conn:
+            conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{db_schema}"'))
 
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=get_metadata(),
+            version_table_schema=db_schema,
             **conf_args
         )
 
