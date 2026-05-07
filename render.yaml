@@ -8,8 +8,6 @@ services:
     name: pflegeos
     runtime: docker
     plan: starter              # $7/mo — always on, required for Docker
-    dockerfilePath: ./pflegeos/Dockerfile
-    dockerContext: ./pflegeos
     healthCheckPath: /auth/login
     envVars:
       # ── Flask ──────────────────────────────────────────────
