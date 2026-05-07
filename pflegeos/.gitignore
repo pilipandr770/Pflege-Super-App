@@ -5,7 +5,6 @@ __pycache__/
 venv/
 .venv/
 uploads/
-migrations/versions/
 *.db
 *.sqlite3
 .DS_Store

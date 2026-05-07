@@ -6,6 +6,15 @@ RUN apt-get update && apt-get install -y \
     libmagic1 \
     libpq-dev \
     gcc \
+    # WeasyPrint system dependencies
+    libpango-1.0-0 \
+    libharfbuzz0b \
+    libpangoft2-1.0-0 \
+    libfontconfig1 \
+    libfreetype6 \
+    libgdk-pixbuf2.0-0 \
+    libffi-dev \
+    shared-mime-info \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -13,6 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN chmod +x /app/start.sh
+
 EXPOSE 5000
 
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+CMD ["/app/start.sh"]

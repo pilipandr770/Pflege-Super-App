@@ -2,9 +2,25 @@ import os
 from datetime import timedelta
 
 
+def _fix_db_url(url: str) -> str:
+    """
+    Render.com liefert DATABASE_URL als 'postgres://' oder 'postgresql://'.
+    psycopg3 braucht 'postgresql+psycopg://'.
+    """
+    if not url:
+        return url
+    if url.startswith('postgres://'):
+        return 'postgresql+psycopg://' + url[len('postgres://'):]
+    if url.startswith('postgresql://'):
+        return 'postgresql+psycopg://' + url[len('postgresql://'):]
+    return url
+
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-aendern')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://pflegeos:pflegeos_passwort@localhost:5432/pflegeos_db')
+    SQLALCHEMY_DATABASE_URI = _fix_db_url(
+        os.environ.get('DATABASE_URL', 'postgresql+psycopg://pflegeos:pflegeos_passwort@localhost:5432/pflegeos_db')
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
