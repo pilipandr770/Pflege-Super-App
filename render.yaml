@@ -7,10 +7,9 @@ services:
   - type: web
     name: pflegeos
     runtime: docker
-    rootDir: pflegeos          # Dockerfile liegt in pflegeos/
     plan: starter              # $7/mo — always on, required for Docker
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    dockerfilePath: ./pflegeos/Dockerfile
+    dockerContext: ./pflegeos
     healthCheckPath: /auth/login
     envVars:
       # ── Flask ──────────────────────────────────────────────
