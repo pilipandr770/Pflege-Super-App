@@ -1,0 +1,210 @@
+{% extends "public/base_public.html" %}
+{% block title %}Pflege-Software für Ihren Pflegedienst{% endblock %}
+
+{% block extra_css %}
+.hero { background: linear-gradient(135deg, #1a5f7a 0%, #159895 100%); color: #fff; padding: 100px 0 80px; }
+.hero h1 { font-size: 2.8rem; font-weight: 800; line-height: 1.15; }
+.hero p.lead { font-size: 1.2rem; opacity: .9; max-width: 560px; }
+.trial-badge { background: rgba(255,255,255,.15); border-radius: 50px; padding: .35rem 1.1rem;
+               display: inline-block; font-size: .85rem; font-weight: 600; margin-bottom: 1.5rem; }
+.btn-hero { background: #fff; color: var(--pflege-blue); font-weight: 700;
+             padding: .75rem 2rem; border-radius: 10px; font-size: 1.05rem;
+             border: none; box-shadow: 0 4px 20px rgba(0,0,0,.2); transition: all .2s; }
+.btn-hero:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(0,0,0,.25); color: var(--pflege-teal); }
+.btn-hero-outline { border: 2px solid rgba(255,255,255,.7); color: #fff; background: transparent;
+                     font-weight: 600; padding: .7rem 1.8rem; border-radius: 10px; font-size: 1.05rem;
+                     transition: all .2s; }
+.btn-hero-outline:hover { background: rgba(255,255,255,.15); color: #fff; }
+.feature-icon { width: 56px; height: 56px; border-radius: 14px; background: var(--pflege-light);
+                 display: flex; align-items: center; justify-content: center;
+                 font-size: 1.6rem; margin-bottom: 1rem; flex-shrink: 0; }
+.feature-card { border: none; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,.07);
+                 transition: transform .2s, box-shadow .2s; height: 100%; }
+.feature-card:hover { transform: translateY(-4px); box-shadow: 0 8px 32px rgba(0,0,0,.12); }
+.pricing-card { border: 3px solid var(--pflege-blue); border-radius: 20px; overflow: hidden; }
+.pricing-header { background: linear-gradient(135deg, #1a5f7a, #159895); color: #fff; padding: 2rem; }
+.price-big { font-size: 3.5rem; font-weight: 800; line-height: 1; }
+.check-list li { padding: .4rem 0; display: flex; align-items: center; gap: .6rem; }
+.section-label { font-size: .8rem; font-weight: 700; letter-spacing: 2px;
+                  text-transform: uppercase; color: var(--pflege-teal); }
+.trust-logo { opacity: .5; filter: grayscale(100%); height: 32px; }
+{% endblock %}
+
+{% block content %}
+
+<!-- ─── Hero ─────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="container">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-6">
+        <div class="trial-badge">✨ 7 Tage gratis &mdash; keine Kreditkartenpflicht bis zum Start</div>
+        <h1>Die Pflege-Software, die Ihnen Zeit zurückgibt</h1>
+        <p class="lead mt-3 mb-4">
+          Dokumentation, Abrechnung, Touren­planung und mehr &mdash; alles in einer Lösung.
+          DSGVO-konform. Sofort einsatzbereit.
+        </p>
+        <div class="d-flex flex-wrap gap-3">
+          <a href="{{ url_for('auth.register') }}" class="btn-hero btn">
+            7 Tage kostenlos testen
+          </a>
+          <a href="#features" class="btn-hero-outline btn">Funktionen ansehen</a>
+        </div>
+        <p class="mt-3 small" style="opacity:.75;">
+          <i class="bi bi-check-circle-fill me-1"></i>Keine Einrichtungsgebühr
+          &nbsp;&middot;&nbsp;
+          <i class="bi bi-check-circle-fill me-1"></i>Jederzeit kündbar
+          &nbsp;&middot;&nbsp;
+          <i class="bi bi-check-circle-fill me-1"></i>Hosting in Deutschland
+        </p>
+      </div>
+      <div class="col-lg-6 text-center d-none d-lg-block">
+        <div style="background:rgba(255,255,255,.1);border-radius:20px;padding:2rem;">
+          <div style="font-size:5rem;">📋</div>
+          <div class="mt-3 text-white-50 small">Dashboard · Patienten · Dokumentation</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Features ─────────────────────────────────────────── -->
+<section id="features" class="py-6 bg-white" style="padding: 80px 0;">
+  <div class="container">
+    <div class="text-center mb-5">
+      <div class="section-label">Funktionen</div>
+      <h2 class="fw-bold mt-1" style="font-size:2rem;">Alles was Ihr Pflegedienst braucht</h2>
+      <p class="text-muted mt-2">Von der Aufnahme bis zur Abrechnung &mdash; digital und effizient.</p>
+    </div>
+    <div class="row g-4">
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card feature-card p-4">
+          <div class="feature-icon">📋</div>
+          <h5 class="fw-bold">Pflege­dokumentation</h5>
+          <p class="text-muted small mb-0">
+            SIS, Pflegeplanung, Wunddokumentation und Vitalwerte &mdash;
+            rechtssicher und mobil erfassbar.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card feature-card p-4">
+          <div class="feature-icon">💊</div>
+          <h5 class="fw-bold">Medikamenten­verwaltung</h5>
+          <p class="text-muted small mb-0">
+            Medikamentenpläne, BTM-Dokumentation und Verabreichungs­nachweise digital und fehlerfrei.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card feature-card p-4">
+          <div class="feature-icon">🚗</div>
+          <h5 class="fw-bold">Fuhrpark & Touren</h5>
+          <p class="text-muted small mb-0">
+            Kilometererfassung, Fahrzeug­verwaltung und GPS-Tracking für Ihren Fuhrpark.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card feature-card p-4">
+          <div class="feature-icon">💶</div>
+          <h5 class="fw-bold">Abrechnung & Leistungs­nachweise</h5>
+          <p class="text-muted small mb-0">
+            Leistungskatalog, Nachweiserfassung und Kassenbuch &mdash;
+            alles für die Pflegekassen­abrechnung.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card feature-card p-4">
+          <div class="feature-icon">👥</div>
+          <h5 class="fw-bold">Personal­verwaltung</h5>
+          <p class="text-muted small mb-0">
+            Mitarbeiterdaten, Rollen, Dienstpläne und Einsatz­zuweisungen übersichtlich verwalten.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card feature-card p-4">
+          <div class="feature-icon">🔒</div>
+          <h5 class="fw-bold">DSGVO & Sicherheit</h5>
+          <p class="text-muted small mb-0">
+            Verschlüsselte Datenhaltung, Zugriffsrechte nach Rollen und
+            Audit-Log für alle Aktionen.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── Pricing ───────────────────────────────────────────── -->
+<section id="pricing" style="background: var(--pflege-light); padding: 80px 0;">
+  <div class="container">
+    <div class="text-center mb-5">
+      <div class="section-label">Preise</div>
+      <h2 class="fw-bold mt-1" style="font-size:2rem;">Einfaches, transparentes Pricing</h2>
+      <p class="text-muted mt-2">Ein Plan. Alle Funktionen. Keine versteckten Kosten.</p>
+    </div>
+    <div class="row justify-content-center">
+      <div class="col-md-8 col-lg-5">
+        <div class="pricing-card">
+          <div class="pricing-header text-center">
+            <div class="small text-white-50 fw-semibold mb-1">PflegeOS Professional</div>
+            <div class="d-flex align-items-end justify-content-center gap-1">
+              <div class="price-big">250&nbsp;€</div>
+              <div class="pb-2 text-white-50">/&nbsp;Monat</div>
+            </div>
+            <div class="mt-2 small" style="background:rgba(255,255,255,.15);border-radius:50px;padding:.3rem .9rem;display:inline-block;">
+              ✨ 7 Tage kostenlos testen
+            </div>
+            <p class="text-white-50 small mt-2 mb-0">Danach 250&nbsp;€/Monat &middot; jederzeit kündbar</p>
+          </div>
+          <div class="p-4">
+            <ul class="list-unstyled check-list mb-4">
+              <li><i class="bi bi-check-circle-fill text-success"></i>Unbegrenzte Patienten</li>
+              <li><i class="bi bi-check-circle-fill text-success"></i>Unbegrenzte Mitarbeiter</li>
+              <li><i class="bi bi-check-circle-fill text-success"></i>Alle Module inklusive</li>
+              <li><i class="bi bi-check-circle-fill text-success"></i>Fuhrparkmodul</li>
+              <li><i class="bi bi-check-circle-fill text-success"></i>Familienportal & Arztportal</li>
+              <li><i class="bi bi-check-circle-fill text-success"></i>E-Mail Support</li>
+              <li><i class="bi bi-check-circle-fill text-success"></i>Hosting in Deutschland (DSGVO)</li>
+              <li><i class="bi bi-check-circle-fill text-success"></i>Regelmäßige Updates</li>
+            </ul>
+            <a href="{{ url_for('auth.register') }}"
+               class="btn w-100 fw-bold py-3"
+               style="background:var(--pflege-blue);color:#fff;border-radius:10px;font-size:1.05rem;">
+              Jetzt 7 Tage kostenlos starten
+            </a>
+            <p class="text-center text-muted small mt-2 mb-0">
+              Kreditkarte erst nach dem Testzeitraum fällig
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CTA Banner ────────────────────────────────────────── -->
+<section style="background: var(--pflege-blue); padding: 60px 0;">
+  <div class="container text-center text-white">
+    <h2 class="fw-bold" style="font-size:1.9rem;">Bereit, Ihren Pflegedienst zu digitalisieren?</h2>
+    <p class="mt-2 mb-4" style="opacity:.85;max-width:480px;margin-inline:auto;">
+      Starten Sie noch heute mit dem kostenlosen Testzugang &mdash; ohne Risiko.
+    </p>
+    <a href="{{ url_for('auth.register') }}"
+       class="btn fw-bold px-5 py-3"
+       style="background:#fff;color:var(--pflege-blue);border-radius:10px;font-size:1.05rem;">
+      Kostenlos registrieren
+    </a>
+  </div>
+</section>
+
+{% endblock %}

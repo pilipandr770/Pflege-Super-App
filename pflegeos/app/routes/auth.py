@@ -37,6 +37,9 @@ def login():
             if next_page and next_page.startswith('/'):
                 return redirect(next_page)
 
+            if employee.is_superadmin:
+                return redirect(url_for('superadmin.index'))
+
             if is_first_login:
                 return redirect(url_for('dashboard.index', _anchor='onboarding'))
             return redirect(url_for('dashboard.index'))
@@ -82,6 +85,9 @@ def register():
         if len(form_data.get('password', '')) < 8:
             errors['password'] = 'Mindestens 8 Zeichen'
 
+        if not form_data.get('agb'):
+            errors['agb'] = 'Bitte akzeptieren Sie die AGB und Datenschutzerklärung'
+
         if Employee.query.filter_by(email=form_data.get('admin_email', '').lower()).first():
             errors['admin_email'] = 'Diese E-Mail ist bereits registriert'
 
@@ -119,7 +125,7 @@ def register():
                 slug=slug,
                 status='PENDING',
                 plan='TRIAL',
-                trial_ends_at=datetime.utcnow() + timedelta(days=30),
+                trial_ends_at=datetime.utcnow() + timedelta(days=7),
             )
             db.session.add(company)
             db.session.flush()
@@ -140,8 +146,13 @@ def register():
 
             log_action('COMPANY_REGISTERED', 'company', entity_id=company.id)
 
-            flash('Registrierung erfolgreich! Bitte melden Sie sich an.', 'success')
-            return redirect(url_for('auth.login'))
+            # Auto-Login des neuen Admins
+            login_user(admin, remember=False)
+            admin.last_login_at = datetime.utcnow()
+            db.session.commit()
+
+            # Direkt zu Stripe Checkout für 7-Tage-Trial
+            return redirect(url_for('billing.onboarding'))
 
     bundeslaender = [
         'Baden-Württemberg', 'Bayern', 'Berlin', 'Brandenburg', 'Bremen',

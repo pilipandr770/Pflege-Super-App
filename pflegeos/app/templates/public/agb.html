@@ -1,0 +1,94 @@
+{% extends "public/base_public.html" %}
+{% block title %}AGB{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 780px;">
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Startseite</a></li>
+      <li class="breadcrumb-item active">AGB</li>
+    </ol>
+  </nav>
+
+  <h1 class="fw-bold mb-1" style="color:var(--pflege-blue);">Allgemeine Geschäftsbedingungen</h1>
+  <p class="text-muted small mb-5">Stand: Mai 2026</p>
+
+  <h5 class="fw-semibold">§ 1 Geltungsbereich</h5>
+  <p>
+    Diese Allgemeinen Geschäftsbedingungen (AGB) gelten für alle Verträge zwischen der
+    PflegeOS GmbH, Musterstraße 1, 10115 Berlin (nachfolgend „Anbieter") und dem Kunden
+    über die Nutzung der SaaS-Plattform „PflegeOS" (nachfolgend „Software").
+    Abweichende oder ergänzende Bedingungen des Kunden sind nur wirksam, wenn der Anbieter
+    ihnen schriftlich zugestimmt hat.
+  </p>
+
+  <h5 class="fw-semibold mt-4">§ 2 Vertragsschluss & Registrierung</h5>
+  <p>
+    Mit der Registrierung über das Online-Formular gibt der Kunde ein verbindliches Angebot
+    auf Abschluss eines Nutzungsvertrages ab. Der Vertrag kommt mit der Aktivierung des
+    Kontos durch den Anbieter zustande. Der Kunde muss bei der Registrierung wahrheitsgemäße
+    Angaben machen und diese stets aktuell halten.
+  </p>
+
+  <h5 class="fw-semibold mt-4">§ 3 Kostenloser Testzeitraum</h5>
+  <p>
+    Neukunden erhalten einen kostenfreien Testzeitraum von 7 (sieben) Tagen ab Registrierung.
+    Für den Testzeitraum werden keine Kosten berechnet. Nach Ablauf des Testzeitraums
+    geht das Abonnement automatisch in einen kostenpflichtigen Vertrag über, sofern der Kunde
+    diesen nicht zuvor kündigt. Eine gültige Zahlungsmethode (Kreditkarte) muss bereits bei
+    der Registrierung hinterlegt werden.
+  </p>
+
+  <h5 class="fw-semibold mt-4">§ 4 Vergütung & Zahlung</h5>
+  <p>
+    Die Nutzung der Software nach dem Testzeitraum ist kostenpflichtig. Der Preis beträgt
+    derzeit <strong>250,00 EUR netto pro Monat</strong> zzgl. der gesetzlichen Mehrwertsteuer.
+    Die Abrechnung erfolgt monatlich im Voraus über den Zahlungsdienstleister Stripe.
+    Bei Zahlungsverzug ist der Anbieter berechtigt, den Zugang zur Software zu sperren.
+    Preisänderungen werden dem Kunden mindestens 30 Tage im Voraus per E-Mail mitgeteilt.
+  </p>
+
+  <h5 class="fw-semibold mt-4">§ 5 Leistungsumfang</h5>
+  <p>
+    Der Anbieter stellt die Software als Software-as-a-Service (SaaS) zur Verfügung.
+    Der Anbieter ist bestrebt, eine Verfügbarkeit von 99 % im Monatsmittel zu gewährleisten,
+    ausgenommen geplante Wartungsfenster. Ein Anspruch auf ununterbrochene Verfügbarkeit
+    besteht nicht.
+  </p>
+
+  <h5 class="fw-semibold mt-4">§ 6 Datenschutz & Auftragsverarbeitung</h5>
+  <p>
+    Bei der Nutzung der Software verarbeitet der Anbieter personenbezogene Daten von
+    Pflegebedürftigen und Mitarbeitern des Kunden als Auftragsverarbeiter gemäß Art. 28 DSGVO.
+    Dazu wird ein gesonderter Auftragsverarbeitungsvertrag (AVV) abgeschlossen.
+    Näheres regelt die <a href="{{ url_for('public.datenschutz') }}">Datenschutzerklärung</a>.
+  </p>
+
+  <h5 class="fw-semibold mt-4">§ 7 Kündigung</h5>
+  <p>
+    Das Abonnement kann jederzeit zum Ende der laufenden Abrechnungsperiode gekündigt werden.
+    Die Kündigung erfolgt über den Kundenbereich in der Software oder per E-Mail an
+    <a href="mailto:kuendigung@pflegeos.de">kuendigung@pflegeos.de</a>.
+    Nach der Kündigung wird der Zugang zum Ende der bezahlten Periode deaktiviert.
+    Daten werden gemäß den gesetzlichen Aufbewahrungsfristen und der Datenschutzerklärung behandelt.
+  </p>
+
+  <h5 class="fw-semibold mt-4">§ 8 Haftung</h5>
+  <p>
+    Der Anbieter haftet unbeschränkt für Vorsatz und grobe Fahrlässigkeit. Bei leichter
+    Fahrlässigkeit haftet der Anbieter nur bei der Verletzung wesentlicher Vertragspflichten
+    (Kardinalpflichten) und auf den typischerweise vorhersehbaren Schaden beschränkt.
+    Eine weitergehende Haftung ist ausgeschlossen.
+  </p>
+
+  <h5 class="fw-semibold mt-4">§ 9 Schlussbestimmungen</h5>
+  <p>
+    Es gilt das Recht der Bundesrepublik Deutschland. Erfüllungsort und Gerichtsstand ist
+    Berlin, sofern der Kunde Kaufmann, eine juristische Person des öffentlichen Rechts oder
+    ein öffentlich-rechtliches Sondervermögen ist. Der Anbieter behält sich vor, diese AGB
+    jederzeit mit Wirkung für die Zukunft zu ändern. Änderungen werden dem Kunden per E-Mail
+    mindestens 30 Tage vor Inkrafttreten mitgeteilt.
+  </p>
+
+</div>
+{% endblock %}

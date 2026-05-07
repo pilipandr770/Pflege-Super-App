@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.config import config
-from app.extensions import db, login_manager, migrate, bcrypt, csrf, mail
+from app.extensions import db, login_manager, migrate, bcrypt, csrf as _csrf, mail
 
 
 def create_app(config_name=None):
@@ -20,7 +20,7 @@ def create_app(config_name=None):
     login_manager.init_app(app)
     migrate.init_app(app, db)
     bcrypt.init_app(app)
-    csrf.init_app(app)
+    _csrf.init_app(app)
     mail.init_app(app)
 
     # Создаём папку для загрузок
@@ -32,6 +32,7 @@ def create_app(config_name=None):
 
     # Регистрируем blueprints
     from app.routes.auth import auth_bp
+    from app.routes.public import public_bp
     from app.routes.dashboard import dashboard_bp
     from app.routes.patients import patients_bp
     from app.routes.sis import sis_bp
@@ -50,7 +51,11 @@ def create_app(config_name=None):
     from app.routes.doctor import doctor_bp
     from app.routes.greetings import greetings_bp
     from app.routes.fuhrpark import fuhrpark_bp
+    from app.routes.buchhaltung import buchhaltung_bp
+    from app.routes.superadmin import superadmin_bp
+    from app.routes.billing import billing_bp
 
+    app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/')
     app.register_blueprint(patients_bp, url_prefix='/patients')
@@ -70,6 +75,12 @@ def create_app(config_name=None):
     app.register_blueprint(export_bp)
     app.register_blueprint(greetings_bp)
     app.register_blueprint(fuhrpark_bp, url_prefix='/fuhrpark')
+    app.register_blueprint(buchhaltung_bp, url_prefix='/buchhaltung')
+    app.register_blueprint(superadmin_bp, url_prefix='/superadmin')
+    app.register_blueprint(billing_bp)
+
+    # Stripe Webhook muss CSRF-exempt sein (Stripe sendet kein CSRF-Token)
+    _csrf.exempt(billing_bp)
 
     # Планировщик задач (утренняя проверка поздравлений)
     from app.tasks import init_scheduler
@@ -89,5 +100,11 @@ def create_app(config_name=None):
         if value is None:
             return '—'
         return value.strftime(fmt)
+
+    # Globale Context-Variablen für alle Templates
+    from datetime import datetime as _dt
+    @app.context_processor
+    def inject_globals():
+        return {'now': _dt.utcnow()}
 
     return app

@@ -28,5 +28,6 @@ anthropic>=0.28.0
 flask-socketio>=5.3.5
 python-socketio>=5.10.0
 python-engineio>=4.8.0
+stripe>=9.0.0
 redis>=5.0.0
 apscheduler>=3.10.0

@@ -26,10 +26,10 @@ def company_required(f):
 
 
 def admin_required(f):
-    """Декоратор: только ADMIN."""
+    """Декоратор: только ADMIN (или superadmin)."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != 'ADMIN':
+        if not current_user.is_authenticated or not current_user.is_admin:
             from flask import abort
             abort(403)
         return f(*args, **kwargs)

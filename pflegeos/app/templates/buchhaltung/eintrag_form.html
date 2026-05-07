@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Buchung erfassen{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.dashboard') }}">Buchhaltung</a></li>
+<li class="breadcrumb-item active">Buchung erfassen</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">💶 Buchung erfassen</h4>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<form method="POST" id="buchForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+
+        {# Art — Einnahme / Ausgabe Toggle #}
+        <div class="col-12">
+          <label class="form-label fw-semibold">Art <span class="text-danger">*</span></label>
+          <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" name="art" id="artEin"
+                   value="EINNAHME" {% if form_data.get('art','EINNAHME') == 'EINNAHME' %}checked{% endif %}
+                   onchange="updateKategorie('EINNAHME')">
+            <label class="btn btn-outline-success" for="artEin">
+              <i class="bi bi-plus-circle"></i> Einnahme
+            </label>
+            <input type="radio" class="btn-check" name="art" id="artAus"
+                   value="AUSGABE" {% if form_data.get('art') == 'AUSGABE' %}checked{% endif %}
+                   onchange="updateKategorie('AUSGABE')">
+            <label class="btn btn-outline-danger" for="artAus">
+              <i class="bi bi-dash-circle"></i> Ausgabe
+            </label>
+          </div>
+          {% if errors.get('art') %}<div class="text-danger small mt-1">{{ errors.art }}</div>{% endif %}
+        </div>
+
+        <div class="col-6 col-md-4">
+          <label class="form-label fw-semibold">Datum <span class="text-danger">*</span></label>
+          <input type="date" name="datum" class="form-control"
+                 value="{{ form_data.get('datum', '') }}" required>
+          {% if errors.get('datum') %}<div class="text-danger small mt-1">{{ errors.datum }}</div>{% endif %}
+        </div>
+
+        <div class="col-6 col-md-4">
+          <label class="form-label fw-semibold">Betrag <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <input type="text" name="betrag" id="betragInput" class="form-control
+              {% if errors.get('betrag') %}is-invalid{% endif %}"
+              value="{{ form_data.get('betrag', '') }}"
+              placeholder="0,00" inputmode="decimal" required>
+            <span class="input-group-text">€</span>
+          </div>
+          {% if errors.get('betrag') %}<div class="text-danger small mt-1">{{ errors.betrag }}</div>{% endif %}
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold">Belegnummer / Rechnungs-Nr.</label>
+          <input type="text" name="beleg_nr" class="form-control"
+                 value="{{ form_data.get('beleg_nr', '') }}"
+                 placeholder="z.B. RE-2026-042">
+        </div>
+
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Kategorie <span class="text-danger">*</span></label>
+          <select name="kategorie" id="kategorieSelect" class="form-select
+            {% if errors.get('kategorie') %}is-invalid{% endif %}" required>
+            <option value="">— wählen —</option>
+            <optgroup label="Einnahmen" id="grpEin">
+              {% for val, label in einnahmen_kat.items() %}
+              <option value="{{ val }}" {% if form_data.get('kategorie') == val %}selected{% endif %}>
+                {{ label }}
+              </option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="Ausgaben" id="grpAus">
+              {% for val, label in ausgaben_kat.items() %}
+              <option value="{{ val }}" {% if form_data.get('kategorie') == val %}selected{% endif %}>
+                {{ label }}
+              </option>
+              {% endfor %}
+            </optgroup>
+          </select>
+          {% if errors.get('kategorie') %}<div class="text-danger small mt-1">{{ errors.kategorie }}</div>{% endif %}
+        </div>
+
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Patient (optional)</label>
+          <select name="patient_id" class="form-select">
+            <option value="">— kein Patient —</option>
+            {% for p in patienten %}
+            <option value="{{ p.id }}" {% if form_data.get('patient_id') == p.id %}selected{% endif %}>
+              {{ p.nachname }}, {{ p.vorname }}
+              {% if p.krankenversicherung %} · {{ p.krankenversicherung }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">Beschreibung / Buchungstext</label>
+          <input type="text" name="beschreibung" class="form-control"
+                 value="{{ form_data.get('beschreibung', '') }}"
+                 placeholder="z.B. Pflegekasse AOK — Abrechnung April 2026">
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary px-4" id="submitBtn">
+      <i class="bi bi-check-lg"></i> Buchung speichern
+    </button>
+    <a href="{{ url_for('buchhaltung.kassenbuch') }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+</form>
+
+<script>
+const EIN_KEYS = {{ einnahmen_kat.keys() | list | tojson }};
+const AUS_KEYS = {{ ausgaben_kat.keys() | list | tojson }};
+
+function updateKategorie(art) {
+  const sel = document.getElementById('kategorieSelect');
+  const btn = document.getElementById('submitBtn');
+  const grpEin = document.getElementById('grpEin');
+  const grpAus = document.getElementById('grpAus');
+
+  // Reset selection if wrong group
+  const val = sel.value;
+  if (art === 'EINNAHME' && AUS_KEYS.includes(val)) sel.value = '';
+  if (art === 'AUSGABE'  && EIN_KEYS.includes(val)) sel.value = '';
+
+  // Visually highlight submit button
+  btn.className = art === 'EINNAHME'
+    ? 'btn btn-success px-4'
+    : 'btn btn-danger px-4';
+  btn.innerHTML = art === 'EINNAHME'
+    ? '<i class="bi bi-plus-lg"></i> Einnahme speichern'
+    : '<i class="bi bi-dash-lg"></i> Ausgabe speichern';
+}
+
+// Init on page load
+const checked = document.querySelector('[name=art]:checked');
+if (checked) updateKategorie(checked.value);
+</script>
+{% endblock %}

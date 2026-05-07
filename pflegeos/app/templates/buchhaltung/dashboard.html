@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Buchhaltung{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Buchhaltung</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">💶 Buchhaltung</h4>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('buchhaltung.eintrag_neu', art='EINNAHME') }}"
+       class="btn btn-success btn-sm">
+      <i class="bi bi-plus-lg"></i> Einnahme
+    </a>
+    <a href="{{ url_for('buchhaltung.eintrag_neu', art='AUSGABE') }}"
+       class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-dash-lg"></i> Ausgabe
+    </a>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+{# ── KPI-Karten ── #}
+<div class="row g-3 mb-4">
+
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-success bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-success mb-0">{{ "%.2f"|format(einnahmen_mtl) }} €</div>
+        <small class="text-muted">Einnahmen {{ monat_label }}</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-danger bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-danger mb-0">{{ "%.2f"|format(ausgaben_mtl) }} €</div>
+        <small class="text-muted">Ausgaben {{ monat_label }}</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card border-0 {% if saldo_mtl >= 0 %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold {% if saldo_mtl >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">
+          {{ "%.2f"|format(saldo_mtl) }} €
+        </div>
+        <small class="text-muted">Saldo {{ monat_label }}</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-warning bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-warning mb-0">{{ "%.2f"|format(offene_wert) }} €</div>
+        <small class="text-muted">
+          <a href="{{ url_for('buchhaltung.leistungen') }}" class="text-muted text-decoration-none">
+            {{ offene_lnw }} Leistungen offen ↗
+          </a>
+        </small>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── Jahres-Saldo ── #}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">📊 Jahresübersicht {{ monat_label[-4:] }}</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Einnahmen gesamt</span>
+          <span class="text-success fw-bold">{{ "%.2f"|format(jahrein) }} €</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Ausgaben gesamt</span>
+          <span class="text-danger fw-bold">{{ "%.2f"|format(jahraus) }} €</span>
+        </div>
+        <hr class="my-2">
+        <div class="d-flex justify-content-between">
+          <span class="fw-semibold">Jahressaldo</span>
+          <span class="fw-bold h5 mb-0 {% if saldo_jahr >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ "%.2f"|format(saldo_jahr) }} €
+          </span>
+        </div>
+        <div class="mt-3">
+          <a href="{{ url_for('buchhaltung.bericht') }}" class="btn btn-sm btn-outline-primary w-100">
+            <i class="bi bi-bar-chart-fill"></i> GuV-Bericht öffnen
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Schnellzugriff ── #}
+  <div class="col-md-3">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">⚡ Schnellzugriff</div>
+      <div class="card-body d-flex flex-column gap-2 p-2">
+        <a href="{{ url_for('buchhaltung.kassenbuch') }}" class="btn btn-outline-primary btn-sm text-start">
+          <i class="bi bi-journal-text"></i> Kassenbuch
+        </a>
+        <a href="{{ url_for('buchhaltung.leistungen') }}" class="btn btn-outline-warning btn-sm text-start">
+          <i class="bi bi-clipboard2-check"></i> Leistungsabrechnung
+        </a>
+        <a href="{{ url_for('buchhaltung.bericht') }}" class="btn btn-outline-info btn-sm text-start">
+          <i class="bi bi-graph-up"></i> GuV-Bericht
+        </a>
+        <a href="{{ url_for('buchhaltung.export_datev') }}" class="btn btn-outline-secondary btn-sm text-start">
+          <i class="bi bi-filetype-csv"></i> DATEV-Export
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {# ── Letzte Einträge ── #}
+  <div class="col-md-5">
+    <div class="card h-100">
+      <div class="card-header fw-semibold d-flex justify-content-between">
+        🕐 Letzte Buchungen
+        <a href="{{ url_for('buchhaltung.kassenbuch') }}" class="small text-muted text-decoration-none">alle →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent %}
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for e in recent %}
+            <tr>
+              <td class="text-muted small ps-3">{{ e.datum.strftime('%d.%m') }}</td>
+              <td class="small">{{ e.kategorie_label }}</td>
+              <td class="text-end pe-3 {% if e.art == 'EINNAHME' %}text-success{% else %}text-danger{% endif %} fw-semibold small">
+                {% if e.art == 'EINNAHME' %}+{% else %}−{% endif %}{{ "%.2f"|format(e.betrag) }} €
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4 small">Noch keine Buchungen.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

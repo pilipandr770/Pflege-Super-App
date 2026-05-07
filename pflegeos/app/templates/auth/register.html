@@ -14,7 +14,7 @@
 <div class="container py-4" style="max-width:800px">
   <div class="text-center mb-4">
     <h1 class="h3 fw-bold">&#x1F493; PflegeOS</h1>
-    <p class="text-muted">Neue Pflegeeinrichtung registrieren — 30 Tage kostenlos testen</p>
+    <p class="text-muted">Neue Pflegeeinrichtung registrieren — 7 Tage kostenlos testen</p>
   </div>
 
   <div class="card shadow-sm">
@@ -155,12 +155,26 @@
         </div>
 
         <div class="alert alert-info py-2 small mb-3">
-          <strong>&#x2139;</strong> Mit der Registrierung starten Sie einen kostenlosen 30-Tage-Test.
-          Keine Kreditkarte erforderlich. Alle Daten werden auf deutschen Servern gespeichert (DSGVO-konform).
+          <strong>&#x2139;</strong> Mit der Registrierung starten Sie einen kostenlosen <strong>7-Tage-Test</strong>.
+          Nach dem Testzeitraum: 250 € / Monat. Jederzeit kündbar.
+          Alle Daten werden auf deutschen Servern gespeichert (DSGVO-konform).
+        </div>
+
+        <div class="form-check mb-3 {% if errors.agb %}text-danger{% endif %}">
+          <input type="checkbox" name="agb" id="agb" class="form-check-input {% if errors.agb %}is-invalid{% endif %}"
+                 {% if form_data.get('agb') %}checked{% endif %} required>
+          <label class="form-check-label small" for="agb">
+            Ich akzeptiere die
+            <a href="{{ url_for('public.agb') }}" target="_blank">AGB</a>
+            und habe die
+            <a href="{{ url_for('public.datenschutz') }}" target="_blank">Datenschutzerklärung</a>
+            gelesen. <span class="text-danger">*</span>
+          </label>
+          {% if errors.agb %}<div class="invalid-feedback d-block">{{ errors.agb }}</div>{% endif %}
         </div>
 
         <button type="submit" class="btn btn-primary w-100 fw-semibold py-2">
-          Einrichtung registrieren & kostenlos starten
+          7 Tage kostenlos testen &rarr;
         </button>
       </form>
     </div>

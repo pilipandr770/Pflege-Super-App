@@ -247,10 +247,14 @@ def katalog_manage():
 
     if request.method == 'POST':
         fd = request.form
+        bezeichnung = fd.get('bezeichnung', '').strip()
+        if not bezeichnung:
+            flash('Bezeichnung ist ein Pflichtfeld.', 'danger')
+            return redirect(request.url)
         item = Leistungskatalog(
             company_id=current_user.company_id,
             leistung_nr=fd.get('leistung_nr', '').strip(),
-            bezeichnung=fd.get('bezeichnung', '').strip(),
+            bezeichnung=bezeichnung,
             beschreibung=fd.get('beschreibung', '').strip(),
             kategorie=fd.get('kategorie', '').strip(),
             dauer_minuten=int(fd['dauer_minuten']) if fd.get('dauer_minuten') else None,

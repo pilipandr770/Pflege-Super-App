@@ -51,8 +51,10 @@ def get_missing_docs():
 
 
 @dashboard_bp.route('/')
-@login_required
 def index():
+    if not current_user.is_authenticated:
+        return render_template('public/landing.html')
+
     cid = current_user.company_id
     today = date.today()
 

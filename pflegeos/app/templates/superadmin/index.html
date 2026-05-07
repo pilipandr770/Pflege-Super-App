@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Superadmin — Alle Einrichtungen{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">⚡ Superadmin-Panel</h4>
+    <small class="text-muted">Alle Pflegeeinrichtungen auf der Plattform</small>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('superadmin.payments_list') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-credit-card"></i> Zahlungen
+    </a>
+  </div>
+</div>
+
+{# Revenue Card #}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0" style="background:linear-gradient(135deg,#1a5f7a,#159895)">
+      <div class="card-body text-white">
+        <div class="small text-white-50 mb-1">Umsatz diesen Monat</div>
+        <div class="fs-4 fw-bold">{{ '%.2f'|format(total_revenue_month) }} €</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0" style="background:linear-gradient(135deg,#198754,#20c997)">
+      <div class="card-body text-white">
+        <div class="small text-white-50 mb-1">Einrichtungen gesamt</div>
+        <div class="fs-4 fw-bold">{{ stats|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0" style="background:linear-gradient(135deg,#6f42c1,#a855f7)">
+      <div class="card-body text-white">
+        <div class="small text-white-50 mb-1">Aktive Patienten (gesamt)</div>
+        <div class="fs-4 fw-bold">{{ stats|sum(attribute='patients') }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Companies Table #}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Einrichtung</th>
+            <th>Typ</th>
+            <th>Status</th>
+            <th>Plan</th>
+            <th class="text-end">Mitarbeiter</th>
+            <th class="text-end">Patienten</th>
+            <th class="text-end">Fahrzeuge</th>
+            <th>Letzte Zahlung</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in stats %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ s.company.name }}</div>
+              <small class="text-muted">{{ s.company.ort }}</small>
+            </td>
+            <td><span class="badge bg-secondary">{{ s.company.company_type }}</span></td>
+            <td>
+              {% set sc = {'ACTIVE':'success','PENDING':'warning','SUSPENDED':'danger','TRIAL':'info','VERIFIED':'success','CANCELLED':'secondary'} %}
+              <span class="badge bg-{{ sc.get(s.company.status, 'secondary') }}">{{ s.company.status }}</span>
+            </td>
+            <td>
+              {% set pc = {'PRO':'primary','PREMIUM':'warning','STARTER':'info','TRIAL':'secondary'} %}
+              <span class="badge bg-{{ pc.get(s.company.plan, 'secondary') }}">{{ s.company.plan }}</span>
+            </td>
+            <td class="text-end">{{ s.employees }}</td>
+            <td class="text-end">{{ s.patients }}</td>
+            <td class="text-end">{{ s.fahrzeuge }}</td>
+            <td>
+              {% if s.last_payment %}
+                <span class="text-success small">{{ s.last_payment.paid_at|datefmt }} · {{ s.last_payment.betrag_display }}</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{{ url_for('superadmin.company_detail', company_id=s.company.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Details">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{{ url_for('superadmin.impersonate', company_id=s.company.id) }}"
+                   class="btn btn-sm btn-warning" title="Als Admin einloggen"
+                   onclick="return confirm('Als Admin von {{ s.company.name }} einloggen?')">
+                  <i class="bi bi-lightning-fill"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-muted py-4 text-center">Keine Einrichtungen gefunden.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

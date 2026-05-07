@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Leistungsabrechnung{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.dashboard') }}">Buchhaltung</a></li>
+<li class="breadcrumb-item active">Leistungsabrechnung</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">📋 Leistungsabrechnung</h4>
+  <form method="GET" class="d-flex gap-2 align-items-center">
+    <label class="form-label mb-0 fw-semibold small">Monat</label>
+    <input type="month" name="monat" class="form-control form-control-sm" value="{{ monat }}" style="width:150px;">
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-funnel"></i> Anzeigen
+    </button>
+  </form>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+{# ── Übersicht-KPIs ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-primary bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-primary mb-0">{{ gesamt_lnw }}</div>
+        <small class="text-muted">Leistungen gesamt</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-success bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-success mb-0">{{ "%.2f"|format(gesamt_wert) }} €</div>
+        <small class="text-muted">Gesamtwert</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-success bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-success mb-0">{{ gesamt_abgerechnet }}</div>
+        <small class="text-muted">Abgerechnet</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 bg-warning bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-warning mb-0">{{ gesamt_offen }}</div>
+        <small class="text-muted">Offen</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Patient-Karten ── #}
+{% if by_patient %}
+  {% for pid, daten in by_patient.items() %}
+  {% set patient = daten.patient %}
+  {% set offene = daten.eintraege | selectattr('abgerechnet', 'equalto', false) | list %}
+
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <div>
+        <span class="fw-semibold">
+          <i class="bi bi-person-fill text-primary"></i>
+          {% if patient %}
+            <a href="{{ url_for('patients.show', patient_id=patient.id) }}" class="text-decoration-none">
+              {{ patient.full_name }}
+            </a>
+            {% if patient.krankenversicherung %}
+            <span class="badge bg-secondary ms-1 fw-normal">{{ patient.krankenversicherung }}</span>
+            {% endif %}
+          {% else %}
+            Unbekannter Patient
+          {% endif %}
+        </span>
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        <span class="small text-muted">{{ daten.anzahl }} Leistungen · {{ daten.minuten }} Min.</span>
+        <span class="badge {% if offene|length == 0 %}bg-success{% else %}bg-warning text-dark{% endif %}">
+          {{ offene|length }} offen
+        </span>
+        <span class="fw-bold text-success">{{ "%.2f"|format(daten.wert) }} €</span>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            {% if current_user.is_admin and offene|length > 0 %}
+            <th class="ps-3" style="width:36px;">
+              <input type="checkbox" class="form-check-input select-all" data-patient="{{ pid }}">
+            </th>
+            {% endif %}
+            <th {% if not (current_user.is_admin and offene|length > 0) %}class="ps-3"{% endif %}>Datum</th>
+            <th>Leistung</th>
+            <th>Mitarbeiter</th>
+            <th class="text-end">Dauer</th>
+            <th class="text-end pe-3">Preis</th>
+            <th class="text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in daten.eintraege %}
+          <tr {% if l.abgerechnet %}class="text-muted"{% endif %}>
+            {% if current_user.is_admin and offene|length > 0 %}
+            <td class="ps-3">
+              {% if not l.abgerechnet %}
+              <input type="checkbox" class="form-check-input lnw-check" data-patient="{{ pid }}" value="{{ l.id }}">
+              {% endif %}
+            </td>
+            {% endif %}
+            <td {% if not (current_user.is_admin and offene|length > 0) %}class="ps-3"{% endif %} class="small text-nowrap">
+              {{ l.durchgefuehrt_am.strftime('%d.%m.%Y') }}
+              {% if l.durchgefuehrt_um %}
+              <span class="text-muted">{{ l.durchgefuehrt_um.strftime('%H:%M') }}</span>
+              {% endif %}
+            </td>
+            <td class="small">
+              {% if l.leistung %}{{ l.leistung.bezeichnung }}{% else %}—{% endif %}
+            </td>
+            <td class="small">
+              {% if l.employee %}{{ l.employee.full_name }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end small text-muted">
+              {% if l.dauer_minuten %}{{ l.dauer_minuten }} Min.{% else %}—{% endif %}
+            </td>
+            <td class="text-end pe-3 small fw-semibold">
+              {% if l.leistung and l.leistung.preis %}
+              {{ "%.2f"|format(l.leistung.preis) }} €
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              {% if l.abgerechnet %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle small">
+                <i class="bi bi-check-circle-fill"></i> Abgerechnet
+              </span>
+              {% else %}
+              <span class="badge bg-warning-subtle text-warning border border-warning-subtle small">
+                <i class="bi bi-hourglass-split"></i> Offen
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# ── Abrechnen-Button für Admin ── #}
+    {% if current_user.is_admin and offene|length > 0 %}
+    <div class="card-footer d-flex justify-content-between align-items-center">
+      <span class="small text-muted" id="selected-count-{{ pid }}">0 ausgewählt</span>
+      <form method="POST" action="{{ url_for('buchhaltung.leistungen_buchen') }}"
+            id="form-{{ pid }}"
+            onsubmit="return prepareSubmit('{{ pid }}');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="lnw_ids" id="lnw-ids-{{ pid }}" value="[]">
+        <button type="submit" class="btn btn-success btn-sm" id="btn-buch-{{ pid }}" disabled>
+          <i class="bi bi-check2-all"></i> Ausgewählte als abgerechnet buchen
+        </button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-clipboard2-x fs-2 d-block mb-2"></i>
+    Keine Leistungsnachweise für {{ von.strftime('%B %Y') }}.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  // Per-patient checkbox logic
+  document.querySelectorAll('.select-all').forEach(function (chkAll) {
+    const pid = chkAll.dataset.patient;
+    chkAll.addEventListener('change', function () {
+      document.querySelectorAll('.lnw-check[data-patient="' + pid + '"]').forEach(function (c) {
+        c.checked = chkAll.checked;
+      });
+      updateCount(pid);
+    });
+  });
+
+  document.querySelectorAll('.lnw-check').forEach(function (chk) {
+    chk.addEventListener('change', function () {
+      updateCount(chk.dataset.patient);
+    });
+  });
+
+  function updateCount(pid) {
+    const checked = document.querySelectorAll('.lnw-check[data-patient="' + pid + '"]:checked');
+    const label   = document.getElementById('selected-count-' + pid);
+    const btn     = document.getElementById('btn-buch-' + pid);
+    if (label) label.textContent = checked.length + ' ausgewählt';
+    if (btn)   btn.disabled = checked.length === 0;
+  }
+})();
+
+function prepareSubmit(pid) {
+  const checked = document.querySelectorAll('.lnw-check[data-patient="' + pid + '"]:checked');
+  if (checked.length === 0) return false;
+  const ids = Array.from(checked).map(c => c.value);
+  document.getElementById('lnw-ids-' + pid).value = JSON.stringify(ids);
+  return confirm(checked.length + ' Leistung(en) als abgerechnet markieren und ins Kassenbuch buchen?');
+}
+</script>
+{% endblock %}

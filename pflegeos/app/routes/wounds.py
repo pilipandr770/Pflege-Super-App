@@ -27,11 +27,15 @@ def new_wound(patient_id):
 
     if request.method == 'POST':
         fd = request.form
+        bezeichnung = fd.get('wunde_bezeichnung', '').strip()
+        if not bezeichnung:
+            flash('Bezeichnung ist ein Pflichtfeld.', 'danger')
+            return render_template('wounds/new_wound.html', patient=p)
         wound = WoundDoc(
             company_id=current_user.company_id,
             patient_id=patient_id,
             created_by=current_user.id,
-            wunde_bezeichnung=fd.get('bezeichnung', '').strip(),
+            wunde_bezeichnung=bezeichnung,
             lokalisation=fd.get('lokalisation', '').strip(),
             stage=fd.get('stage', '').strip() or None,
             erstfeststellung=_parse_date(fd.get('erstfeststellung')) or date.today(),

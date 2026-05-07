@@ -64,6 +64,12 @@ class Company(db.Model):
     trial_ends_at = db.Column(db.DateTime)
     verified_at = db.Column(db.DateTime)
 
+    # Stripe
+    stripe_customer_id     = db.Column(db.String(100), unique=True)  # cus_xxx
+    stripe_subscription_id = db.Column(db.String(100), unique=True)  # sub_xxx
+    subscription_status    = db.Column(db.String(30))                # active | past_due | canceled | trialing
+    current_period_end     = db.Column(db.DateTime)                  # next billing date
+
     slug = db.Column(db.String(100), unique=True)
     logo_url = db.Column(db.Text)
 
@@ -114,6 +120,7 @@ class Employee(db.Model, UserMixin):
     can_wound_care = db.Column(db.Boolean, default=False)
     can_approve_documents = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
+    is_superadmin = db.Column(db.Boolean, default=False)  # Platform super-admin
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -137,7 +144,7 @@ class Employee(db.Model, UserMixin):
 
     @property
     def is_admin(self):
-        return self.role == 'ADMIN'
+        return self.role == 'ADMIN' or bool(self.is_superadmin)
 
     # --- Rolle-Helfer für Template-Navigation ---
 
@@ -770,6 +777,42 @@ class AuditLog(db.Model):
 
 
 # ============================================================
+# SUBSCRIPTION PAYMENTS
+# ============================================================
+class SubscriptionPayment(db.Model):
+    """Track monthly/annual subscription payments per company."""
+    __tablename__ = 'subscription_payments'
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+
+    plan = db.Column(db.String(20), nullable=False)   # TRIAL | STARTER | PRO | PREMIUM
+    betrag = db.Column(db.Numeric(10, 2), nullable=False)
+    waehrung = db.Column(db.String(3), default='EUR')
+    period_start = db.Column(db.Date, nullable=False)
+    period_end = db.Column(db.Date, nullable=False)
+
+    # PENDING | PAID | FAILED | REFUNDED
+    status = db.Column(db.String(20), default='PENDING')
+    payment_method = db.Column(db.String(50))   # STRIPE | BANK | INVOICE
+    payment_ref = db.Column(db.String(255))     # Stripe charge id or bank reference
+    stripe_invoice_id      = db.Column(db.String(100))   # in_xxx
+    stripe_subscription_id = db.Column(db.String(100))   # sub_xxx (snapshot)
+    rechnung_nr = db.Column(db.String(50))
+
+    paid_at = db.Column(db.DateTime)
+    notiz = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    company = db.relationship('Company', backref='payments')
+
+    @property
+    def betrag_display(self):
+        return f'{self.betrag:.2f} {self.waehrung}'
+
+
+# ============================================================
 # PATIENT PHOTOS (Phase 3: Photo + GPS Capture)
 # ============================================================
 class PatientPhoto(db.Model):
@@ -1362,3 +1405,79 @@ class Wartungseintrag(db.Model):
 
     def __repr__(self):
         return f"<Wartungseintrag {self.fahrzeug_id} {self.art} {self.datum}>"
+
+
+# ============================================================
+# BUCHHALTUNG
+# ============================================================
+
+class KassenbuchEintrag(db.Model):
+    """Einnahmen/Ausgaben-Kassenbuch für den Pflegedienst."""
+    __tablename__ = 'kassenbuch'
+
+    id          = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id  = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'))  # erstellt von
+    patient_id  = db.Column(db.String(36), db.ForeignKey('patients.id'))   # optional
+
+    datum       = db.Column(db.Date, nullable=False, default=date.today)
+    # EINNAHME | AUSGABE
+    art         = db.Column(db.String(10), nullable=False)
+    kategorie   = db.Column(db.String(50), nullable=False)
+    betrag      = db.Column(db.Numeric(10, 2), nullable=False)
+    beschreibung = db.Column(db.String(500))
+    beleg_nr    = db.Column(db.String(100))   # Belegnummer / Rechnungsnummer
+
+    # Nur für Einnahmen: welche Leistungsnachweise sind damit abgedeckt (JSON-Array IDs)
+    leistungs_ids = db.Column(db.Text)
+
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    deleted_at  = db.Column(db.DateTime)
+
+    ersteller = db.relationship('Employee', backref='kassenbuch_eintraege')
+    patient   = db.relationship('Patient',  backref='kassenbuch_eintraege')
+
+    __table_args__ = (
+        db.Index('ix_kassenbuch_company_id', 'company_id'),
+        db.Index('ix_kassenbuch_datum',      'datum'),
+        db.Index('ix_kassenbuch_art',        'art'),
+    )
+
+    # ── Kategorien-Definitionen ──────────────────────────────
+    EINNAHMEN_KATEGORIEN = {
+        'PFLEGEKASSE':     '🏛️ Pflegekasse',
+        'PRIVATPATIENT':   '👤 Privatpatient',
+        'EIGENANTEIL':     '💶 Eigenanteil Patient',
+        'FOERDERUNG':      '📋 Förderung / Zuschuss',
+        'SONSTIGE_EINNAHME': '➕ Sonstige Einnahme',
+    }
+    AUSGABEN_KATEGORIEN = {
+        'KRAFTSTOFF':      '⛽ Kraftstoff',
+        'FAHRZEUG_WARTUNG':'🔧 Fahrzeugwartung/-reparatur',
+        'GEHAELTER':       '👥 Gehälter / Löhne',
+        'MIETE':           '🏢 Miete / Leasing',
+        'MATERIAL_PFLEGE': '🩺 Pflegematerial',
+        'BUERO':           '📎 Bürobedarf',
+        'VERSICHERUNG':    '🛡️ Versicherung',
+        'STEUER':          '🧾 Steuer / Abgaben',
+        'FORTBILDUNG':     '📚 Fortbildung',
+        'SONSTIGE_AUSGABE':'➖ Sonstige Ausgabe',
+    }
+
+    @property
+    def kategorie_label(self):
+        alle = {**self.EINNAHMEN_KATEGORIEN, **self.AUSGABEN_KATEGORIEN}
+        return alle.get(self.kategorie, self.kategorie)
+
+    @property
+    def ist_einnahme(self):
+        return self.art == 'EINNAHME'
+
+    @property
+    def betrag_vorzeichenbehaftet(self):
+        """Positiv für Einnahmen, negativ für Ausgaben (für Saldo-Berechnung)."""
+        b = float(self.betrag)
+        return b if self.ist_einnahme else -b
+
+    def __repr__(self):
+        return f"<KassenbuchEintrag {self.datum} {self.art} {self.betrag}>"

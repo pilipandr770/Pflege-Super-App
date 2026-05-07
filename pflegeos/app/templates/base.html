@@ -66,18 +66,41 @@
       <div class="text-white fw-bold fs-5">
         <i class="bi bi-heart-pulse-fill text-danger"></i> PflegeOS
       </div>
-      <small class="text-white-50">{{ current_user.company.name }}</small>
+      {% if current_user.is_superadmin %}
+        <small class="text-warning"><i class="bi bi-lightning-fill"></i> Superadmin</small>
+      {% else %}
+        <small class="text-white-50">{{ current_user.company.name }}</small>
+      {% endif %}
     </div>
     <hr class="text-white-50 my-1">
     <ul class="nav flex-column flex-grow-1">
 
+      {# ── SUPERADMIN — Plattform-Panel ── #}
+      {% if current_user.is_superadmin %}
+      <li class="nav-item">
+        <a href="{{ url_for('superadmin.index') }}"
+           class="nav-link {% if request.endpoint and 'superadmin' in request.endpoint %}active{% endif %}">
+          <i class="bi bi-lightning-fill text-warning"></i> Superadmin-Panel
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('superadmin.payments_list') }}"
+           class="nav-link {% if request.endpoint == 'superadmin.payments_list' %}active{% endif %}">
+          <i class="bi bi-credit-card"></i> Zahlungen
+        </a>
+      </li>
+      <hr class="text-white-50 my-1">
+      {% endif %}
+
       {# ── DASHBOARD — alle Rollen ── #}
+      {% if not current_user.is_superadmin %}
       <li class="nav-item">
         <a href="{{ url_for('dashboard.index') }}"
            class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
           <i class="bi bi-grid-fill"></i> Dashboard
         </a>
       </li>
+      {% endif %}
 
       {# ── ADMIN — vollständiger Zugriff ── #}
       {% if current_user.is_admin %}
@@ -131,6 +154,12 @@
           <a href="{{ url_for('company.settings') }}"
              class="nav-link {% if request.endpoint == 'company.settings' %}active{% endif %}">
             <i class="bi bi-gear-fill"></i> Einstellungen
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('billing.index') }}"
+             class="nav-link {% if request.endpoint and 'billing' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-credit-card"></i> Abonnement
           </a>
         </li>
         <li class="nav-item">
@@ -262,6 +291,16 @@
 
   <!-- Main -->
   <div class="main-content">
+    {% if session.get('superadmin_id') %}
+    <div class="alert alert-warning mb-0 rounded-0 py-2 text-center small" style="position:sticky;top:0;z-index:999">
+      <i class="bi bi-lightning-fill"></i>
+      <strong>Superadmin-Modus:</strong>
+      Sie verwalten „{{ current_user.company.name }}" als Admin.
+      <a href="{{ url_for('superadmin.back_to_superadmin') }}" class="alert-link ms-2">
+        <i class="bi bi-arrow-return-left"></i> Zurück zum Superadmin-Panel
+      </a>
+    </div>
+    {% endif %}
     {% if current_user.is_authenticated %}
     <nav class="navbar-top d-flex align-items-center px-4">
       <nav aria-label="breadcrumb" class="me-auto">
@@ -333,5 +372,16 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {% block extra_js %}{% endblock %}
+
+<!-- Footer links -->
+<footer class="text-center py-2 border-top mt-auto" style="font-size:.78rem;color:#aaa;background:#fff;">
+  <a href="{{ url_for('public.impressum') }}" class="text-muted text-decoration-none mx-2">Impressum</a>
+  &middot;
+  <a href="{{ url_for('public.agb') }}" class="text-muted text-decoration-none mx-2">AGB</a>
+  &middot;
+  <a href="{{ url_for('public.datenschutz') }}" class="text-muted text-decoration-none mx-2">Datenschutz</a>
+  &nbsp;&nbsp;&copy; 2026 PflegeOS
+</footer>
+
 </body>
 </html>

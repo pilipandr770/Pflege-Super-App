@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}GuV-Bericht {{ jahr }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.dashboard') }}">Buchhaltung</a></li>
+<li class="breadcrumb-item active">GuV-Bericht</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">📊 GuV-Bericht {{ jahr }}</h4>
+  <div class="d-flex gap-2 align-items-center">
+    <form method="GET" class="d-flex gap-2">
+      <select name="jahr" class="form-select form-select-sm" onchange="this.form.submit()" style="width:110px;">
+        {% for j in jahre %}
+        <option value="{{ j }}" {% if j == jahr %}selected{% endif %}>{{ j }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="{{ url_for('buchhaltung.export_datev', von=jahr~'-01-01', bis=jahr~'-12-31') }}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-filetype-csv"></i> DATEV-Export
+    </a>
+  </div>
+</div>
+
+{# ── Jahres-KPIs ── #}
+<div class="row g-3 mb-4">
+  <div class="col-4">
+    <div class="card border-0 bg-success bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-success mb-0">{{ "%.2f"|format(gesamt_ein) }} €</div>
+        <small class="text-muted">Einnahmen {{ jahr }}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card border-0 bg-danger bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold text-danger mb-0">{{ "%.2f"|format(gesamt_aus) }} €</div>
+        <small class="text-muted">Ausgaben {{ jahr }}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card border-0 {% if saldo >= 0 %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h3 fw-bold {% if saldo >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">
+          {{ "%.2f"|format(saldo) }} €
+        </div>
+        <small class="text-muted">Jahresergebnis</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Chart ── #}
+<div class="card mb-4">
+  <div class="card-header fw-semibold">📈 Einnahmen &amp; Ausgaben pro Monat</div>
+  <div class="card-body">
+    <canvas id="guvChart" style="max-height:280px;"></canvas>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+
+  {# ── Kategorien Einnahmen ── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold text-success">
+        <i class="bi bi-plus-circle-fill"></i> Einnahmen nach Kategorie
+      </div>
+      <div class="card-body p-0">
+        {% if kat_ein %}
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% set total_ein = kat_ein.values()|sum %}
+            {% for label, wert in kat_ein.items() %}
+            <tr>
+              <td class="ps-3 small">{{ label }}</td>
+              <td class="text-end pe-3 text-success fw-semibold small text-nowrap">
+                {{ "%.2f"|format(wert) }} €
+              </td>
+              <td class="pe-3" style="width:100px;">
+                <div class="progress" style="height:6px;">
+                  <div class="progress-bar bg-success" style="width:{{ (wert / total_ein * 100)|round|int if total_ein > 0 else 0 }}%;"></div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4 small">Keine Einnahmen.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Kategorien Ausgaben ── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold text-danger">
+        <i class="bi bi-dash-circle-fill"></i> Ausgaben nach Kategorie
+      </div>
+      <div class="card-body p-0">
+        {% if kat_aus %}
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% set total_aus = kat_aus.values()|sum %}
+            {% for label, wert in kat_aus.items() %}
+            <tr>
+              <td class="ps-3 small">{{ label }}</td>
+              <td class="text-end pe-3 text-danger fw-semibold small text-nowrap">
+                {{ "%.2f"|format(wert) }} €
+              </td>
+              <td class="pe-3" style="width:100px;">
+                <div class="progress" style="height:6px;">
+                  <div class="progress-bar bg-danger" style="width:{{ (wert / total_aus * 100)|round|int if total_aus > 0 else 0 }}%;"></div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4 small">Keine Ausgaben.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── Monatsübersicht-Tabelle ── #}
+<div class="card">
+  <div class="card-header fw-semibold">🗓️ Monatsübersicht {{ jahr }}</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Monat</th>
+          <th class="text-end text-success">Einnahmen</th>
+          <th class="text-end text-danger">Ausgaben</th>
+          <th class="text-end">Saldo</th>
+          <th class="text-center">Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in monthly %}
+        <tr {% if m.einnahmen == 0 and m.ausgaben == 0 %}class="text-muted"{% endif %}>
+          <td class="ps-3 fw-semibold">{{ m.monat }}</td>
+          <td class="text-end text-success">
+            {% if m.einnahmen > 0 %}{{ "%.2f"|format(m.einnahmen) }} €{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-danger">
+            {% if m.ausgaben > 0 %}{{ "%.2f"|format(m.ausgaben) }} €{% else %}—{% endif %}
+          </td>
+          <td class="text-end fw-semibold {% if m.saldo >= 0 %}text-success{% elif m.einnahmen > 0 or m.ausgaben > 0 %}text-danger{% endif %}">
+            {% if m.einnahmen > 0 or m.ausgaben > 0 %}{{ "%.2f"|format(m.saldo) }} €{% else %}—{% endif %}
+          </td>
+          <td class="text-center">
+            <a href="{{ url_for('buchhaltung.kassenbuch', monat=m.monat_str) }}"
+               class="btn btn-link btn-sm text-decoration-none p-0 small">
+              <i class="bi bi-journal-text"></i> Kassenbuch
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td class="ps-3">Gesamt</td>
+          <td class="text-end text-success">{{ "%.2f"|format(gesamt_ein) }} €</td>
+          <td class="text-end text-danger">{{ "%.2f"|format(gesamt_aus) }} €</td>
+          <td class="text-end {% if saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ "%.2f"|format(saldo) }} €
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const labels = {{ monate_labels | tojson }};
+  const einData = {{ ein_data | tojson }};
+  const ausData = {{ aus_data | tojson }};
+
+  new Chart(document.getElementById('guvChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Einnahmen',
+          data: einData,
+          backgroundColor: 'rgba(25,135,84,0.7)',
+          borderColor: 'rgba(25,135,84,1)',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Ausgaben',
+          data: ausData,
+          backgroundColor: 'rgba(220,53,69,0.7)',
+          borderColor: 'rgba(220,53,69,1)',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} €`,
+          },
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: v => v.toLocaleString('de-DE') + ' €' },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}

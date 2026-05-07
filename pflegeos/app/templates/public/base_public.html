@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}PflegeOS{% endblock %} — PflegeOS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --pflege-blue: #1a5f7a;
+      --pflege-teal: #159895;
+      --pflege-light: #f0f7f8;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a2332; }
+    .navbar-brand { font-weight: 800; color: var(--pflege-blue) !important; font-size: 1.35rem; }
+    .navbar-brand span { color: var(--pflege-teal); }
+    .btn-primary-pflegeos {
+      background: var(--pflege-blue); border: none; color: #fff;
+      padding: .55rem 1.5rem; border-radius: 8px; font-weight: 600;
+      transition: background .2s;
+    }
+    .btn-primary-pflegeos:hover { background: var(--pflege-teal); color: #fff; }
+    .btn-outline-pflegeos {
+      border: 2px solid var(--pflege-blue); color: var(--pflege-blue);
+      padding: .5rem 1.4rem; border-radius: 8px; font-weight: 600; background: transparent;
+      transition: all .2s;
+    }
+    .btn-outline-pflegeos:hover { background: var(--pflege-blue); color: #fff; }
+    footer a { color: rgba(255,255,255,.7); text-decoration: none; font-size: .85rem; }
+    footer a:hover { color: #fff; }
+    {% block extra_css %}{% endblock %}
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-light bg-white shadow-sm sticky-top">
+  <div class="container">
+    <a class="navbar-brand" href="{{ url_for('dashboard.index') }}">
+      💙 Pflege<span>OS</span>
+    </a>
+    <div class="d-flex gap-2 align-items-center">
+      <a href="{{ url_for('auth.login') }}" class="btn-outline-pflegeos btn">Anmelden</a>
+      <a href="{{ url_for('auth.register') }}" class="btn-primary-pflegeos btn">Kostenlos testen</a>
+    </div>
+  </div>
+</nav>
+
+{% block content %}{% endblock %}
+
+<!-- Footer -->
+<footer class="bg-dark text-white pt-5 pb-4 mt-0">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-md-4">
+        <h6 class="fw-bold text-white mb-2">💙 PflegeOS</h6>
+        <p class="text-white-50 small mb-0">
+          Die All-in-One-Software für ambulante und stationäre Pflegedienste in Deutschland.
+          DSGVO-konform. Made in Germany.
+        </p>
+      </div>
+      <div class="col-md-4">
+        <h6 class="fw-bold text-white mb-2">Produkt</h6>
+        <ul class="list-unstyled mb-0">
+          <li><a href="{{ url_for('auth.register') }}">7 Tage kostenlos testen</a></li>
+          <li><a href="{{ url_for('auth.login') }}">Anmelden</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <h6 class="fw-bold text-white mb-2">Rechtliches</h6>
+        <ul class="list-unstyled mb-0">
+          <li><a href="{{ url_for('public.impressum') }}">Impressum</a></li>
+          <li><a href="{{ url_for('public.agb') }}">AGB</a></li>
+          <li><a href="{{ url_for('public.datenschutz') }}">Datenschutzerklärung</a></li>
+        </ul>
+      </div>
+    </div>
+    <hr class="border-secondary mt-4">
+    <div class="text-center text-white-50 small">
+      &copy; {{ now.year if now is defined else 2026 }} PflegeOS GmbH &mdash;
+      <a href="{{ url_for('public.impressum') }}">Impressum</a> &middot;
+      <a href="{{ url_for('public.datenschutz') }}">Datenschutz</a> &middot;
+      <a href="{{ url_for('public.agb') }}">AGB</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmFz/9Yr+2G4A6m/Y/oLi8EMRY/onh"
+        crossorigin="anonymous"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

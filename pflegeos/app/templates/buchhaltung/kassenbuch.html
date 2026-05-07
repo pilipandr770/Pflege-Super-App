@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Kassenbuch{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.dashboard') }}">Buchhaltung</a></li>
+<li class="breadcrumb-item active">Kassenbuch</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">📒 Kassenbuch</h4>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('buchhaltung.eintrag_neu', art='EINNAHME') }}" class="btn btn-success btn-sm">
+      <i class="bi bi-plus-lg"></i> Einnahme
+    </a>
+    <a href="{{ url_for('buchhaltung.eintrag_neu', art='AUSGABE') }}" class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-dash-lg"></i> Ausgabe
+    </a>
+    <a href="{{ url_for('buchhaltung.export_datev', monat=monat) }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-filetype-csv"></i> DATEV-Export
+    </a>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+{# ── Filter-Zeile ── #}
+<form method="GET" class="card card-body mb-4 p-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-6 col-md-3">
+      <label class="form-label form-label-sm mb-1 fw-semibold">Monat</label>
+      <input type="month" name="monat" class="form-control form-control-sm" value="{{ monat }}">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label form-label-sm mb-1 fw-semibold">Art</label>
+      <select name="art" class="form-select form-select-sm">
+        <option value="">Alle</option>
+        <option value="EINNAHME" {% if art_filter == 'EINNAHME' %}selected{% endif %}>Einnahmen</option>
+        <option value="AUSGABE"  {% if art_filter == 'AUSGABE'  %}selected{% endif %}>Ausgaben</option>
+      </select>
+    </div>
+    <div class="col-8 col-md-4">
+      <label class="form-label form-label-sm mb-1 fw-semibold">Kategorie</label>
+      <select name="kategorie" class="form-select form-select-sm">
+        <option value="">Alle</option>
+        {% for val, label in alle_kategorien.items() %}
+        <option value="{{ val }}" {% if kat_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-4 col-md-2">
+      <button type="submit" class="btn btn-primary btn-sm w-100">
+        <i class="bi bi-funnel"></i> Filter
+      </button>
+    </div>
+  </div>
+</form>
+
+{# ── Saldo-Karten ── #}
+<div class="row g-3 mb-4">
+  <div class="col-4">
+    <div class="card border-0 bg-success bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h4 fw-bold text-success mb-0">{{ "%.2f"|format(einnahmen) }} €</div>
+        <small class="text-muted">Einnahmen</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card border-0 bg-danger bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h4 fw-bold text-danger mb-0">{{ "%.2f"|format(ausgaben) }} €</div>
+        <small class="text-muted">Ausgaben</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card border-0 {% if saldo >= 0 %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 text-center">
+      <div class="card-body py-3">
+        <div class="h4 fw-bold {% if saldo >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">
+          {{ "%.2f"|format(saldo) }} €
+        </div>
+        <small class="text-muted">Saldo</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Tabelle ── #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">
+      Einträge {{ von.strftime('%d.%m.%Y') }} – {{ bis.strftime('%d.%m.%Y') }}
+    </span>
+    <span class="badge bg-secondary">{{ eintraege|length }}</span>
+  </div>
+  <div class="table-responsive">
+    {% if eintraege %}
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Datum</th>
+          <th>Art</th>
+          <th>Kategorie</th>
+          <th>Beschreibung</th>
+          <th>Beleg-Nr.</th>
+          <th>Patient</th>
+          <th class="text-end pe-3">Betrag</th>
+          {% if current_user.is_admin %}
+          <th class="text-center">Aktion</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in eintraege %}
+        <tr>
+          <td class="ps-3 text-muted small text-nowrap">{{ e.datum.strftime('%d.%m.%Y') }}</td>
+          <td>
+            {% if e.art == 'EINNAHME' %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle">
+              <i class="bi bi-plus-lg"></i> Einnahme
+            </span>
+            {% else %}
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+              <i class="bi bi-dash-lg"></i> Ausgabe
+            </span>
+            {% endif %}
+          </td>
+          <td class="small">{{ e.kategorie_label }}</td>
+          <td class="small text-muted" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            {{ e.beschreibung or '—' }}
+          </td>
+          <td class="small text-muted">{{ e.beleg_nr or '—' }}</td>
+          <td class="small">
+            {% if e.patient %}
+            <a href="{{ url_for('patients.show', patient_id=e.patient.id) }}" class="text-decoration-none">
+              {{ e.patient.full_name }}
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-end pe-3 fw-semibold text-nowrap
+            {% if e.art == 'EINNAHME' %}text-success{% else %}text-danger{% endif %}">
+            {% if e.art == 'EINNAHME' %}+{% else %}−{% endif %}{{ "%.2f"|format(e.betrag) }} €
+          </td>
+          {% if current_user.is_admin %}
+          <td class="text-center">
+            <form method="POST" action="{{ url_for('buchhaltung.eintrag_loeschen', eintrag_id=e.id) }}"
+                  onsubmit="return confirm('Eintrag wirklich löschen?');" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="Löschen">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-semibold">
+        <tr>
+          <td colspan="{% if current_user.is_admin %}6{% else %}5{% endif %}" class="ps-3 text-end">Gesamt</td>
+          <td class="text-end pe-3 {% if saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ "%.2f"|format(saldo) }} €
+          </td>
+          {% if current_user.is_admin %}<td></td>{% endif %}
+        </tr>
+      </tfoot>
+    </table>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+      Keine Einträge für diesen Zeitraum.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -226,6 +226,24 @@ def detail(fahrzeug_id):
 
 
 # ─────────────────────────────────────────────────────────────
+# FAHRZEUG SOFT-DELETE
+# ─────────────────────────────────────────────────────────────
+
+@fuhrpark_bp.route('/<fahrzeug_id>/loeschen', methods=['POST'])
+@login_required
+@admin_required
+def loeschen(fahrzeug_id):
+    f = Fahrzeug.query.filter_by(
+        id=fahrzeug_id, company_id=current_user.company_id, deleted_at=None
+    ).first_or_404()
+    f.deleted_at = datetime.utcnow()
+    db.session.commit()
+    log_action('DELETE', 'Fahrzeug', f.id)
+    flash(f'Fahrzeug {f.kennzeichen} wurde archiviert.', 'success')
+    return redirect(url_for('fuhrpark.index'))
+
+
+# ─────────────────────────────────────────────────────────────
 # KILOMETERBUCH EINTRAG
 # ─────────────────────────────────────────────────────────────
 
