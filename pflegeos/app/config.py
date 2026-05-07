@@ -54,7 +54,7 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@pflegeos.local')
-    SYSTEM_URL = os.environ.get('SYSTEM_URL', 'http://localhost:5000')
+    SYSTEM_URL = os.environ.get('SYSTEM_URL', '')  # falls back to request.host_url in billing
 
     # Anthropic
     ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')

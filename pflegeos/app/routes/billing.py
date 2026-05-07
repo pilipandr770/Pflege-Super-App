@@ -74,7 +74,7 @@ def index():
 def checkout():
     s = _stripe()
     company = Company.query.get_or_404(current_user.company_id)
-    base_url = current_app.config.get('SYSTEM_URL', request.host_url.rstrip('/'))
+    base_url = current_app.config.get('SYSTEM_URL') or request.host_url.rstrip('/')
 
     try:
         # Stripe Customer anlegen oder wiederverwenden
@@ -146,7 +146,7 @@ def onboarding():
     """Erstellt sofort eine Stripe-Checkout-Session und leitet weiter (kein Formular nötig)."""
     s = _stripe()
     company = Company.query.get_or_404(current_user.company_id)
-    base_url = current_app.config.get('SYSTEM_URL', request.host_url.rstrip('/'))
+    base_url = current_app.config.get('SYSTEM_URL') or request.host_url.rstrip('/')
 
     try:
         if company.stripe_customer_id:
@@ -193,7 +193,7 @@ def onboarding():
 def portal():
     s = _stripe()
     company = Company.query.get_or_404(current_user.company_id)
-    base_url = current_app.config.get('SYSTEM_URL', request.host_url.rstrip('/'))
+    base_url = current_app.config.get('SYSTEM_URL') or request.host_url.rstrip('/')
 
     if not company.stripe_customer_id:
         flash('Kein aktives Abonnement vorhanden.', 'warning')
