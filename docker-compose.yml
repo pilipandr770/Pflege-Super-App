@@ -1,0 +1,57 @@
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: pflegeos_db
+    environment:
+      POSTGRES_USER: pflegeos
+      POSTGRES_PASSWORD: pflegeos_passwort
+      POSTGRES_DB: pflegeos_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pflegeos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Flask-App (Entwicklung: Hot-Reload) ─────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pflegeos_app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Datenbank zeigt auf den db-Service (überschreibt .env)
+      DATABASE_URL: postgresql+psycopg://pflegeos:pflegeos_passwort@db:5432/pflegeos_db
+      FLASK_APP: run.py
+      FLASK_ENV: development
+      UPLOAD_FOLDER: /app/uploads
+    ports:
+      - "5000:5000"
+    volumes:
+      # Source-Code für Hot-Reload einhängen
+      - ./pflegeos:/app
+      # Uploads persistent speichern
+      - uploads_data:/app/uploads
+    command: >
+      bash -c "
+        echo '▶ Migrations ...' &&
+        flask db upgrade &&
+        echo '▶ Flask Dev-Server starten ...' &&
+        flask run --host=0.0.0.0 --port=5000 --debug
+      "
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads_data:

@@ -61,3 +61,7 @@ htmlcov/
 # Node (if frontend build)
 node_modules/
 dist/
+
+# Uploads (user files — nicht ins Repo)
+pflegeos/uploads/*
+!pflegeos/uploads/.gitkeep

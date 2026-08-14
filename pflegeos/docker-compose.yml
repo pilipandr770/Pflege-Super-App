@@ -1,53 +1,7 @@
-version: '3.8'
-
-services:
-  db:
-    image: postgres:16-alpine
-    container_name: pflegeos_db
-    environment:
-      POSTGRES_USER: pflegeos
-      POSTGRES_PASSWORD: pflegeos_passwort
-      POSTGRES_DB: pflegeos_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pflegeos"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: pflegeos_redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  app:
-    build: .
-    container_name: pflegeos_app
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    ports:
-      - "5000:5000"
-    volumes:
-      - .:/app
-      - ./uploads:/app/uploads
-    restart: unless-stopped
-    command: flask run --host=0.0.0.0 --port=5000
-
-volumes:
-  postgres_data:
+# ⚠ Diese Datei ist veraltet.
+# Das kanonische docker-compose.yml liegt im Repo-Root:
+#
+#   cd ..        (eine Ebene nach oben)
+#   make up      (oder: docker compose up)
+#
+# Weitere Befehle: make help
