@@ -1,13 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Mitarbeiter anlegen{% endblock %}
+{% block title %}{% if employee %}Mitarbeiter bearbeiten{% else %}Mitarbeiter anlegen{% endif %}{% endblock %}
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
 <li class="breadcrumb-item"><a href="{{ url_for('company.employees') }}">Mitarbeiter</a></li>
-<li class="breadcrumb-item active">Neu</li>
+<li class="breadcrumb-item active">{% if employee %}Bearbeiten{% else %}Neu{% endif %}</li>
 {% endblock %}
 
 {% block content %}
-<h4 class="fw-bold mb-4">Neuer Mitarbeiter</h4>
+<h4 class="fw-bold mb-4">
+  {% if employee %}{{ employee.full_name }} bearbeiten{% else %}Neuer Mitarbeiter{% endif %}
+</h4>
 
 <form method="POST" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -20,46 +22,52 @@
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label fw-semibold">Vorname <span class="text-danger">*</span></label>
-              <input type="text" name="vorname" class="form-control" required>
+              <input type="text" name="vorname" class="form-control" required
+                     value="{{ employee.vorname if employee else '' }}">
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold">Nachname <span class="text-danger">*</span></label>
-              <input type="text" name="nachname" class="form-control" required>
+              <input type="text" name="nachname" class="form-control" required
+                     value="{{ employee.nachname if employee else '' }}">
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold">Telefon</label>
-              <input type="tel" name="telefon" class="form-control">
+              <input type="tel" name="telefon" class="form-control"
+                     value="{{ employee.telefon if employee else '' }}">
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">
                 E-Mail (Login) <span class="text-danger">*</span>
               </label>
-              <input type="email" name="email" class="form-control {% if errors.email %}is-invalid{% endif %}" required>
+              <input type="email" name="email" class="form-control {% if errors.email %}is-invalid{% endif %}" required
+                     value="{{ employee.email if employee else '' }}">
               {% if errors.email %}<div class="invalid-feedback">{{ errors.email }}</div>{% endif %}
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">Rolle <span class="text-danger">*</span></label>
               <select name="role" class="form-select" required>
-                <option value="PFLEGEHILFSKRAFT">Pflegehilfskraft</option>
-                <option value="PFLEGEFACHKRAFT">Pflegefachkraft</option>
-                <option value="BEHANDLUNGSPFLEGE">Behandlungspflege</option>
-                <option value="HAUSWIRTSCHAFT">Hauswirtschaft</option>
-                <option value="FAHRER">Fahrer</option>
-                <option value="VERWALTUNG">Verwaltung</option>
-                <option value="ADMIN">Administrator</option>
+                {% set cur_role = employee.role if employee else 'PFLEGEHILFSKRAFT' %}
+                <option value="PFLEGEHILFSKRAFT" {% if cur_role == 'PFLEGEHILFSKRAFT' %}selected{% endif %}>Pflegehilfskraft</option>
+                <option value="PFLEGEFACHKRAFT"  {% if cur_role == 'PFLEGEFACHKRAFT'  %}selected{% endif %}>Pflegefachkraft</option>
+                <option value="BEHANDLUNGSPFLEGE"{% if cur_role == 'BEHANDLUNGSPFLEGE'%}selected{% endif %}>Behandlungspflege</option>
+                <option value="HAUSWIRTSCHAFT"   {% if cur_role == 'HAUSWIRTSCHAFT'   %}selected{% endif %}>Hauswirtschaft</option>
+                <option value="FAHRER"           {% if cur_role == 'FAHRER'           %}selected{% endif %}>Fahrer</option>
+                <option value="VERWALTUNG"       {% if cur_role == 'VERWALTUNG'       %}selected{% endif %}>Verwaltung</option>
+                <option value="ADMIN"            {% if cur_role == 'ADMIN'            %}selected{% endif %}>Administrator</option>
               </select>
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">Qualifikation</label>
+              {% set cur_qual = employee.qualification if employee else '' %}
               <select name="qualification" class="form-select">
-                <option value="">—</option>
-                <option value="Exam_AP">Exam. Altenpfleger/in</option>
-                <option value="Exam_KP">Exam. Krankenpfleger/in</option>
-                <option value="Exam_GKP">Exam. Gesundheits- u. Krankenpfleger/in</option>
-                <option value="AP_Hilfe">Altenpflegehilfe</option>
-                <option value="KP_Hilfe">Krankenpflegehilfe</option>
-                <option value="Arzthelferin">Arzthelferin</option>
-                <option value="Quereinsteiger">Quereinsteiger</option>
+                <option value="" {% if not cur_qual %}selected{% endif %}>—</option>
+                <option value="Exam_AP"      {% if cur_qual == 'Exam_AP'      %}selected{% endif %}>Exam. Altenpfleger/in</option>
+                <option value="Exam_KP"      {% if cur_qual == 'Exam_KP'      %}selected{% endif %}>Exam. Krankenpfleger/in</option>
+                <option value="Exam_GKP"     {% if cur_qual == 'Exam_GKP'     %}selected{% endif %}>Exam. Gesundheits- u. Krankenpfleger/in</option>
+                <option value="AP_Hilfe"     {% if cur_qual == 'AP_Hilfe'     %}selected{% endif %}>Altenpflegehilfe</option>
+                <option value="KP_Hilfe"     {% if cur_qual == 'KP_Hilfe'     %}selected{% endif %}>Krankenpflegehilfe</option>
+                <option value="Arzthelferin" {% if cur_qual == 'Arzthelferin' %}selected{% endif %}>Arzthelferin</option>
+                <option value="Quereinsteiger"{% if cur_qual == 'Quereinsteiger'%}selected{% endif %}>Quereinsteiger</option>
               </select>
             </div>
           </div>
@@ -79,8 +87,13 @@
                 <small class="text-muted fw-normal">(min. 8 Zeichen)</small>
               </label>
               <input type="password" name="password" class="form-control"
-                     minlength="8" autocomplete="new-password" placeholder="Initialpasswort">
+                     minlength="8" autocomplete="new-password"
+                     placeholder="{% if employee %}Leer = unverändert{% else %}Initialpasswort{% endif %}">
+              {% if not employee %}
               <div class="form-text">Standard: changeme123 (bitte nach erstem Login ändern)</div>
+              {% else %}
+              <div class="form-text text-muted">Nur ausfüllen wenn Passwort geändert werden soll.</div>
+              {% endif %}
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold">
@@ -90,7 +103,8 @@
                 <small class="text-muted fw-normal">(6-stellig)</small>
               </label>
               <input type="password" name="pin" class="form-control"
-                     maxlength="6" inputmode="numeric" autocomplete="new-password" placeholder="123456">
+                     maxlength="6" inputmode="numeric" autocomplete="new-password"
+                     placeholder="{% if employee %}Leer = unverändert{% else %}123456{% endif %}">
             </div>
           </div>
         </div>
@@ -105,7 +119,8 @@
           <div class="row g-3">
             <div class="col-md-4">
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="can_btm" id="can_btm">
+                <input class="form-check-input" type="checkbox" name="can_btm" id="can_btm"
+                       {% if employee and employee.can_administer_btm %}checked{% endif %}>
                 <label class="form-check-label" for="can_btm">
                   <span class="fw-semibold">BtM-Berechtigung</span><br>
                   <small class="text-muted">Darf Betäubungsmittel verabreichen und im BtM-Buch signieren</small>
@@ -114,7 +129,8 @@
             </div>
             <div class="col-md-4">
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="can_wound" id="can_wound">
+                <input class="form-check-input" type="checkbox" name="can_wound" id="can_wound"
+                       {% if employee and employee.can_wound_care %}checked{% endif %}>
                 <label class="form-check-label" for="can_wound">
                   <span class="fw-semibold">Wundversorgung</span><br>
                   <small class="text-muted">Darf Wundbefunde erfassen und Verbandwechsel dokumentieren</small>
@@ -123,7 +139,8 @@
             </div>
             <div class="col-md-4">
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="can_approve" id="can_approve">
+                <input class="form-check-input" type="checkbox" name="can_approve" id="can_approve"
+                       {% if employee and employee.can_approve_documents %}checked{% endif %}>
                 <label class="form-check-label" for="can_approve">
                   <span class="fw-semibold">Dokumentenfreigabe</span><br>
                   <small class="text-muted">Darf SIS und Pflegedokumente freigeben (PDL-Funktion)</small>
@@ -138,7 +155,8 @@
     <div class="col-12">
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary fw-semibold">
-          <i class="bi bi-person-check"></i> Mitarbeiter anlegen
+          <i class="bi bi-person-check"></i>
+          {% if employee %}Änderungen speichern{% else %}Mitarbeiter anlegen{% endif %}
         </button>
         <a href="{{ url_for('company.employees') }}" class="btn btn-outline-secondary">Abbrechen</a>
       </div>

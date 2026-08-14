@@ -571,7 +571,7 @@ def _call_claude_api(prompt):
         client = anthropic.Anthropic(api_key=current_app.config.get('ANTHROPIC_API_KEY'))
 
         message = client.messages.create(
-            model="claude-opus-4-1-20250805",
+            model="claude-opus-4-5",
             max_tokens=4096,
             messages=[
                 {

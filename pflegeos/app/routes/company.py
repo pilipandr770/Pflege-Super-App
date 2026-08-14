@@ -44,7 +44,9 @@ def settings():
 def employees():
     staff = Employee.query.filter_by(
         company_id=current_user.company_id, deleted_at=None
-    ).order_by(Employee.nachname).all()
+    ).filter(Employee.is_superadmin == False).order_by(
+        Employee.is_active.desc(), Employee.nachname
+    ).all()
     return render_template('company/employees.html', employees=staff)
 
 
@@ -83,3 +85,75 @@ def new_employee():
             return redirect(url_for('company.employees'))
 
     return render_template('company/employee_form.html', errors=errors, employee=None)
+
+
+@company_bp.route('/employees/<emp_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_employee(emp_id):
+    emp = Employee.query.filter_by(
+        id=emp_id, company_id=current_user.company_id, deleted_at=None
+    ).first_or_404()
+
+    errors = {}
+
+    if request.method == 'POST':
+        fd = request.form
+        new_email = fd.get('email', '').strip().lower()
+
+        # E-Mail-Konflikt prüfen (außer für sich selbst)
+        conflict = Employee.query.filter(
+            Employee.email == new_email,
+            Employee.id != emp_id,
+        ).first()
+        if conflict:
+            errors['email'] = 'Diese E-Mail wird bereits verwendet.'
+
+        if not errors:
+            old_role = emp.role
+            emp.vorname    = fd.get('vorname', '').strip()
+            emp.nachname   = fd.get('nachname', '').strip()
+            emp.email      = new_email
+            emp.telefon    = fd.get('telefon', '').strip() or None
+            emp.role       = fd.get('role', emp.role)
+            emp.qualification = fd.get('qualification', '').strip() or None
+            emp.can_administer_btm    = 'can_btm'     in fd
+            emp.can_wound_care        = 'can_wound'   in fd
+            emp.can_approve_documents = 'can_approve' in fd
+
+            new_pw = fd.get('password', '').strip()
+            if new_pw:
+                emp.set_password(new_pw)
+            new_pin = fd.get('pin', '').strip()
+            if new_pin:
+                emp.set_pin(new_pin)
+
+            db.session.commit()
+            log_action('UPDATE', 'employees', entity_id=emp.id,
+                       new_values={'role_old': old_role, 'role_new': emp.role})
+            flash(f'Mitarbeiter {emp.full_name} aktualisiert.', 'success')
+            return redirect(url_for('company.employees'))
+
+    return render_template('company/employee_form.html', errors=errors, employee=emp)
+
+
+@company_bp.route('/employees/<emp_id>/toggle', methods=['POST'])
+@login_required
+@admin_required
+def toggle_employee(emp_id):
+    emp = Employee.query.filter_by(
+        id=emp_id, company_id=current_user.company_id, deleted_at=None
+    ).first_or_404()
+
+    if emp.id == current_user.id:
+        flash('Sie können Ihren eigenen Account nicht deaktivieren.', 'danger')
+        return redirect(url_for('company.employees'))
+
+    emp.is_active = not emp.is_active
+    db.session.commit()
+
+    action = 'EMPLOYEE_ACTIVATED' if emp.is_active else 'EMPLOYEE_DEACTIVATED'
+    log_action(action, 'employees', entity_id=emp.id)
+    status = 'aktiviert' if emp.is_active else 'deaktiviert'
+    flash(f'{emp.full_name} wurde {status}.', 'success')
+    return redirect(url_for('company.employees'))

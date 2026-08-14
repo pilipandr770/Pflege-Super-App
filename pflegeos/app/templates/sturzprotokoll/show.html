@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Sturzprotokoll Detail{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.show', patient_id=patient.id) }}">{{ patient.full_name }}</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('sturzprotokoll.list_view', patient_id=patient.id) }}">Sturzprotokoll</a></li>
+<li class="breadcrumb-item active">Detail</li>
+{% endblock %}
+
+{% block content %}
+{% set sev = severity_labels.get(protokoll.severity, ('—', 'secondary')) %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">
+      Sturzereignis vom {{ protokoll.sturz_datum.strftime('%d.%m.%Y') }}
+      {% if protokoll.sturz_uhrzeit %} um {{ protokoll.sturz_uhrzeit.strftime('%H:%M') }} Uhr{% endif %}
+    </h4>
+    <span class="badge bg-{{ sev[1] }} {% if sev[1] == 'warning' %}text-dark{% endif %} fs-6">
+      {{ sev[0] }}
+    </span>
+  </div>
+  <a href="{{ url_for('sturzprotokoll.neu', patient_id=patient.id) }}" class="btn btn-outline-danger btn-sm">
+    <i class="bi bi-plus-circle"></i> Weiteren Sturz erfassen
+  </a>
+</div>
+
+<div class="row g-3">
+
+  <!-- Patient & Erfassung -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold bg-light">Patient</div>
+      <div class="card-body">
+        <dl class="mb-0" style="display:grid;grid-template-columns:auto 1fr;gap:.4rem 1rem">
+          <dt class="text-muted small">Name</dt>
+          <dd class="mb-0">{{ patient.full_name }}</dd>
+          <dt class="text-muted small">Pflegegrad</dt>
+          <dd class="mb-0">{{ patient.pflegegrad or '—' }}</dd>
+        </dl>
+        <hr class="my-3">
+        <dl class="mb-0" style="display:grid;grid-template-columns:auto 1fr;gap:.4rem 1rem">
+          <dt class="text-muted small">Erfasst von</dt>
+          <dd class="mb-0">{{ reporter.full_name if reporter else '—' }}</dd>
+          <dt class="text-muted small">Erfasst am</dt>
+          <dd class="mb-0">{{ protokoll.created_at.strftime('%d.%m.%Y %H:%M') }}</dd>
+          <dt class="text-muted small">Fundort</dt>
+          <dd class="mb-0">{{ protokoll.fundort or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Beschreibung -->
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header fw-semibold bg-light">Beschreibung</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="small text-muted fw-semibold text-uppercase letter-spacing-1 mb-1">Sturzursache</div>
+          <p class="mb-0">{{ protokoll.sturzursache or '<span class="text-muted">Nicht angegeben</span>'|safe }}</p>
+        </div>
+        <hr>
+        <div class="mb-3">
+          <div class="small text-muted fw-semibold text-uppercase mb-1">Verletzungen</div>
+          <p class="mb-0">{{ protokoll.verletzungen or '<span class="text-muted">Keine</span>'|safe }}</p>
+        </div>
+        <hr>
+        <div>
+          <div class="small text-muted fw-semibold text-uppercase mb-1">Sofortmaßnahmen</div>
+          <p class="mb-0">{{ protokoll.massnahmen_sofort or '<span class="text-muted">Nicht angegeben</span>'|safe }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Benachrichtigungen -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header fw-semibold bg-light">Benachrichtigungen</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="d-flex align-items-center gap-3">
+              {% if protokoll.arzt_informiert %}
+              <i class="bi bi-check-circle-fill text-success fs-4"></i>
+              <div>
+                <div class="fw-semibold">Arzt informiert</div>
+                {% if protokoll.arzt_informiert_um %}
+                <div class="small text-muted">
+                  Am {{ protokoll.arzt_informiert_um.strftime('%d.%m.%Y um %H:%M') }} Uhr
+                </div>
+                {% endif %}
+              </div>
+              {% else %}
+              <i class="bi bi-x-circle-fill text-danger fs-4"></i>
+              <div class="text-muted">Arzt nicht informiert</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="d-flex align-items-center gap-3">
+              {% if protokoll.angehoerige_informiert %}
+              <i class="bi bi-check-circle-fill text-success fs-4"></i>
+              <div class="fw-semibold">Angehörige informiert</div>
+              {% else %}
+              <i class="bi bi-x-circle-fill text-danger fs-4"></i>
+              <div class="text-muted">Angehörige nicht informiert</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

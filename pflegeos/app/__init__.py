@@ -55,6 +55,7 @@ def create_app(config_name=None):
     from app.routes.superadmin import superadmin_bp
     from app.routes.billing import billing_bp
     from app.routes.schichtplan import schichtplan_bp
+    from app.routes.sturzprotokoll import sturzprotokoll_bp
 
     app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -80,6 +81,7 @@ def create_app(config_name=None):
     app.register_blueprint(superadmin_bp, url_prefix='/superadmin')
     app.register_blueprint(billing_bp)
     app.register_blueprint(schichtplan_bp)
+    app.register_blueprint(sturzprotokoll_bp)
 
     # Stripe Webhook muss CSRF-exempt sein (Stripe sendet kein CSRF-Token)
     _csrf.exempt(billing_bp)

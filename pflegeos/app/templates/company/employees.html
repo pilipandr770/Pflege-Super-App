@@ -25,6 +25,7 @@
           <th>Berechtigungen</th>
           <th>Status</th>
           <th>Letzter Login</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -52,10 +53,28 @@
             </span>
           </td>
           <td class="small text-muted">{{ emp.last_login_at|datetimefmt if emp.last_login_at else 'Noch nie' }}</td>
+          <td class="text-end" style="white-space:nowrap">
+            <a href="{{ url_for('company.edit_employee', emp_id=emp.id) }}"
+               class="btn btn-sm btn-outline-secondary me-1">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {% if emp.id != current_user.id %}
+            <form method="POST"
+                  action="{{ url_for('company.toggle_employee', emp_id=emp.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('{{ emp.full_name }} {% if emp.is_active %}deaktivieren{% else %}aktivieren{% endif %}?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit"
+                      class="btn btn-sm {% if emp.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}">
+                <i class="bi bi-{% if emp.is_active %}person-dash{% else %}person-check{% endif %}"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" class="text-center text-muted py-5">Keine Mitarbeiter angelegt</td>
+          <td colspan="8" class="text-center text-muted py-5">Keine Mitarbeiter angelegt</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -45,6 +45,10 @@
        class="btn btn-outline-danger w-100">&#x1FA79; Wunden</a>
   </div>
   <div class="col">
+    <a href="{{ url_for('sturzprotokoll.list_view', patient_id=patient.id) }}"
+       class="btn btn-outline-warning w-100">&#x26A0; Sturzprotokoll</a>
+  </div>
+  <div class="col">
     <a href="{{ url_for('photos.list_photos', patient_id=patient.id) }}"
        class="btn btn-outline-secondary w-100">&#x1F4F7; Fotos</a>
   </div>

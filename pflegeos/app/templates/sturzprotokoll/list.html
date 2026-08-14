@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Sturzprotokoll – {{ patient.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.show', patient_id=patient.id) }}">{{ patient.full_name }}</a></li>
+<li class="breadcrumb-item active">Sturzprotokoll</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">Sturzprotokoll</h4>
+    <p class="text-muted mb-0 small">{{ patient.full_name }}</p>
+  </div>
+  <a href="{{ url_for('sturzprotokoll.neu', patient_id=patient.id) }}" class="btn btn-danger">
+    <i class="bi bi-exclamation-triangle-fill"></i> Sturz erfassen
+  </a>
+</div>
+
+{% if protokolle %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum / Zeit</th>
+          <th>Fundort</th>
+          <th>Verletzungen</th>
+          <th>Schwere</th>
+          <th>Arzt info.</th>
+          <th>Erfasst von</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in protokolle %}
+        {% set sev = severity_labels.get(p.severity, ('—', 'secondary')) %}
+        <tr>
+          <td>
+            <strong>{{ p.sturz_datum.strftime('%d.%m.%Y') }}</strong>
+            {% if p.sturz_uhrzeit %}
+            <div class="text-muted small">{{ p.sturz_uhrzeit.strftime('%H:%M') }} Uhr</div>
+            {% endif %}
+          </td>
+          <td class="small">{{ p.fundort or '—' }}</td>
+          <td class="small">
+            {% if p.verletzungen %}
+              {{ p.verletzungen[:60] }}{% if p.verletzungen|length > 60 %}…{% endif %}
+            {% else %}
+              <span class="text-muted">Keine</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge bg-{{ sev[1] }} {% if sev[1] == 'warning' %}text-dark{% endif %}">
+              {{ sev[0] }}
+            </span>
+          </td>
+          <td class="text-center">
+            {% if p.arzt_informiert %}
+              <i class="bi bi-check-circle-fill text-success" title="Arzt informiert"></i>
+            {% else %}
+              <i class="bi bi-dash-circle text-muted"></i>
+            {% endif %}
+          </td>
+          <td class="small text-muted">
+            {% if p.reporter %}{{ p.reporter.full_name }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('sturzprotokoll.show', protokoll_id=p.id) }}"
+               class="btn btn-sm btn-outline-secondary">Detail</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mt-3 text-muted small">
+  <i class="bi bi-info-circle"></i>
+  Insgesamt {{ protokolle|length }} Sturzereignis{% if protokolle|length != 1 %}se{% endif %} dokumentiert.
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-shield-check text-success" style="font-size:2.5rem"></i>
+    <p class="mt-3 mb-1 fw-semibold">Keine Sturzereignisse dokumentiert</p>
+    <p class="text-muted small">Sturzprotokolle werden hier nach der Erfassung angezeigt.</p>
+    <a href="{{ url_for('sturzprotokoll.neu', patient_id=patient.id) }}" class="btn btn-danger mt-2">
+      <i class="bi bi-exclamation-triangle-fill"></i> Ersten Sturz erfassen
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

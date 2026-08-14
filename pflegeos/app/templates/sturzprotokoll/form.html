@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Sturz erfassen – {{ patient.full_name }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.index') }}">Patienten</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('patients.show', patient_id=patient.id) }}">{{ patient.full_name }}</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('sturzprotokoll.list_view', patient_id=patient.id) }}">Sturzprotokoll</a></li>
+<li class="breadcrumb-item active">Neu</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center"
+       style="width:3rem;height:3rem;flex-shrink:0">
+    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  </div>
+  <div>
+    <h4 class="fw-bold mb-0">Sturzereignis erfassen</h4>
+    <p class="text-muted mb-0 small">{{ patient.full_name }}</p>
+  </div>
+</div>
+
+<form method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-3">
+
+    <!-- Ereignisdaten -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold bg-danger text-white">
+          <i class="bi bi-calendar-event"></i> Ereignisdaten
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Datum <span class="text-danger">*</span></label>
+              <input type="date" name="sturz_datum"
+                     class="form-control {% if errors.sturz_datum %}is-invalid{% endif %}"
+                     value="{{ today }}" required>
+              {% if errors.sturz_datum %}
+              <div class="invalid-feedback">{{ errors.sturz_datum }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Uhrzeit</label>
+              <input type="time" name="sturz_uhrzeit" class="form-control">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Schwere <span class="text-danger">*</span></label>
+              <select name="severity" class="form-select {% if errors.severity %}is-invalid{% endif %}">
+                {% for val, (label, color) in severity_labels.items() %}
+                <option value="{{ val }}" {% if val == 'MITTEL' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Fundort</label>
+              <input type="text" name="fundort" class="form-control"
+                     placeholder="z.B. Schlafzimmer, Bad">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beschreibung -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold">
+          <i class="bi bi-file-text"></i> Beschreibung
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Sturzursache</label>
+              <textarea name="sturzursache" class="form-control" rows="3"
+                        placeholder="Beschreiben Sie die vermutliche Ursache des Sturzes..."></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Verletzungen</label>
+              <textarea name="verletzungen" class="form-control" rows="3"
+                        placeholder="Art und Lage der Verletzungen (ggf. &quot;keine sichtbaren Verletzungen&quot;)..."></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Sofortmaßnahmen</label>
+              <textarea name="massnahmen_sofort" class="form-control" rows="3"
+                        placeholder="Welche Maßnahmen wurden unmittelbar nach dem Sturz eingeleitet?"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benachrichtigungen -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header fw-semibold">
+          <i class="bi bi-bell"></i> Benachrichtigungen
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="arzt_informiert"
+                       id="arzt_informiert" onchange="toggleArztZeit(this)">
+                <label class="form-check-label fw-semibold" for="arzt_informiert">
+                  Arzt informiert
+                </label>
+              </div>
+              <div id="arzt_zeit_feld" class="d-none">
+                <label class="form-label small text-muted">Zeitpunkt der Arztinformation</label>
+                <input type="datetime-local" name="arzt_informiert_um" class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="angehoerige_informiert"
+                       id="angehoerige_informiert">
+                <label class="form-check-label fw-semibold" for="angehoerige_informiert">
+                  Angehörige informiert
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-danger fw-semibold">
+          <i class="bi bi-save"></i> Sturzprotokoll speichern
+        </button>
+        <a href="{{ url_for('sturzprotokoll.list_view', patient_id=patient.id) }}"
+           class="btn btn-outline-secondary">Abbrechen</a>
+      </div>
+    </div>
+
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleArztZeit(cb) {
+  document.getElementById('arzt_zeit_feld').classList.toggle('d-none', !cb.checked);
+}
+</script>
+{% endblock %}
