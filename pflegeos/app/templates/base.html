@@ -163,6 +163,18 @@
           </a>
         </li>
         <li class="nav-item">
+          <a href="{{ url_for('admin.alerts') }}"
+             class="nav-link {% if request.endpoint == 'admin.alerts' %}active{% endif %}">
+            <i class="bi bi-exclamation-triangle"></i> Offene Dokumentation
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('admin.auditlog') }}"
+             class="nav-link {% if request.endpoint == 'admin.auditlog' %}active{% endif %}">
+            <i class="bi bi-journal-text"></i> Audit-Log
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('billing.index') }}"
              class="nav-link {% if request.endpoint and 'billing' in request.endpoint %}active{% endif %}">
             <i class="bi bi-credit-card"></i> Abonnement
@@ -300,7 +312,12 @@
     <div class="px-3 mt-auto">
       <small class="text-white-50 d-block">{{ current_user.full_name }}</small>
       <small class="text-white-50">{{ current_user.role_label }}</small>
-      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-light mt-2 w-100">
+      <a href="{{ url_for('auth.totp_setup') }}"
+         class="btn btn-sm btn-outline-light mt-2 w-100 {% if current_user.totp_enabled %}border-success text-success{% endif %}">
+        <i class="bi bi-shield-{% if current_user.totp_enabled %}check-fill text-success{% else %}lock{% endif %}"></i>
+        2FA {% if current_user.totp_enabled %}aktiv{% else %}einrichten{% endif %}
+      </a>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-light mt-1 w-100">
         <i class="bi bi-box-arrow-right"></i> Abmelden
       </a>
     </div>

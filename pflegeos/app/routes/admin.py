@@ -7,7 +7,8 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models import (
     Company, Employee, Patient, Procedure, EmployeeSchedule, VisitReport,
-    EmployeePatientAssignment, Leistungsnachweis, PatientPhoto
+    EmployeePatientAssignment, Leistungsnachweis, PatientPhoto, AuditLog,
+    SisAssessment, MedicationPlan, WoundDoc, WoundAssessment,
 )
 from app.utils.auth import admin_required, log_action
 from datetime import datetime, date, timedelta
@@ -885,3 +886,102 @@ def unconfirm_leistung(ln_id):
 
     log_action('LEISTUNG_UNCONFIRMED', 'Leistungsnachweis', ln_id)
     return jsonify({'success': True})
+
+
+# ── AuditLog-Viewer ────────────────────────────────────────────────────────────
+
+@admin_bp.route('/auditlog')
+@login_required
+@admin_required
+def auditlog():
+    page = request.args.get('page', 1, type=int)
+    action_filter = request.args.get('action', '').strip()
+    user_filter   = request.args.get('user_id', '').strip()
+
+    q = AuditLog.query.filter_by(company_id=current_user.company_id)
+    if action_filter:
+        q = q.filter(AuditLog.action.ilike(f'%{action_filter}%'))
+    if user_filter:
+        q = q.filter(AuditLog.user_id == user_filter)
+
+    pagination = q.order_by(AuditLog.created_at.desc()).paginate(
+        page=page, per_page=50, error_out=False
+    )
+
+    # Mitarbeiter-Map für Namen-Auflösung
+    employee_ids = {e.user_id for e in pagination.items if e.user_id}
+    employees = {e.id: e for e in Employee.query.filter(
+        Employee.id.in_(employee_ids)
+    ).all()} if employee_ids else {}
+
+    staff = Employee.query.filter_by(
+        company_id=current_user.company_id, deleted_at=None
+    ).order_by(Employee.nachname).all()
+
+    return render_template('admin/auditlog.html',
+                           pagination=pagination,
+                           entries=pagination.items,
+                           employees=employees,
+                           staff=staff,
+                           action_filter=action_filter,
+                           user_filter=user_filter)
+
+
+# ── Alerts / Fehlende Dokumentation ───────────────────────────────────────────
+
+@admin_bp.route('/alerts')
+@login_required
+@admin_required
+def alerts():
+    cid = current_user.company_id
+    today = date.today()
+
+    patients = Patient.query.filter_by(
+        company_id=cid, status='AKTIV', deleted_at=None
+    ).order_by(Patient.nachname).all()
+
+    alerts_list = []
+    for patient in patients:
+        issues = []
+
+        # Kein aktuelles SIS
+        sis_current = SisAssessment.query.filter_by(
+            patient_id=patient.id, is_current=True
+        ).first()
+        if not sis_current:
+            issues.append({'typ': 'warning', 'text': 'Kein aktuelles SIS vorhanden'})
+
+        # Kein aktiver Medikamentenplan
+        med_plan = MedicationPlan.query.filter_by(
+            patient_id=patient.id, is_active=True
+        ).first()
+        if not med_plan:
+            issues.append({'typ': 'info', 'text': 'Kein aktiver Medikamentenplan'})
+
+        # Letzte Leistung > 7 Tage alt
+        last_ln = Leistungsnachweis.query.filter_by(
+            patient_id=patient.id
+        ).order_by(Leistungsnachweis.datum.desc()).first()
+        if not last_ln or (today - last_ln.datum).days > 7:
+            days = (today - last_ln.datum).days if last_ln else None
+            msg = f'Letzter Leistungsnachweis vor {days} Tagen' if days else 'Noch kein Leistungsnachweis'
+            issues.append({'typ': 'danger', 'text': msg})
+
+        # Offene Wunddokumentation (Wunde ohne aktuelle Beurteilung ≤ 3 Tage)
+        open_wounds = WoundDoc.query.filter_by(
+            patient_id=patient.id, is_active=True
+        ).all()
+        for w in open_wounds:
+            latest_a = WoundAssessment.query.filter_by(
+                wound_id=w.id
+            ).order_by(WoundAssessment.assessment_date.desc()).first()
+            if not latest_a or (today - latest_a.assessment_date).days > 3:
+                issues.append({'typ': 'danger', 'text': f'Wunde "{w.lokalisation}" ohne aktuelle Beurteilung'})
+
+        if issues:
+            alerts_list.append({'patient': patient, 'issues': issues})
+
+    return render_template('admin/alerts.html',
+                           alerts_list=alerts_list,
+                           total_patients=len(patients),
+                           today=today)

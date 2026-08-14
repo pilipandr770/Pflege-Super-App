@@ -115,6 +115,10 @@ class Employee(db.Model, UserMixin):
     pin_hash = db.Column(db.Text)
     last_login_at = db.Column(db.DateTime)
 
+    # 2FA / TOTP
+    totp_secret  = db.Column(db.Text)
+    totp_enabled = db.Column(db.Boolean, default=False, nullable=False)
+
     # Разрешения
     can_administer_btm = db.Column(db.Boolean, default=False)
     can_wound_care = db.Column(db.Boolean, default=False)
@@ -137,6 +141,24 @@ class Employee(db.Model, UserMixin):
 
     def check_pin(self, pin):
         return bcrypt.check_password_hash(self.pin_hash, pin)
+
+    def generate_totp_secret(self):
+        import pyotp
+        self.totp_secret = pyotp.random_base32()
+        return self.totp_secret
+
+    def get_totp_uri(self):
+        import pyotp
+        return pyotp.totp.TOTP(self.totp_secret).provisioning_uri(
+            name=self.email,
+            issuer_name='PflegeOS'
+        )
+
+    def verify_totp(self, code):
+        import pyotp
+        if not self.totp_secret:
+            return False
+        return pyotp.TOTP(self.totp_secret).verify(code, valid_window=1)
 
     @property
     def full_name(self):

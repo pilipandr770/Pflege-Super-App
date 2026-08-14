@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Zwei-Faktor-Authentifizierung{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-4 col-sm-10">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <div class="text-center mb-4">
+          <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center mb-3"
+               style="width:3.5rem;height:3.5rem">
+            <i class="bi bi-shield-lock-fill fs-4"></i>
+          </div>
+          <h5 class="fw-bold mb-0">Zwei-Faktor-Code</h5>
+          <p class="text-muted small mt-1">
+            Bitte geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.
+          </p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger py-2 small">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" autocomplete="off">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <input type="text" name="code" class="form-control form-control-lg text-center fw-bold"
+                   style="letter-spacing:0.3em;font-size:1.5rem"
+                   maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="000000" autofocus required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 fw-semibold">
+            <i class="bi bi-check-circle"></i> Bestätigen
+          </button>
+        </form>
+
+        <div class="text-center mt-3">
+          <a href="{{ url_for('auth.login') }}" class="small text-muted">
+            Zurück zur Anmeldung
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

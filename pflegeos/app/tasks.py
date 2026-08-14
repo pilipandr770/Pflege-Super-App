@@ -8,11 +8,10 @@ In Entwicklung (flask run): manueller Trigger über /greetings/trigger-check.
 """
 import logging
 import os
-import threading
 from datetime import date, datetime, timedelta
 
 logger = logging.getLogger(__name__)
-_scheduler_thread = None
+_scheduler = None
 
 
 # ── Morgendliche Glückwunsch-Prüfung ─────────────────────────────────────────
@@ -163,57 +162,40 @@ def run_fuhrpark_alerts_check(app):
         logger.info(f"[Fuhrpark-Check] Abgeschlossen: {emails_sent} Alerts versendet.")
 
 
-# ── Täglicher Schlaf-Loop ─────────────────────────────────────────────────────
-
-def _daily_loop(app):
-    """
-    Hintergrundthread: schläft bis 08:00 und löst den Check aus.
-    Läuft endlos bis das Programm beendet wird.
-    """
-    logger.info("✓ Täglicher Glückwunsch-Scheduler gestartet (nächster Check um 08:00)")
-    while True:
-        try:
-            now = datetime.now()
-            # Nächsten 08:00 berechnen
-            target = now.replace(hour=8, minute=0, second=0, microsecond=0)
-            if now >= target:
-                target += timedelta(days=1)  # morgen 08:00
-            wait = (target - now).total_seconds()
-            logger.debug(f"[Scheduler] Nächster Check in {wait/3600:.1f}h um {target.strftime('%d.%m.%Y 08:00')}")
-            threading.Event().wait(timeout=wait)
-            run_morning_greetings_check(app)
-        except Exception as e:
-            logger.error(f"[Scheduler] Fehler im Loop: {e} — retry in 60s")
-            threading.Event().wait(timeout=60)
-
-
-# ── Scheduler initialisieren ─────────────────────────────────────────────────
+# ── APScheduler-Initialisierung ───────────────────────────────────────────────
 
 def init_scheduler(app):
     """
-    Startet den täglichen Hintergrund-Thread.
-    - Im Debug-Modus mit Werkzeug-Reloader: nur im Child-Prozess starten.
-    - In Produktion (gunicorn): immer starten.
+    Startet APScheduler mit einem täglichen Cron-Job um 08:00.
+    - Im Debug-Modus mit Werkzeug-Reloader: nur im Child-Prozess starten,
+      um doppelte Jobs zu vermeiden.
+    - In Produktion (gunicorn --workers 1): läuft sicher in einem Prozess.
     """
-    global _scheduler_thread
+    global _scheduler
 
-    # Werkzeug Reloader: nur im Child-Prozess starten (WERKZEUG_RUN_MAIN='true')
-    # In Produktion (gunicorn) ist WERKZEUG_RUN_MAIN nicht gesetzt → starten
     if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         logger.debug("[Scheduler] Übersprungen — Werkzeug Parent-Prozess")
         return
 
-    if _scheduler_thread is not None and _scheduler_thread.is_alive():
+    if _scheduler is not None and _scheduler.running:
         logger.debug("[Scheduler] Läuft bereits")
         return
 
-    _scheduler_thread = threading.Thread(
-        target=_daily_loop,
-        args=(app,),
-        daemon=True,
-        name='GlueckwunschScheduler'
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+
+    _scheduler = BackgroundScheduler(timezone='Europe/Berlin')
+    _scheduler.add_job(
+        func=run_morning_greetings_check,
+        trigger=CronTrigger(hour=8, minute=0, timezone='Europe/Berlin'),
+        args=[app],
+        id='morning_check',
+        name='Täglicher Glückwunsch- und Fuhrpark-Check',
+        replace_existing=True,
+        misfire_grace_time=3600,
     )
-    _scheduler_thread.start()
+    _scheduler.start()
+    logger.info("✓ APScheduler gestartet — Täglicher Check um 08:00 Europe/Berlin")
 
 
 def trigger_manual_check(app):

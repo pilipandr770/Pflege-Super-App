@@ -26,6 +26,11 @@ def login():
             log_action('LOGIN_FAILED', 'employee')
         elif not employee.is_active:
             error = 'Ihr Konto ist deaktiviert. Bitte wenden Sie sich an Ihren Administrator.'
+        elif employee.totp_enabled:
+            # 2FA aktiv → Passwort korrekt, TOTP-Verifizierung erforderlich
+            session['_2fa_employee_id'] = employee.id
+            session['_2fa_next'] = request.args.get('next', '')
+            return redirect(url_for('auth.totp_verify'))
         else:
             is_first_login = employee.last_login_at is None
             login_user(employee, remember=False)
@@ -165,3 +170,83 @@ def register():
                            errors=errors,
                            form_data=form_data,
                            bundeslaender=bundeslaender)
+
+
+# ── 2FA: TOTP-Verifizierung nach Login ───────────────────────────────────────
+
+@auth_bp.route('/2fa/verify', methods=['GET', 'POST'])
+def totp_verify():
+    employee_id = session.get('_2fa_employee_id')
+    if not employee_id:
+        return redirect(url_for('auth.login'))
+
+    employee = Employee.query.filter_by(id=employee_id, is_active=True).first()
+    if not employee:
+        session.pop('_2fa_employee_id', None)
+        return redirect(url_for('auth.login'))
+
+    error = None
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip().replace(' ', '')
+        if employee.verify_totp(code):
+            session.pop('_2fa_employee_id', None)
+            next_page = session.pop('_2fa_next', '')
+
+            is_first_login = employee.last_login_at is None
+            login_user(employee, remember=False)
+            employee.last_login_at = datetime.utcnow()
+            db.session.commit()
+            log_action('LOGIN_SUCCESS_2FA', 'employee', entity_id=employee.id)
+
+            if next_page and next_page.startswith('/'):
+                return redirect(next_page)
+            if employee.is_superadmin:
+                return redirect(url_for('superadmin.index'))
+            if is_first_login:
+                return redirect(url_for('dashboard.index', _anchor='onboarding'))
+            return redirect(url_for('dashboard.index'))
+        else:
+            error = 'Ungültiger Code. Bitte erneut versuchen.'
+            log_action('2FA_FAILED', 'employee', entity_id=employee.id)
+
+    return render_template('auth/totp_verify.html', error=error)
+
+
+# ── 2FA: Setup (einloggt, für eigenes Profil) ────────────────────────────────
+
+@auth_bp.route('/2fa/setup', methods=['GET', 'POST'])
+@login_required
+def totp_setup():
+    employee = Employee.query.get(current_user.id)
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'generate':
+            employee.generate_totp_secret()
+            db.session.commit()
+            return redirect(url_for('auth.totp_setup'))
+
+        if action == 'enable':
+            code = request.form.get('code', '').strip()
+            if employee.verify_totp(code):
+                employee.totp_enabled = True
+                db.session.commit()
+                log_action('2FA_ENABLED', 'employee', entity_id=employee.id)
+                flash('Zwei-Faktor-Authentifizierung erfolgreich aktiviert.', 'success')
+                return redirect(url_for('auth.totp_setup'))
+            flash('Ungültiger Code — bitte erneut versuchen.', 'danger')
+
+        if action == 'disable':
+            code = request.form.get('code', '').strip()
+            if employee.verify_totp(code):
+                employee.totp_enabled = False
+                employee.totp_secret = None
+                db.session.commit()
+                log_action('2FA_DISABLED', 'employee', entity_id=employee.id)
+                flash('Zwei-Faktor-Authentifizierung deaktiviert.', 'info')
+                return redirect(url_for('auth.totp_setup'))
+            flash('Ungültiger Code — bitte erneut versuchen.', 'danger')
+
+    totp_uri = employee.get_totp_uri() if employee.totp_secret else None
+    return render_template('auth/totp_setup.html', employee=employee, totp_uri=totp_uri)

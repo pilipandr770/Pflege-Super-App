@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Zwei-Faktor-Authentifizierung einrichten{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item active">2FA-Einstellungen</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <h4 class="fw-bold mb-1">Zwei-Faktor-Authentifizierung</h4>
+    <p class="text-muted mb-4 small">
+      Schützt Ihr Konto mit einem einmaligen Code aus einer Authenticator-App
+      (z.B. Google Authenticator, Authy, Microsoft Authenticator).
+    </p>
+
+    {% if employee.totp_enabled %}
+    <!-- 2FA IST AKTIV -->
+    <div class="alert alert-success d-flex align-items-center gap-2">
+      <i class="bi bi-shield-check-fill fs-5"></i>
+      <div><strong>2FA ist aktiviert.</strong> Ihr Konto ist mit Zwei-Faktor-Authentifizierung geschützt.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header fw-semibold text-danger bg-danger bg-opacity-10">
+        <i class="bi bi-shield-x"></i> 2FA deaktivieren
+      </div>
+      <div class="card-body">
+        <p class="small text-muted mb-3">
+          Geben Sie einen gültigen Code aus Ihrer Authenticator-App ein, um 2FA zu deaktivieren.
+        </p>
+        <form method="POST" class="d-flex gap-2 align-items-start">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="disable">
+          <input type="text" name="code" class="form-control"
+                 maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                 placeholder="6-stelliger Code" required style="max-width:160px">
+          <button type="submit" class="btn btn-outline-danger fw-semibold">
+            2FA deaktivieren
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% elif employee.totp_secret %}
+    <!-- SECRET VORHANDEN, ABER NOCH NICHT AKTIVIERT -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold bg-warning bg-opacity-10">
+        <i class="bi bi-qr-code-scan"></i> Schritt 1 — QR-Code scannen
+      </div>
+      <div class="card-body text-center">
+        <p class="text-muted small mb-3">
+          Scannen Sie diesen QR-Code mit Ihrer Authenticator-App.
+        </p>
+        <div id="qrcode" class="d-inline-block mb-3 p-2 border rounded bg-white"></div>
+        <div>
+          <details class="small text-start">
+            <summary class="text-muted" style="cursor:pointer">
+              QR-Code funktioniert nicht? Manuell eingeben
+            </summary>
+            <div class="mt-2 p-2 bg-light rounded font-monospace small" style="word-break:break-all">
+              {{ totp_uri }}
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-check2-circle"></i> Schritt 2 — Code bestätigen &amp; aktivieren
+      </div>
+      <div class="card-body">
+        <p class="small text-muted mb-3">
+          Geben Sie den 6-stelligen Code aus Ihrer App ein, um die Einrichtung abzuschließen.
+        </p>
+        <form method="POST" class="d-flex gap-2 align-items-start">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="enable">
+          <input type="text" name="code" class="form-control"
+                 maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                 placeholder="000000" autofocus required style="max-width:160px">
+          <button type="submit" class="btn btn-success fw-semibold">
+            <i class="bi bi-shield-check"></i> Aktivieren
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% else %}
+    <!-- NOCH KEIN SECRET -->
+    <div class="alert alert-warning d-flex align-items-center gap-2">
+      <i class="bi bi-shield-exclamation fs-5"></i>
+      <div>2FA ist noch nicht eingerichtet. Klicken Sie unten, um zu beginnen.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-shield-plus text-primary" style="font-size:3rem"></i>
+        <p class="mt-3 mb-1 fw-semibold">Zwei-Faktor-Authentifizierung einrichten</p>
+        <p class="text-muted small">
+          Installieren Sie eine Authenticator-App (Google Authenticator, Authy o.ä.)
+          und klicken Sie dann auf „Einrichten".
+        </p>
+        <form method="POST" class="mt-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="generate">
+          <button type="submit" class="btn btn-primary fw-semibold">
+            <i class="bi bi-qr-code-scan"></i> 2FA einrichten
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if totp_uri and not employee.totp_enabled %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+        integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAXAIn1dFRlhM/hFiEGTGmzHqdQ01L0a6fO8Yfpw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+  new QRCode(document.getElementById('qrcode'), {
+    text: {{ totp_uri|tojson }},
+    width: 200,
+    height: 200,
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+</script>
+{% endif %}
+{% endblock %}
