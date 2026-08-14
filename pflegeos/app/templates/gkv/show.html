@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block title %}GKV-Abrechnung – {{ abr.patient.full_name }}{% endblock %}
+
+{% block content %}
+{% set label, color = status_labels.get(abr.status, (abr.status, 'secondary')) %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <a href="{{ url_for('gkv.index', monat=abr.abrechnungsmonat) }}"
+       class="text-decoration-none text-muted small">
+      <i class="bi bi-arrow-left me-1"></i>Zurück
+    </a>
+    <h2 class="mb-1 mt-1">{{ abr.patient.full_name }}</h2>
+    <span class="text-muted">{{ abr.abrechnungsmonat }}</span>
+    &nbsp;<span class="badge bg-{{ color }}">{{ label }}</span>
+  </div>
+
+  {# Status-Aktionen #}
+  <div class="d-flex gap-2">
+    {% if abr.status == 'ENTWURF' %}
+    <form method="post" action="{{ url_for('gkv.update_status', abr_id=abr.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="EINGEREICHT">
+      <button class="btn btn-primary" onclick="return confirm('Abrechnung als eingereicht markieren?')">
+        <i class="bi bi-send me-1"></i>Einreichen
+      </button>
+    </form>
+    {% elif abr.status == 'EINGEREICHT' %}
+    <form method="post" action="{{ url_for('gkv.update_status', abr_id=abr.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="GENEHMIGT">
+      <button class="btn btn-success">
+        <i class="bi bi-check-circle me-1"></i>Genehmigt
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('gkv.update_status', abr_id=abr.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="ABGELEHNT">
+      <button class="btn btn-outline-danger">
+        <i class="bi bi-x-circle me-1"></i>Abgelehnt
+      </button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('gkv.export_csv', monat=abr.abrechnungsmonat) }}"
+       class="btn btn-outline-secondary">
+      <i class="bi bi-download me-1"></i>CSV
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  {# Bearbeitungsformular #}
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0">Abrechnungsbeträge (SGB XI)</h6>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Sachleistungen §36 SGB XI (€)</label>
+              <input type="number" name="sachleistungen_betrag" class="form-control font-monospace"
+                     step="0.01" min="0"
+                     value="{{ "%.2f"|format(abr.sachleistungen_betrag or 0) }}"
+                     {% if abr.status != 'ENTWURF' %}readonly{% endif %}>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Verhinderungspflege §39 (€)</label>
+              <input type="number" name="verhinderungspflege" class="form-control font-monospace"
+                     step="0.01" min="0"
+                     value="{{ "%.2f"|format(abr.verhinderungspflege or 0) }}"
+                     {% if abr.status != 'ENTWURF' %}readonly{% endif %}>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Pflegehilfsmittel §40 (€)</label>
+              <input type="number" name="pflegehilfsmittel" class="form-control font-monospace"
+                     step="0.01" min="0"
+                     value="{{ "%.2f"|format(abr.pflegehilfsmittel or 0) }}"
+                     {% if abr.status != 'ENTWURF' %}readonly{% endif %}>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">Entlastungsbetrag §45b (€)</label>
+              <input type="number" name="entlastungsbetrag" class="form-control font-monospace"
+                     step="0.01" min="0"
+                     value="{{ "%.2f"|format(abr.entlastungsbetrag or 0) }}"
+                     {% if abr.status != 'ENTWURF' %}readonly{% endif %}>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">IK-Nummer Krankenkasse</label>
+              <input type="text" name="ik_nummer_kasse" class="form-control"
+                     value="{{ abr.ik_nummer_kasse or '' }}" maxlength="20"
+                     placeholder="z.B. 101575519"
+                     {% if abr.status != 'ENTWURF' %}readonly{% endif %}>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold">IK-Nummer Pflegedienst</label>
+              <input type="text" class="form-control" readonly
+                     value="{{ abr.ik_nummer_dienst or '—' }}">
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label small fw-semibold">Notizen</label>
+            <textarea name="notizen" class="form-control" rows="3"
+                      {% if abr.status != 'ENTWURF' %}readonly{% endif %}>{{ abr.notizen or '' }}</textarea>
+          </div>
+
+          {# Gesamtbetrag #}
+          <div class="alert alert-light border d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">Gesamtbetrag</span>
+            <span class="fs-5 fw-bold font-monospace text-primary">
+              {{ "%.2f"|format(abr.gesamtbetrag or 0) }} €
+            </span>
+          </div>
+
+          {% if abr.status == 'ENTWURF' %}
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>Speichern
+          </button>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# Patienteninfo + Leistungsübersicht #}
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Patienteninformationen</h6></div>
+      <div class="card-body small">
+        <table class="table table-sm mb-0">
+          <tr><th class="text-muted fw-normal w-50">Pflegegrad</th>
+              <td>{{ abr.pflegegrad or '—' }}</td></tr>
+          <tr><th class="text-muted fw-normal">Krankenkasse</th>
+              <td>{{ abr.krankenkasse or '—' }}</td></tr>
+          <tr><th class="text-muted fw-normal">Einsätze</th>
+              <td>{{ abr.anzahl_einsaetze or 0 }}</td></tr>
+          {% if abr.eingereicht_am %}
+          <tr><th class="text-muted fw-normal">Eingereicht am</th>
+              <td>{{ abr.eingereicht_am.strftime('%d.%m.%Y') }}</td></tr>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+
+    {% if lns %}
+    <div class="card">
+      <div class="card-header d-flex justify-content-between">
+        <h6 class="mb-0">Leistungsnachweise ({{ lns|length }})</h6>
+        <span class="text-muted small">{{ abr.abrechnungsmonat }}</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="list-group list-group-flush" style="max-height:380px;overflow-y:auto">
+          {% for ln in lns %}
+          <div class="list-group-item list-group-item-action py-2 px-3">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="small fw-semibold">{{ ln.leistung.name if ln.leistung else '—' }}</div>
+                <div class="text-muted" style="font-size:.8rem">
+                  {{ ln.durchgefuehrt_am.strftime('%d.%m.') }}
+                  {{ ln.durchgefuehrt_um.strftime('%H:%M') }}
+                  — {{ ln.employee.full_name }}
+                </div>
+              </div>
+              <span class="font-monospace small text-end">
+                {{ "%.2f"|format(ln.leistung.preis or 0) if ln.leistung else '—' }} €
+              </span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning small">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      Keine Leistungsnachweise für {{ abr.abrechnungsmonat }} gefunden.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

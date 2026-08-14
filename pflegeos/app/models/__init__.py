@@ -1577,6 +1577,56 @@ class Dienstschicht(db.Model):
 # QM — QUALITÄTSMANAGEMENT (MDK-Checklisten)
 # ============================================================
 
+# ============================================================
+# GKV-ABRECHNUNG (SGB XI §105)
+# ============================================================
+
+class GkvAbrechnung(db.Model):
+    """Monatliche GKV-Abrechnungsposition je Patient."""
+    __tablename__ = 'gkv_abrechnungen'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    abrechnungsmonat = db.Column(db.String(7), nullable=False)  # YYYY-MM
+    krankenkasse     = db.Column(db.String(255))
+    ik_nummer_kasse  = db.Column(db.String(20))   # IK-Nummer der Krankenkasse
+    ik_nummer_dienst = db.Column(db.String(20))   # IK-Nummer des Pflegedienstes
+
+    pflegegrad = db.Column(db.String(1))
+
+    # Leistungsarten (SGB XI)
+    sachleistungen_betrag  = db.Column(db.Numeric(10, 2), default=0)
+    verhinderungspflege    = db.Column(db.Numeric(10, 2), default=0)
+    pflegehilfsmittel      = db.Column(db.Numeric(10, 2), default=0)
+    entlastungsbetrag      = db.Column(db.Numeric(10, 2), default=0)
+    gesamtbetrag           = db.Column(db.Numeric(10, 2), default=0)
+
+    anzahl_einsaetze = db.Column(db.Integer, default=0)
+    anzahl_stunden   = db.Column(db.Numeric(6, 2), default=0)
+
+    # ENTWURF | EINGEREICHT | GENEHMIGT | ABGELEHNT | TEILGENEHMIGT
+    status        = db.Column(db.String(20), default='ENTWURF')
+    eingereicht_am = db.Column(db.DateTime)
+    notizen       = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    company = db.relationship('Company',  backref='gkv_abrechnungen')
+    patient = db.relationship('Patient',  backref='gkv_abrechnungen')
+    ersteller = db.relationship('Employee', backref='gkv_abrechnungen')
+
+    __table_args__ = (
+        db.Index('ix_gkv_abrechnungen_company_id', 'company_id'),
+        db.Index('ix_gkv_abrechnungen_monat',      'abrechnungsmonat'),
+        db.UniqueConstraint('company_id', 'patient_id', 'abrechnungsmonat',
+                            name='uq_gkv_patient_monat'),
+    )
+
+
 class QmPruefung(db.Model):
     """MDK-Prüfung oder interne QM-Prüfung."""
     __tablename__ = 'qm_pruefungen'

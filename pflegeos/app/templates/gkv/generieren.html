@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}GKV-Abrechnung generieren{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('gkv.index') }}" class="text-decoration-none text-muted">
+    <i class="bi bi-arrow-left me-1"></i>Zurück zur Übersicht
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-magic me-2"></i>Abrechnung automatisch generieren</h5>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Das System erstellt für jeden aktiven Patienten eine GKV-Abrechnung basierend auf den
+          erfassten Leistungsnachweisen des gewählten Monats. Bereits vorhandene Abrechnungen
+          werden übersprungen.
+        </p>
+
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Abrechnungsmonat <span class="text-danger">*</span></label>
+            <input type="month" name="monat" class="form-control"
+                   value="{{ today_monat }}" required>
+            <div class="form-text">Format: JJJJ-MM (z.B. 2024-01)</div>
+          </div>
+
+          {% if company %}
+          <div class="alert alert-info small">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>IK-Nummer des Pflegedienstes:</strong>
+            {{ company.ik_nummer or '<em>nicht hinterlegt</em>' }}
+            {% if not company.ik_nummer %}
+            — bitte in den <a href="{{ url_for('company.settings') }}">Einstellungen</a> nachtragen.
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-magic me-1"></i>Generieren
+            </button>
+            <a href="{{ url_for('gkv.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

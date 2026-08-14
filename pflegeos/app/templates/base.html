@@ -6,6 +6,13 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PflegeOS">
+  <meta name="theme-color" content="#1a5f7a">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.svg">
   <title>{% block title %}PflegeOS{% endblock %} — PflegeOS</title>
 
   <!-- Bootstrap 5.3 -->
@@ -172,6 +179,12 @@
           <a href="{{ url_for('qm.index') }}"
              class="nav-link {% if request.endpoint and 'qm.' in request.endpoint %}active{% endif %}">
             <i class="bi bi-clipboard2-check"></i> QM-Prüfungen
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('gkv.index') }}"
+             class="nav-link {% if request.endpoint and 'gkv.' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-receipt"></i> GKV-Abrechnung
           </a>
         </li>
         <li class="nav-item">
@@ -413,6 +426,21 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {% block extra_js %}{% endblock %}
+
+<!-- PWA Service Worker -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js', {scope: '/'})
+      .then(function(reg) {
+        console.log('[PWA] Service Worker registriert:', reg.scope);
+      })
+      .catch(function(err) {
+        console.warn('[PWA] Service Worker Fehler:', err);
+      });
+  });
+}
+</script>
 
 <!-- Footer links -->
 <footer class="text-center py-2 border-top mt-auto" style="font-size:.78rem;color:#aaa;background:#fff;">

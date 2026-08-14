@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline — PflegeOS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d2b3e;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+    .card {
+      background: rgba(255,255,255,0.08);
+      border-radius: 1rem;
+      padding: 3rem 2rem;
+      max-width: 420px;
+      width: 100%;
+    }
+    .icon {
+      font-size: 4rem;
+      margin-bottom: 1.5rem;
+      display: block;
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+    p  { color: rgba(255,255,255,0.7); margin-bottom: 1.5rem; font-size: .95rem; }
+    button {
+      background: #1a5f7a;
+      color: #fff;
+      border: none;
+      border-radius: .5rem;
+      padding: .75rem 2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+    button:hover { background: #2179a0; }
+    .hint {
+      margin-top: 2rem;
+      font-size: .8rem;
+      color: rgba(255,255,255,0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="icon">📴</span>
+    <h1>Keine Internetverbindung</h1>
+    <p>
+      PflegeOS benötigt eine aktive Verbindung. Bitte überprüfen Sie Ihr WLAN
+      oder mobile Daten und versuchen Sie es erneut.
+    </p>
+    <button onclick="location.reload()">Erneut versuchen</button>
+    <p class="hint">
+      Zuletzt gecachte Seiten sind möglicherweise noch verfügbar —
+      navigieren Sie zurück.
+    </p>
+  </div>
+</body>
+</html>
