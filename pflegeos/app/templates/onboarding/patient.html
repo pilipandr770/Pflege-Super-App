@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Einrichtung – Erster Patient{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <div class="text-center mb-4">
+      <h2 class="fw-bold">Ersten Patienten anlegen</h2>
+      <p class="text-muted">Erfassen Sie Ihren ersten Pflegebedürftigen.</p>
+    </div>
+
+    {% include 'onboarding/_progress.html' %}
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body p-4">
+        <h5 class="mb-3">Schritt 3: Ersten Patienten anlegen</h5>
+
+        {% if patient_count > 0 %}
+        <div class="alert alert-success">
+          <i class="bi bi-check-circle me-2"></i>
+          Sie haben bereits <strong>{{ patient_count }} Patient{{ 'en' if patient_count != 1 else '' }}</strong> erfasst.
+        </div>
+        {% else %}
+        <p class="text-muted">Sie haben noch keine Patienten.</p>
+        {% endif %}
+
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('patients.new') }}" class="btn btn-outline-primary">
+            <i class="bi bi-person-plus me-1"></i>Patient anlegen
+          </a>
+          <a href="{{ url_for('patients.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-people me-1"></i>Patientenliste
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="d-flex justify-content-between">
+        <a href="{{ url_for('onboarding.step', slug='mitarbeiter') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Zurück
+        </a>
+        <button type="submit" class="btn btn-success px-4">
+          <i class="bi bi-check-lg me-1"></i>Einrichtung abschließen
+        </button>
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}

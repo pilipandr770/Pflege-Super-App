@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Einrichtung – Firmendaten{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <div class="text-center mb-4">
+      <h2 class="fw-bold">Willkommen bei PflegeOS!</h2>
+      <p class="text-muted">Lassen Sie uns Ihren Pflegedienst einrichten. Das dauert nur wenige Minuten.</p>
+    </div>
+
+    {% include 'onboarding/_progress.html' %}
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h5 class="mb-4">Schritt 1: Firmendaten vervollständigen</h5>
+
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">IK-Nummer <span class="text-muted small">(Institutionskennzeichen)</span></label>
+              <input type="text" name="ik_nummer" class="form-control"
+                     value="{{ company.ik_nummer or '' }}" maxlength="15"
+                     placeholder="z.B. 271234567">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Telefon</label>
+              <input type="tel" name="telefon" class="form-control"
+                     value="{{ company.telefon or '' }}" placeholder="+49 89 ...">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Pflegedienstleitung (PDL)</label>
+              <input type="text" name="pdl_name" class="form-control"
+                     value="{{ company.pdl_name or '' }}" placeholder="Vor- und Nachname">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Geschäftsführung</label>
+              <input type="text" name="gf_name" class="form-control"
+                     value="{{ company.geschaeftsfuehrer_name or '' }}" placeholder="Vor- und Nachname">
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-4">
+            <a href="{{ url_for('onboarding.skip') }}" class="text-muted small">
+              Einrichtung überspringen
+            </a>
+            <button type="submit" class="btn btn-primary px-4">
+              Weiter <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

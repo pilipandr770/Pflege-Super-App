@@ -8,7 +8,7 @@ from app.extensions import db
 from app.models import (
     Company, Employee, Patient, Procedure, EmployeeSchedule, VisitReport,
     EmployeePatientAssignment, Leistungsnachweis, PatientPhoto, AuditLog,
-    SisAssessment, MedicationPlan, WoundDoc, WoundAssessment,
+    SisAssessment, MedicationPlan, WoundDoc, WoundAssessment, Device,
 )
 from app.utils.auth import admin_required, log_action
 from datetime import datetime, date, timedelta
@@ -1047,3 +1047,54 @@ def alerts():
                            alerts_list=alerts_list,
                            total_patients=len(patients),
                            today=today)
+
+
+# ── Device Registry ────────────────────────────────────────────────────────────
+
+@admin_bp.route('/geraete')
+@login_required
+@admin_required
+def devices():
+    geraete = Device.query.filter_by(
+        company_id=current_user.company_id
+    ).order_by(Device.last_seen_at.desc().nullslast()).all()
+
+    employees = {e.id: e for e in Employee.query.filter_by(
+        company_id=current_user.company_id, deleted_at=None
+    ).all()}
+
+    return render_template('admin/devices.html', geraete=geraete,
+                           employees=employees)
+
+
+@admin_bp.route('/geraete/<device_id>/zuweisen', methods=['POST'])
+@login_required
+@admin_required
+def device_assign(device_id):
+    dev = Device.query.filter_by(
+        id=device_id, company_id=current_user.company_id
+    ).first_or_404()
+    emp_id = request.form.get('employee_id') or None
+    dev.employee_id = emp_id
+    db.session.commit()
+    log_action('DEVICE_ASSIGNED', 'devices', device_id,
+               new_values={'employee_id': emp_id})
+    flash('Gerätezuweisung aktualisiert.', 'success')
+    return redirect(url_for('admin.devices'))
+
+
+@admin_bp.route('/geraete/<device_id>/deaktivieren', methods=['POST'])
+@login_required
+@admin_required
+def device_deactivate(device_id):
+    dev = Device.query.filter_by(
+        id=device_id, company_id=current_user.company_id
+    ).first_or_404()
+    dev.is_active = not dev.is_active
+    if not dev.is_active:
+        dev.deactivated_at = datetime.utcnow()
+    db.session.commit()
+    status = 'aktiviert' if dev.is_active else 'deaktiviert'
+    log_action(f'DEVICE_{status.upper()}', 'devices', device_id)
+    flash(f'Gerät wurde {status}.', 'success')
+    return redirect(url_for('admin.devices'))

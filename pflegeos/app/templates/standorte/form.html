@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Standort bearbeiten' if standort else 'Neuer Standort' }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('standorte.index') }}" class="text-decoration-none text-muted">
+    <i class="bi bi-arrow-left me-1"></i>Zurück zur Übersicht
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">
+          {{ 'Standort bearbeiten' if standort else 'Neuer Standort' }}
+        </h5>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-8">
+              <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" required
+                     value="{{ standort.name if standort else '' }}"
+                     placeholder="z.B. Nordring-Wohnbereich">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">Kürzel</label>
+              <input type="text" name="kuerzel" class="form-control font-monospace"
+                     maxlength="10"
+                     value="{{ standort.kuerzel if standort else '' }}"
+                     placeholder="z.B. NRD-1">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Beschreibung</label>
+            <textarea name="beschreibung" class="form-control" rows="2"
+                      placeholder="Optionale Beschreibung">{{ standort.beschreibung if standort else '' }}</textarea>
+          </div>
+
+          <hr>
+          <h6 class="text-muted mb-3">Adresse (wenn abweichend vom Firmensitz)</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-sm-8">
+              <label class="form-label">Straße</label>
+              <input type="text" name="strasse" class="form-control"
+                     value="{{ standort.strasse if standort else '' }}">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label">Hausnummer</label>
+              <input type="text" name="hausnummer" class="form-control"
+                     value="{{ standort.hausnummer if standort else '' }}">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label">PLZ</label>
+              <input type="text" name="plz" class="form-control"
+                     value="{{ standort.plz if standort else '' }}">
+            </div>
+            <div class="col-sm-8">
+              <label class="form-label">Ort</label>
+              <input type="text" name="ort" class="form-control"
+                     value="{{ standort.ort if standort else '' }}">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6">
+              <label class="form-label">Telefon</label>
+              <input type="tel" name="telefon" class="form-control"
+                     value="{{ standort.telefon if standort else '' }}">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Standortleitung</label>
+              <select name="leiter_id" class="form-select">
+                <option value="">— keine Zuweisung —</option>
+                {% for emp in employees %}
+                <option value="{{ emp.id }}"
+                        {{ 'selected' if standort and standort.leiter_id == emp.id }}>
+                  {{ emp.full_name }} ({{ emp.role }})
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-save me-1"></i>Speichern
+            </button>
+            <a href="{{ url_for('standorte.index') }}" class="btn btn-outline-secondary">
+              Abbrechen
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

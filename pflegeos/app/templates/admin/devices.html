@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Geräteverwaltung{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0"><i class="bi bi-phone me-2"></i>Geräteverwaltung</h2>
+  <span class="text-muted small">Registrierte Geräte: {{ geraete|length }}</span>
+</div>
+
+{% if geraete %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Gerät</th>
+          <th>MAC-Adresse</th>
+          <th>Betriebssystem</th>
+          <th>App-Version</th>
+          <th>Zugewiesen an</th>
+          <th>Zuletzt gesehen</th>
+          <th>Status</th>
+          <th>Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in geraete %}
+        <tr class="{{ '' if g.is_active else 'table-secondary text-muted' }}">
+          <td>
+            <div class="fw-semibold">{{ g.device_name or g.mac_address }}</div>
+            {% if g.device_model %}
+            <div class="text-muted small">{{ g.device_model }}</div>
+            {% endif %}
+          </td>
+          <td class="font-monospace small">{{ g.mac_address }}</td>
+          <td class="small">{{ g.os_version or '—' }}</td>
+          <td class="small">{{ g.app_version or '—' }}</td>
+          <td>
+            {% set emp = employees.get(g.employee_id) %}
+            {% if emp %}
+            <span class="badge bg-info text-dark">{{ emp.full_name }}</span>
+            {% else %}
+            <span class="text-muted small">nicht zugewiesen</span>
+            {% endif %}
+          </td>
+          <td class="small">
+            {% if g.last_seen_at %}
+            {{ g.last_seen_at.strftime('%d.%m.%Y %H:%M') }}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if g.is_active %}
+            <span class="badge bg-success">Aktiv</span>
+            {% else %}
+            <span class="badge bg-secondary">Deaktiviert</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1 flex-wrap">
+              {# Mitarbeiter zuweisen #}
+              <button class="btn btn-sm btn-outline-secondary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#assignModal{{ g.id }}">
+                <i class="bi bi-person-check"></i>
+              </button>
+              {# Aktivieren/Deaktivieren #}
+              <form method="post"
+                    action="{{ url_for('admin.device_deactivate', device_id=g.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm {{ 'btn-outline-danger' if g.is_active else 'btn-outline-success' }}"
+                        title="{{ 'Deaktivieren' if g.is_active else 'Aktivieren' }}"
+                        onclick="return confirm('Sicher?')">
+                  <i class="bi bi-{{ 'toggle-on' if g.is_active else 'toggle-off' }}"></i>
+                </button>
+              </form>
+            </div>
+
+            {# Assign Modal #}
+            <div class="modal fade" id="assignModal{{ g.id }}" tabindex="-1">
+              <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h6 class="modal-title">Mitarbeiter zuweisen</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <form method="post"
+                        action="{{ url_for('admin.device_assign', device_id=g.id) }}">
+                    <div class="modal-body">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <select name="employee_id" class="form-select">
+                        <option value="">— kein Mitarbeiter —</option>
+                        {% for eid, emp in employees.items() %}
+                        <option value="{{ eid }}"
+                                {{ 'selected' if g.employee_id == eid }}>
+                          {{ emp.full_name }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="submit" class="btn btn-primary btn-sm">Speichern</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-phone fs-1 d-block mb-3 opacity-25"></i>
+  <p>Noch keine Geräte registriert.</p>
+  <p class="small">Geräte registrieren sich automatisch, wenn sich Mitarbeiter
+     über die App anmelden.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Standorte{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Standorte</h2>
+  <a href="{{ url_for('standorte.new') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Neuer Standort
+  </a>
+</div>
+
+{% if standorte %}
+<div class="row g-3">
+  {% for s in standorte %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 {{ '' if s.is_active else 'border-secondary opacity-75' }}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h5 class="mb-0">{{ s.name }}</h5>
+            {% if s.kuerzel %}
+            <span class="badge bg-light text-dark border font-monospace">{{ s.kuerzel }}</span>
+            {% endif %}
+          </div>
+          {% if not s.is_active %}
+          <span class="badge bg-secondary">Inaktiv</span>
+          {% endif %}
+        </div>
+
+        {% if s.beschreibung %}
+        <p class="text-muted small mb-2">{{ s.beschreibung }}</p>
+        {% endif %}
+
+        {% if s.strasse %}
+        <div class="small text-muted mb-1">
+          <i class="bi bi-map me-1"></i>
+          {{ s.strasse }} {{ s.hausnummer }}, {{ s.plz }} {{ s.ort }}
+        </div>
+        {% endif %}
+        {% if s.telefon %}
+        <div class="small text-muted mb-1">
+          <i class="bi bi-telephone me-1"></i>{{ s.telefon }}
+        </div>
+        {% endif %}
+        {% if s.leiter %}
+        <div class="small text-muted">
+          <i class="bi bi-person-badge me-1"></i>{{ s.leiter.full_name }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-footer bg-transparent d-flex gap-2">
+        <a href="{{ url_for('standorte.edit', standort_id=s.id) }}"
+           class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-pencil"></i> Bearbeiten
+        </a>
+        <form method="post"
+              action="{{ url_for('standorte.deactivate', standort_id=s.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm {{ 'btn-outline-danger' if s.is_active else 'btn-outline-success' }}"
+                  onclick="return confirm('Sicher?')">
+            {{ 'Deaktivieren' if s.is_active else 'Aktivieren' }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-geo-alt fs-1 d-block mb-3 opacity-25"></i>
+  <p>Noch keine Standorte angelegt.</p>
+  <a href="{{ url_for('standorte.new') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Ersten Standort anlegen
+  </a>
+</div>
+{% endif %}
+{% endblock %}

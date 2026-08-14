@@ -58,6 +58,9 @@ class Company(db.Model):
     datenschutz_name = db.Column(db.String(255))
     datenschutz_email = db.Column(db.String(255))
 
+    # Onboarding
+    onboarding_completed = db.Column(db.Boolean, default=False)
+
     # SaaS статус
     status = db.Column(db.String(20), default='PENDING')
     plan = db.Column(db.String(20), default='TRIAL')
@@ -1705,4 +1708,41 @@ class QmPruefungItem(db.Model):
 
     __table_args__ = (
         db.Index('ix_qm_items_pruefung_id', 'pruefung_id'),
+    )
+
+
+# ============================================================
+# STANDORT (Filiale / Wohnbereich)
+# ============================================================
+
+class Standort(db.Model):
+    """Filiale oder Wohnbereich eines Pflegedienstes."""
+    __tablename__ = 'standorte'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+
+    name       = db.Column(db.String(255), nullable=False)
+    kuerzel    = db.Column(db.String(10))   # z.B. "FRA-1", "MUC-N"
+    beschreibung = db.Column(db.Text)
+
+    # Adresse (kann von Firmensitz abweichen)
+    strasse    = db.Column(db.String(255))
+    hausnummer = db.Column(db.String(20))
+    plz        = db.Column(db.String(10))
+    ort        = db.Column(db.String(100))
+
+    telefon    = db.Column(db.String(50))
+    leiter_id  = db.Column(db.String(36), db.ForeignKey('employees.id'))
+
+    is_active  = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    leiter  = db.relationship('Employee', foreign_keys=[leiter_id], backref='geleitete_standorte')
+    company = db.relationship('Company', backref='standorte')
+
+    __table_args__ = (
+        db.Index('ix_standorte_company_id', 'company_id'),
+        db.UniqueConstraint('company_id', 'kuerzel', name='uq_standort_kuerzel'),
     )

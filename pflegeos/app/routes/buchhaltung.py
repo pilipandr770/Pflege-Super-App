@@ -9,7 +9,7 @@ from flask import (Blueprint, render_template, request, redirect,
                    url_for, flash, abort, Response)
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import KassenbuchEintrag, Leistungsnachweis, Patient, Employee
+from app.models import KassenbuchEintrag, Leistungsnachweis, Patient, Employee, VisitReport
 from app.utils.auth import admin_required, log_action
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -534,4 +534,159 @@ def export_datev():
         '﻿' + si.getvalue(),
         mimetype='text/csv; charset=utf-8',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# DATEV LOHNABRECHNUNG (LODAS-kompatibel)
+# ─────────────────────────────────────────────────────────────
+
+@buchhaltung_bp.route('/lohn')
+@login_required
+def lohn():
+    _buch_access()
+    from calendar import monthrange
+
+    monat = request.args.get('monat', date.today().strftime('%Y-%m'))
+    year, month = int(monat[:4]), int(monat[5:])
+    _, last_day = monthrange(year, month)
+    von = date(year, month, 1)
+    bis = date(year, month, last_day)
+
+    employees = Employee.query.filter_by(
+        company_id=current_user.company_id, deleted_at=None
+    ).order_by(Employee.nachname).all()
+
+    # Stunden aus VisitReports
+    vr_minutes = defaultdict(int)
+    visit_reports = VisitReport.query.filter(
+        VisitReport.company_id == current_user.company_id,
+        VisitReport.visit_date >= von,
+        VisitReport.visit_date <= bis,
+        VisitReport.is_active == True,
+    ).all()
+    for vr in visit_reports:
+        if vr.visit_start_time and vr.visit_end_time:
+            delta = vr.visit_end_time - vr.visit_start_time
+            vr_minutes[vr.employee_id] += int(delta.total_seconds() / 60)
+        elif vr.billable_minutes:
+            vr_minutes[vr.employee_id] += vr.billable_minutes
+
+    # Stunden aus Leistungsnachweisen
+    ln_minutes = defaultdict(int)
+    lns = Leistungsnachweis.query.filter(
+        Leistungsnachweis.company_id == current_user.company_id,
+        Leistungsnachweis.durchgefuehrt_am >= von,
+        Leistungsnachweis.durchgefuehrt_am <= bis,
+    ).all()
+    for ln in lns:
+        if ln.dauer_minuten:
+            ln_minutes[ln.employee_id] += ln.dauer_minuten
+
+    rows = []
+    for emp in employees:
+        vr_h = round(vr_minutes[emp.id] / 60, 2)
+        ln_h = round(ln_minutes[emp.id] / 60, 2)
+        total_h = max(vr_h, ln_h)   # nimm den höheren Wert (VR detaillierter)
+        rows.append({
+            'emp': emp,
+            'vr_stunden': vr_h,
+            'ln_stunden': ln_h,
+            'total_stunden': total_h,
+        })
+
+    # Monate für Dropdown
+    monate = db.session.query(
+        db.func.to_char(VisitReport.visit_date, 'YYYY-MM')
+    ).filter_by(company_id=current_user.company_id).distinct().order_by(
+        db.func.to_char(VisitReport.visit_date, 'YYYY-MM').desc()
+    ).limit(24).all()
+    monate = [m[0] for m in monate if m[0]]
+    if monat not in monate:
+        monate = [monat] + monate
+
+    return render_template('buchhaltung/lohn.html',
+                           rows=rows, monat=monat, monate=monate,
+                           von=von, bis=bis)
+
+
+@buchhaltung_bp.route('/lohn/export')
+@login_required
+def lohn_export():
+    _buch_access()
+    from calendar import monthrange
+
+    monat = request.args.get('monat', date.today().strftime('%Y-%m'))
+    year, month = int(monat[:4]), int(monat[5:])
+    _, last_day = monthrange(year, month)
+    von = date(year, month, 1)
+    bis = date(year, month, last_day)
+
+    employees = Employee.query.filter_by(
+        company_id=current_user.company_id, deleted_at=None
+    ).order_by(Employee.nachname).all()
+
+    vr_minutes = defaultdict(int)
+    for vr in VisitReport.query.filter(
+        VisitReport.company_id == current_user.company_id,
+        VisitReport.visit_date >= von,
+        VisitReport.visit_date <= bis,
+        VisitReport.is_active == True,
+    ).all():
+        if vr.visit_start_time and vr.visit_end_time:
+            delta = vr.visit_end_time - vr.visit_start_time
+            vr_minutes[vr.employee_id] += int(delta.total_seconds() / 60)
+        elif vr.billable_minutes:
+            vr_minutes[vr.employee_id] += vr.billable_minutes
+
+    ln_minutes = defaultdict(int)
+    for ln in Leistungsnachweis.query.filter(
+        Leistungsnachweis.company_id == current_user.company_id,
+        Leistungsnachweis.durchgefuehrt_am >= von,
+        Leistungsnachweis.durchgefuehrt_am <= bis,
+    ).all():
+        if ln.dauer_minuten:
+            ln_minutes[ln.employee_id] += ln.dauer_minuten
+
+    si = io.StringIO()
+    si.write('﻿')   # UTF-8 BOM
+    cw = csv.writer(si, delimiter=';')
+
+    # DATEV LODAS-ähnliche Kopfzeile
+    cw.writerow([
+        f'DATEV LODAS Lohnabrechnung {monat}',
+        '', '', '', '', '', '', '',
+    ])
+    cw.writerow([
+        'Personalnummer', 'Vorname', 'Nachname', 'Qualifikation',
+        'Einsatzart',
+        'Stunden (Einsätze)', 'Stunden (Leistungen)', 'Gesamtstunden',
+        'Lohnart',
+    ])
+
+    for emp in employees:
+        vr_h = round(vr_minutes[emp.id] / 60, 2)
+        ln_h = round(ln_minutes[emp.id] / 60, 2)
+        total_h = max(vr_h, ln_h)
+        if total_h == 0:
+            continue
+        cw.writerow([
+            emp.personalnummer or '',
+            emp.vorname,
+            emp.nachname,
+            emp.qualification or '',
+            emp.role or '',
+            str(vr_h).replace('.', ','),
+            str(ln_h).replace('.', ','),
+            str(total_h).replace('.', ','),
+            '1000',   # DATEV Lohnart 1000 = Reguläre Arbeitsstunden
+        ])
+
+    log_action('DATEV_LOHN_EXPORT', 'employees',
+               new_values={'monat': monat})
+    filename = f'DATEV_Lohn_{monat}.csv'
+    return Response(
+        si.getvalue(),
+        mimetype='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
     )

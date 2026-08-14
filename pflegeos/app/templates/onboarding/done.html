@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Einrichtung abgeschlossen{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6 text-center py-5">
+    <div class="display-1 mb-3">🎉</div>
+    <h2 class="fw-bold mb-2">Einrichtung abgeschlossen!</h2>
+    <p class="text-muted mb-4">
+      <strong>{{ company.name }}</strong> ist jetzt einsatzbereit.
+      Hier sind Ihre nächsten Schritte:
+    </p>
+
+    <div class="list-group text-start mb-4">
+      <a href="{{ url_for('patients.index') }}" class="list-group-item list-group-item-action">
+        <i class="bi bi-people me-2 text-primary"></i>
+        Patienten verwalten
+      </a>
+      <a href="{{ url_for('company.employees') }}" class="list-group-item list-group-item-action">
+        <i class="bi bi-person-badge me-2 text-primary"></i>
+        Mitarbeiter einrichten
+      </a>
+      <a href="{{ url_for('admin.schedule') }}" class="list-group-item list-group-item-action">
+        <i class="bi bi-calendar3 me-2 text-primary"></i>
+        Dienstplan erstellen (KI)
+      </a>
+      <a href="{{ url_for('gkv.index') }}" class="list-group-item list-group-item-action">
+        <i class="bi bi-receipt me-2 text-primary"></i>
+        GKV-Abrechnung
+      </a>
+    </div>
+
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary btn-lg px-5">
+      Zum Dashboard <i class="bi bi-arrow-right ms-2"></i>
+    </a>
+  </div>
+</div>
+{% endblock %}

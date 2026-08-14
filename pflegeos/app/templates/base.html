@@ -188,6 +188,24 @@
           </a>
         </li>
         <li class="nav-item">
+          <a href="{{ url_for('buchhaltung.lohn') }}"
+             class="nav-link {% if request.endpoint == 'buchhaltung.lohn' or request.endpoint == 'buchhaltung.lohn_export' %}active{% endif %}">
+            <i class="bi bi-people"></i> Lohnabrechnung
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('standorte.index') }}"
+             class="nav-link {% if request.endpoint and 'standorte.' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-geo-alt"></i> Standorte
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('admin.devices') }}"
+             class="nav-link {% if request.endpoint == 'admin.devices' %}active{% endif %}">
+            <i class="bi bi-phone"></i> Geräte
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('admin.auditlog') }}"
              class="nav-link {% if request.endpoint == 'admin.auditlog' %}active{% endif %}">
             <i class="bi bi-journal-text"></i> Audit-Log

@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}DATEV Lohnabrechnung{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0"><i class="bi bi-people me-2"></i>Lohnabrechnung</h2>
+  <a href="{{ url_for('buchhaltung.lohn_export', monat=monat) }}"
+     class="btn btn-outline-secondary">
+    <i class="bi bi-download me-1"></i>DATEV LODAS Export
+  </a>
+</div>
+
+{# Monat-Filter #}
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <form class="d-flex align-items-center gap-3" method="get">
+      <label class="form-label mb-0 fw-semibold">Abrechnungsmonat:</label>
+      <select name="monat" class="form-select w-auto" onchange="this.form.submit()">
+        {% for m in monate %}
+        <option value="{{ m }}" {{ 'selected' if m == monat }}>{{ m }}</option>
+        {% endfor %}
+      </select>
+      <span class="text-muted small">{{ von.strftime('%d.%m.') }} – {{ bis.strftime('%d.%m.%Y') }}</span>
+    </form>
+  </div>
+</div>
+
+{# Tabelle #}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Personalnummer</th>
+          <th>Mitarbeiter</th>
+          <th>Qualifikation</th>
+          <th>Rolle</th>
+          <th class="text-end">Std. Einsätze</th>
+          <th class="text-end">Std. Leistungen</th>
+          <th class="text-end fw-semibold">Gesamtstunden</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set total_h = namespace(val=0) %}
+        {% for r in rows %}
+        {% if r.total_stunden > 0 %}
+        {% set total_h.val = total_h.val + r.total_stunden %}
+        <tr>
+          <td class="font-monospace text-muted small">
+            {{ r.emp.personalnummer or '—' }}
+          </td>
+          <td class="fw-semibold">{{ r.emp.full_name }}</td>
+          <td class="small text-muted">{{ r.emp.qualification or '—' }}</td>
+          <td>
+            <span class="badge bg-light text-dark border">{{ r.emp.role or '—' }}</span>
+          </td>
+          <td class="text-end font-monospace">{{ "%.2f"|format(r.vr_stunden) }}</td>
+          <td class="text-end font-monospace">{{ "%.2f"|format(r.ln_stunden) }}</td>
+          <td class="text-end font-monospace fw-bold text-primary">
+            {{ "%.2f"|format(r.total_stunden) }}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="6" class="text-end fw-semibold">Gesamtstunden {{ monat }}:</td>
+          <td class="text-end font-monospace fw-bold fs-5 text-primary">
+            {{ "%.2f"|format(total_h.val) }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<div class="mt-3 text-muted small">
+  <i class="bi bi-info-circle me-1"></i>
+  <strong>Hinweis:</strong> „Std. Einsätze" wird aus Besuchsberichten (An-/Abmeldzeit) berechnet,
+  „Std. Leistungen" aus Leistungsnachweisen (Dauer in Minuten). Als Gesamtstunden wird der
+  jeweils höhere Wert verwendet.
+</div>
+{% endblock %}
