@@ -20,6 +20,7 @@ from app.models import (
     Fahrzeug, Kilometerbuch, Schadensmeldung, Wartungseintrag,
     MedicationPlan, Medication,
     SisAssessment, WoundDoc,
+    Dienstschicht,
 )
 
 
@@ -167,6 +168,23 @@ def make_leistung(company, **kwargs):
     _db.session.add(l)
     _db.session.commit()
     return l
+
+
+def make_schicht(company, employee, datum=None, schicht_typ='FRUEH', **kwargs):
+    from datetime import time as dtime
+    defaults = dict(
+        company_id=company.id,
+        employee_id=employee.id,
+        datum=datum or date.today(),
+        schicht_typ=schicht_typ,
+        beginn=dtime(6, 0) if schicht_typ == 'FRUEH' else None,
+        ende=dtime(14, 0) if schicht_typ == 'FRUEH' else None,
+    )
+    defaults.update(kwargs)
+    s = Dienstschicht(**defaults)
+    _db.session.add(s)
+    _db.session.commit()
+    return s
 
 
 def make_fahrzeug(company, **kwargs):

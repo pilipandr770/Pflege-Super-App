@@ -3,7 +3,7 @@
 # Voraussetzung: Docker Desktop installiert und gestartet
 # ============================================================
 
-.PHONY: help up down build logs shell db-shell migrate seed superadmin reset prod-build
+.PHONY: help up down build logs shell db-shell migrate seed superadmin reset prod-build test test-v
 
 # Standard: Hilfe anzeigen
 help:
@@ -20,6 +20,8 @@ help:
 	@echo "  make seed        — Testdaten einspielen"
 	@echo "  make superadmin  — Superadmin-Account anlegen"
 	@echo "  make reset       — ALLE Daten löschen + neu starten"
+	@echo "  make test        — pytest (kurze Ausgabe)"
+	@echo "  make test-v      — pytest (verbose, mit Traceback)"
 	@echo ""
 
 # Erste Einrichtung + Start
@@ -81,6 +83,14 @@ reset:
 	@sleep 3
 	docker compose down -v
 	docker compose up
+
+# Tests im App-Container ausführen
+test:
+	docker compose exec app python -m pytest tests/ -q
+
+# Tests mit detaillierter Ausgabe
+test-v:
+	docker compose exec app python -m pytest tests/ -v --tb=short
 
 # Produktions-Build testen (kein Hot-Reload, Gunicorn)
 prod-build:
