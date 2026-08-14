@@ -1481,3 +1481,71 @@ class KassenbuchEintrag(db.Model):
 
     def __repr__(self):
         return f"<KassenbuchEintrag {self.datum} {self.art} {self.betrag}>"
+
+
+# ============================================================
+# SCHICHTPLANUNG (Dienstplan)
+# ============================================================
+class Dienstschicht(db.Model):
+    """Ein Schichteintrag für einen Mitarbeiter an einem Tag."""
+    __tablename__ = 'dienstschichten'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    datum      = db.Column(db.Date, nullable=False)
+    # FRUEH | SPAET | NACHT | FREI | URLAUB | KRANK | FORTBILDUNG | SONSTIGES
+    schicht_typ = db.Column(db.String(20), nullable=False, default='FRUEH')
+
+    beginn     = db.Column(db.Time)
+    ende       = db.Column(db.Time)
+    bereich    = db.Column(db.String(100))
+    notiz      = db.Column(db.String(500))
+
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    employee   = db.relationship('Employee', foreign_keys=[employee_id], backref='schichten')
+    ersteller  = db.relationship('Employee', foreign_keys=[created_by])
+    company    = db.relationship('Company',  backref='schichten')
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'employee_id', 'datum',
+                            name='uq_dienstschicht_employee_datum'),
+        db.Index('ix_dienstschichten_company_id', 'company_id'),
+        db.Index('ix_dienstschichten_employee_id', 'employee_id'),
+        db.Index('ix_dienstschichten_datum', 'datum'),
+    )
+
+    # (label, Bootstrap-Farbe, Kürzel, default_beginn, default_ende)
+    TYPEN = {
+        'FRUEH':       ('Frühschicht',  'success',   'F',  '06:00', '14:00'),
+        'SPAET':       ('Spätschicht',  'primary',   'S',  '14:00', '22:00'),
+        'NACHT':       ('Nachtschicht', 'dark',      'N',  '22:00', '06:00'),
+        'FREI':        ('Frei',         'secondary', '—',  None,    None),
+        'URLAUB':      ('Urlaub',       'info',      'U',  None,    None),
+        'KRANK':       ('Krank',        'danger',    'K',  None,    None),
+        'FORTBILDUNG': ('Fortbildung',  'warning',   'FB', None,    None),
+        'SONSTIGES':   ('Sonstiges',    'light',     '?',  None,    None),
+    }
+
+    @property
+    def typ_label(self):
+        return self.TYPEN.get(self.schicht_typ, (self.schicht_typ,))[0]
+
+    @property
+    def typ_farbe(self):
+        return self.TYPEN.get(self.schicht_typ, ('', 'secondary'))[1]
+
+    @property
+    def typ_kuerzel(self):
+        return self.TYPEN.get(self.schicht_typ, ('', '', '?'))[2]
+
+    @property
+    def ist_arbeitstag(self):
+        return self.schicht_typ in ('FRUEH', 'SPAET', 'NACHT', 'SONSTIGES')
+
+    def __repr__(self):
+        return f"<Dienstschicht {self.employee_id} {self.datum} {self.schicht_typ}>"

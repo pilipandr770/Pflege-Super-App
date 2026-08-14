@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Dienstplan{% endblock %}
+
+{% block extra_head %}
+<style>
+  .plan-table { min-width: 900px; }
+  .plan-table th, .plan-table td { padding: 4px 6px; text-align: center; white-space: nowrap; font-size: .8rem; }
+  .plan-table th.emp-col { text-align: left; min-width: 140px; max-width: 160px; }
+  .plan-table td.emp-col { text-align: left; font-size: .82rem; }
+  .tag-header { font-size: .72rem; line-height: 1.2; }
+  .tag-header .wt { color: #6c757d; }
+  .tag-header .heute-mark { font-weight: 700; color: var(--pflege-blue); }
+  .schicht-badge {
+    display: inline-block; width: 28px; height: 28px; line-height: 28px;
+    border-radius: 6px; font-size: .72rem; font-weight: 700; cursor: pointer;
+    border: none; transition: opacity .15s;
+  }
+  .schicht-badge:hover { opacity: .75; }
+  .schicht-leer {
+    display: inline-block; width: 28px; height: 28px; line-height: 28px;
+    border-radius: 6px; font-size: .65rem; color: #ced4da; cursor: pointer;
+    border: 1px dashed #ced4da;
+  }
+  .schicht-leer:hover { border-color: #6c757d; color: #6c757d; }
+  td.so, th.so { background: #f8f9fa; }
+  td.heute-col { background: #e8f4fd !important; }
+  .stat-mini { font-size: .65rem; line-height: 1; }
+  .stat-frueh { color: #198754; }
+  .stat-spaet { color: #0d6efd; }
+  .stat-nacht { color: #212529; }
+  .stat-offen { color: #dc3545; }
+  .emp-rolle { font-size: .65rem; color: #6c757d; }
+  .legend-badge { display: inline-block; width: 22px; height: 22px; line-height: 22px;
+    border-radius: 4px; font-size: .68rem; font-weight: 700; text-align: center; }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">📅 Dienstplan</li>
+{% endblock %}
+
+{% block content %}
+
+{# Monat-Titel und Navigation #}
+{% set monat_namen = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'] %}
+{% set wt_kurz = ['Mo','Di','Mi','Do','Fr','Sa','So'] %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">📅 Dienstplan</h4>
+    <small class="text-muted">{{ monat_namen[month-1] }} {{ year }}</small>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <a href="{{ url_for('schichtplan.index', year=prev[0], month=prev[1]) }}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <span class="fw-semibold px-2">{{ monat_namen[month-1] }} {{ year }}</span>
+    <a href="{{ url_for('schichtplan.index', year=nxt[0], month=nxt[1]) }}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="{{ url_for('schichtplan.index', year=heute.year, month=heute.month) }}"
+       class="btn btn-outline-primary btn-sm ms-2">Heute</a>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show py-2 mb-3">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+{# Legende #}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  {% for typ, (label, farbe, kuerzel, b, e) in typen.items() %}
+  <span>
+    <span class="legend-badge bg-{{ farbe }} {% if farbe == 'light' %}border text-dark{% else %}text-white{% endif %}">{{ kuerzel }}</span>
+    <small class="text-muted">{{ label }}</small>
+  </span>
+  {% endfor %}
+</div>
+
+{# Dienstplan-Tabelle #}
+<div class="card">
+  <div class="card-body p-0" style="overflow-x: auto;">
+    <table class="table table-bordered table-sm plan-table mb-0">
+      <thead>
+        <tr>
+          <th class="emp-col" style="background:#f8f9fa;">Mitarbeiter</th>
+          {% for tag in tage %}
+          {% set wt = tag.weekday() %}
+          <th class="{% if wt >= 6 %}so{% endif %} {% if tag == heute %}heute-col{% endif %}">
+            <div class="tag-header">
+              <div class="wt">{{ wt_kurz[wt] }}</div>
+              <div class="{% if tag == heute %}heute-mark{% endif %}">{{ tag.day }}</div>
+            </div>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in mitarbeiter %}
+        <tr>
+          <td class="emp-col">
+            <div class="fw-semibold" style="font-size:.82rem;">{{ emp.nachname }}, {{ emp.vorname[:1] }}.</div>
+            <div class="emp-rolle">{{ emp.role_label }}</div>
+          </td>
+          {% for tag in tage %}
+          {% set wt = tag.weekday() %}
+          {% set schicht = schichten_map.get(emp.id, {}).get(tag) %}
+          <td class="{% if wt >= 6 %}so{% endif %} {% if tag == heute %}heute-col{% endif %}">
+            {% if schicht %}
+            <button class="schicht-badge bg-{{ schicht.typ_farbe }}
+                           {% if schicht.typ_farbe == 'light' %}border text-dark{% else %}text-white{% endif %}"
+                    onclick="openModal('{{ emp.id }}','{{ emp.full_name }}','{{ tag.isoformat() }}','{{ tag.day }}.{{ '%02d'|format(month) }}')"
+                    title="{{ schicht.typ_label }}{% if schicht.beginn %} {{ schicht.beginn.strftime('%H:%M') }}–{{ schicht.ende.strftime('%H:%M') if schicht.ende else '' }}{% endif %}{% if schicht.notiz %} · {{ schicht.notiz }}{% endif %}">
+              {{ schicht.typ_kuerzel }}
+            </button>
+            {% else %}
+            <button class="schicht-leer"
+                    onclick="openModal('{{ emp.id }}','{{ emp.full_name }}','{{ tag.isoformat() }}','{{ tag.day }}.{{ '%02d'|format(month) }}')"
+                    title="Schicht eintragen">+</button>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+
+        {# Tagessummen-Zeile #}
+        <tr class="table-light">
+          <td class="emp-col fw-semibold" style="font-size:.75rem;">∑ Besetzung</td>
+          {% for tag in tage %}
+          {% set wt = tag.weekday() %}
+          {% set st = tages_stats[tag] %}
+          <td class="{% if wt >= 6 %}so{% endif %} {% if tag == heute %}heute-col{% endif %}">
+            <div class="stat-mini">
+              <div class="stat-frueh">F:{{ st.FRUEH }}</div>
+              <div class="stat-spaet">S:{{ st.SPAET }}</div>
+              <div class="stat-nacht">N:{{ st.NACHT }}</div>
+              {% if st.offen > 0 %}
+              <div class="stat-offen">?:{{ st.offen }}</div>
+              {% endif %}
+            </div>
+          </td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# Modal: Schicht eintragen/bearbeiten #}
+<div class="modal fade" id="schichtModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title fw-bold mb-0" id="modalTitle">Schicht eintragen</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('schichtplan.setzen') }}" id="schichtForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="employee_id" id="modalEmpId">
+        <input type="hidden" name="datum" id="modalDatum">
+        <input type="hidden" name="year" value="{{ year }}">
+        <input type="hidden" name="month" value="{{ month }}">
+        <div class="modal-body py-2">
+          <p class="text-muted mb-2" id="modalSubtitle" style="font-size:.82rem;"></p>
+
+          <div class="mb-2">
+            <label class="form-label mb-1" style="font-size:.82rem;">Schichttyp</label>
+            <div class="d-flex flex-wrap gap-1" id="typButtons">
+              {% for typ, (label, farbe, kuerzel, b, e) in typen.items() %}
+              <button type="button"
+                      class="btn btn-sm btn-outline-{{ farbe }} typ-btn {% if farbe == 'dark' %}text-white{% endif %}"
+                      data-typ="{{ typ }}"
+                      data-beginn="{{ b or '' }}"
+                      data-ende="{{ e or '' }}"
+                      onclick="selectTyp(this)">
+                <span class="fw-bold">{{ kuerzel }}</span> {{ label }}
+              </button>
+              {% endfor %}
+            </div>
+            <input type="hidden" name="schicht_typ" id="selectedTyp" required>
+          </div>
+
+          <div class="row g-2" id="zeitRow">
+            <div class="col-6">
+              <label class="form-label mb-1" style="font-size:.82rem;">Beginn</label>
+              <input type="time" name="beginn" id="modalBeginn" class="form-control form-control-sm">
+            </div>
+            <div class="col-6">
+              <label class="form-label mb-1" style="font-size:.82rem;">Ende</label>
+              <input type="time" name="ende" id="modalEnde" class="form-control form-control-sm">
+            </div>
+          </div>
+
+          <div class="mt-2">
+            <label class="form-label mb-1" style="font-size:.82rem;">Bereich / Station</label>
+            <input type="text" name="bereich" id="modalBereich" class="form-control form-control-sm"
+                   placeholder="z.B. Station 2">
+          </div>
+          <div class="mt-2">
+            <label class="form-label mb-1" style="font-size:.82rem;">Notiz</label>
+            <input type="text" name="notiz" id="modalNotiz" class="form-control form-control-sm"
+                   placeholder="Optional">
+          </div>
+        </div>
+        <div class="modal-footer py-2 d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-danger btn-sm" id="loeschenBtn"
+                  onclick="loeschenSchicht()" style="display:none!important;">
+            <i class="bi bi-trash"></i> Löschen
+          </button>
+          <div class="ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="speichernBtn" disabled>
+              <i class="bi bi-floppy"></i> Speichern
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# Löschen-Formular (versteckt) #}
+<form method="POST" id="loeschenForm" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="month" value="{{ month }}">
+</form>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentSchichtId = null;
+const modal = new bootstrap.Modal(document.getElementById('schichtModal'));
+
+function openModal(empId, empName, datum, datumLabel) {
+  document.getElementById('modalTitle').textContent = empName;
+  document.getElementById('modalSubtitle').textContent = datumLabel;
+  document.getElementById('modalEmpId').value = empId;
+  document.getElementById('modalDatum').value = datum;
+  document.getElementById('selectedTyp').value = '';
+  document.getElementById('modalBeginn').value = '';
+  document.getElementById('modalEnde').value = '';
+  document.getElementById('modalBereich').value = '';
+  document.getElementById('modalNotiz').value = '';
+  document.getElementById('speichernBtn').disabled = true;
+  document.getElementById('loeschenBtn').style.display = 'none';
+  currentSchichtId = null;
+
+  // Typ-Buttons zurücksetzen
+  document.querySelectorAll('.typ-btn').forEach(b => b.classList.remove('active'));
+
+  // Bestehende Schicht laden
+  fetch(`{{ url_for('schichtplan.api_schicht') }}?employee_id=${empId}&datum=${datum}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.schicht_typ) {
+        currentSchichtId = data.id || null;
+        document.getElementById('selectedTyp').value = data.schicht_typ;
+        document.getElementById('modalBeginn').value = data.beginn || '';
+        document.getElementById('modalEnde').value   = data.ende   || '';
+        document.getElementById('modalBereich').value = data.bereich || '';
+        document.getElementById('modalNotiz').value  = data.notiz  || '';
+        document.getElementById('speichernBtn').disabled = false;
+        if (currentSchichtId) {
+          document.getElementById('loeschenBtn').style.removeProperty('display');
+        }
+        const btn = document.querySelector(`.typ-btn[data-typ="${data.schicht_typ}"]`);
+        if (btn) btn.classList.add('active');
+      }
+    })
+    .catch(() => {});
+
+  modal.show();
+}
+
+function selectTyp(btn) {
+  document.querySelectorAll('.typ-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const typ = btn.dataset.typ;
+  document.getElementById('selectedTyp').value = typ;
+  document.getElementById('speichernBtn').disabled = false;
+  if (!document.getElementById('modalBeginn').value) {
+    document.getElementById('modalBeginn').value = btn.dataset.beginn || '';
+    document.getElementById('modalEnde').value   = btn.dataset.ende   || '';
+  }
+}
+
+function loeschenSchicht() {
+  if (!currentSchichtId) return;
+  if (!confirm('Schichteintrag wirklich löschen?')) return;
+  const form = document.getElementById('loeschenForm');
+  form.action = `/schichtplan/${currentSchichtId}/loeschen`;
+  form.submit();
+}
+</script>
+{% endblock %}

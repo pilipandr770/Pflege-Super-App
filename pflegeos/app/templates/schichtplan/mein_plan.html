@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Mein Dienstplan{% endblock %}
+
+{% block extra_head %}
+<style>
+  .tag-card { border-radius: 10px; padding: 10px 12px; border: 1px solid #dee2e6; margin-bottom: 6px; }
+  .tag-card.heute { border-color: var(--pflege-blue); background: #f0f7f8; }
+  .tag-card.vergangen { opacity: .6; }
+  .tag-card.frei-tag { background: #f8f9fa; }
+  .schicht-gross { display: inline-block; border-radius: 8px; padding: 4px 14px;
+    font-weight: 700; font-size: .9rem; }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{{ url_for('nurse.dashboard') }}">Mein Bereich</a>
+</li>
+<li class="breadcrumb-item active">Mein Dienstplan</li>
+{% endblock %}
+
+{% block content %}
+
+{% set monat_namen = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'] %}
+{% set wt_lang = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'] %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">📅 Mein Dienstplan</h4>
+    <small class="text-muted">{{ monat_namen[month-1] }} {{ year }}</small>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('schichtplan.mein_plan', year=prev[0], month=prev[1]) }}"
+       class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-left"></i></a>
+    <a href="{{ url_for('schichtplan.mein_plan', year=heute.year, month=heute.month) }}"
+       class="btn btn-outline-primary btn-sm">Heute</a>
+    <a href="{{ url_for('schichtplan.mein_plan', year=nxt[0], month=nxt[1]) }}"
+       class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-right"></i></a>
+  </div>
+</div>
+
+{# Monats-Statistik #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold text-success">{{ arbeitstage }}</div>
+        <small class="text-muted">Arbeitstage</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold text-secondary">{{ frei_tage }}</div>
+        <small class="text-muted">Frei</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold text-info">{{ urlaub_tage }}</div>
+        <small class="text-muted">Urlaub</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold text-danger">{{ krank_tage }}</div>
+        <small class="text-muted">Krank</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Tagesliste #}
+<div>
+  {% for tag in tage %}
+  {% set wt = tag.weekday() %}
+  {% set schicht = schichten.get(tag) %}
+  {% if schicht or wt < 6 or tag == heute %}
+  <div class="tag-card
+    {% if tag == heute %}heute
+    {% elif tag < heute %}vergangen
+    {% elif not schicht %}frei-tag
+    {% endif %}
+    ">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <span class="fw-semibold" style="font-size:.88rem;">
+          {{ wt_lang[wt] }}, {{ tag.day }}. {{ ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][month-1] }}
+          {% if tag == heute %}<span class="badge bg-primary ms-1" style="font-size:.65rem;">Heute</span>{% endif %}
+        </span>
+      </div>
+      <div>
+        {% if schicht %}
+        <span class="schicht-gross bg-{{ schicht.typ_farbe }}
+          {% if schicht.typ_farbe in ('light','secondary') %}text-dark border{% else %}text-white{% endif %}">
+          {{ schicht.typ_label }}
+        </span>
+        {% else %}
+        <span class="text-muted" style="font-size:.8rem;">—</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if schicht %}
+    <div class="mt-1" style="font-size:.8rem; color:#6c757d;">
+      {% if schicht.beginn %}
+      <i class="bi bi-clock"></i>
+      {{ schicht.beginn.strftime('%H:%M') }} – {{ schicht.ende.strftime('%H:%M') if schicht.ende else '?' }}
+      {% endif %}
+      {% if schicht.bereich %}
+      · <i class="bi bi-building"></i> {{ schicht.bereich }}
+      {% endif %}
+      {% if schicht.notiz %}
+      · <i class="bi bi-chat-text"></i> {{ schicht.notiz }}
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+{% endblock %}

@@ -127,9 +127,15 @@
           </a>
         </li>
         <li class="nav-item">
+          <a href="{{ url_for('schichtplan.index') }}"
+             class="nav-link {% if request.endpoint and 'schichtplan' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-calendar3"></i> Schichtplan
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('admin.schedules_list') }}"
              class="nav-link {% if 'admin' in request.endpoint and 'schedule' in request.endpoint %}active{% endif %}">
-            <i class="bi bi-calendar2-week-fill"></i> Dienstpläne (AI)
+            <i class="bi bi-calendar2-week-fill"></i> Einsatzplan (AI)
           </a>
         </li>
         <li class="nav-item">
@@ -208,9 +214,15 @@
         <hr class="text-white-50 my-1">
         <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Mein Bereich</small></li>
         <li class="nav-item">
+          <a href="{{ url_for('schichtplan.mein_plan') }}"
+             class="nav-link {% if request.endpoint and 'schichtplan' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-calendar3"></i> Mein Schichtplan
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('nurse.dashboard') }}"
              class="nav-link {% if 'nurse' in request.endpoint and request.endpoint != 'nurse.my_reports' %}active{% endif %}">
-            <i class="bi bi-calendar2-check-fill"></i> Mein Dienstplan
+            <i class="bi bi-calendar2-check-fill"></i> Meine Einsätze
           </a>
         </li>
         <li class="nav-item">
@@ -226,9 +238,15 @@
         <hr class="text-white-50 my-1">
         <li><small class="text-white-50 px-3 text-uppercase" style="font-size:0.7rem">Mein Bereich</small></li>
         <li class="nav-item">
+          <a href="{{ url_for('schichtplan.mein_plan') }}"
+             class="nav-link {% if request.endpoint and 'schichtplan' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-calendar3"></i> Mein Schichtplan
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('nurse.dashboard') }}"
              class="nav-link {% if 'nurse' in request.endpoint and request.endpoint != 'nurse.my_reports' %}active{% endif %}">
-            <i class="bi bi-calendar2-check-fill"></i> Mein Dienstplan
+            <i class="bi bi-calendar2-check-fill"></i> Meine Einsätze
           </a>
         </li>
         <li class="nav-item">
