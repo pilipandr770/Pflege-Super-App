@@ -1,6 +1,7 @@
 import json
 import os
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+import threading
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, jsonify, abort
 from flask_login import login_required, current_user
 from app.extensions import db
 from app.models import WoundDoc, WoundAssessment, Patient
@@ -101,7 +102,14 @@ def new_assessment(wound_id):
         db.session.add(assessment)
         db.session.commit()
         log_action('CREATE', 'wound_assessments', entity_id=assessment.id)
+
+        # KI-Analyse asynchron starten (nur wenn Fotos vorhanden)
+        if foto_paths and current_app.config.get('ANTHROPIC_API_KEY'):
+            _trigger_ai_analysis(assessment.id, current_app._get_current_object())
+
         flash('Wundbefund gespeichert.', 'success')
+        if foto_paths and current_app.config.get('ANTHROPIC_API_KEY'):
+            flash('KI-Analyse läuft im Hintergrund und wird in Kürze angezeigt.', 'info')
         return redirect(url_for('wounds.show_wound', wound_id=wound_id))
 
     return render_template('wounds/assessment_form.html', wound=wound, patient=p)
@@ -123,6 +131,56 @@ def show_wound(wound_id):
 
     return render_template('wounds/show.html', wound=wound, patient=wound.patient,
                            assessments=assessments)
+
+
+def _trigger_ai_analysis(assessment_id: str, app):
+    """Startet KI-Wundanalyse in einem Daemon-Thread (non-blocking)."""
+    from app.services.wound_analysis_service import run_analysis_and_save
+
+    def _run():
+        run_analysis_and_save(assessment_id, app=app)
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+
+@wounds_bp.route('/assessment/<assessment_id>/ai-analyse', methods=['POST'])
+@login_required
+def trigger_ai_analyse(assessment_id):
+    """Manueller Neustart der KI-Analyse (AJAX-Endpunkt)."""
+    a = WoundAssessment.query.join(WoundDoc).filter(
+        WoundAssessment.id == assessment_id,
+        WoundDoc.company_id == current_user.company_id,
+    ).first_or_404()
+
+    if not current_app.config.get('ANTHROPIC_API_KEY'):
+        return jsonify({'error': 'KI-Analyse nicht konfiguriert.'}), 503
+
+    # Vorherige Analyse löschen, damit sie neu läuft
+    a.foto_ai_analysis = None
+    db.session.commit()
+
+    _trigger_ai_analysis(a.id, current_app._get_current_object())
+    return jsonify({'status': 'started', 'assessment_id': assessment_id})
+
+
+@wounds_bp.route('/assessment/<assessment_id>/ai-result')
+@login_required
+def ai_result(assessment_id):
+    """Gibt aktuelles KI-Analyse-Ergebnis zurück (Polling-Endpunkt)."""
+    a = WoundAssessment.query.join(WoundDoc).filter(
+        WoundAssessment.id == assessment_id,
+        WoundDoc.company_id == current_user.company_id,
+    ).first_or_404()
+
+    if not a.foto_ai_analysis:
+        return jsonify({'status': 'pending'})
+
+    try:
+        data = json.loads(a.foto_ai_analysis)
+        return jsonify({'status': 'ready', 'data': data})
+    except Exception:
+        return jsonify({'status': 'error'})
 
 
 def _calculate_tendenz(wound_id, fd):

@@ -70,6 +70,89 @@
       </div>
       {% endif %}
     </div>
+
+    {# ── KI-Analyse ── #}
+    {% if a.foto_list %}
+    <hr class="my-2">
+    {% set ai_raw = a.foto_ai_analysis %}
+    {% if ai_raw %}
+      {% set ai = ai_raw | from_json %}
+      <div class="rounded p-2 border
+        {% if ai.dringlichkeit == 'dringend' %}border-danger bg-danger bg-opacity-10
+        {% elif ai.dringlichkeit == 'erhöht' %}border-warning bg-warning bg-opacity-10
+        {% else %}border-info bg-info bg-opacity-10{% endif %}">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-robot text-primary fs-5"></i>
+          <strong class="small">KI-Wundanalyse</strong>
+          <span class="badge
+            {% if ai.dringlichkeit == 'dringend' %}bg-danger
+            {% elif ai.dringlichkeit == 'erhöht' %}bg-warning text-dark
+            {% else %}bg-info text-dark{% endif %} ms-auto">
+            {{ ai.dringlichkeit | capitalize }}
+          </span>
+        </div>
+        <div class="row g-2 small">
+          <div class="col-sm-6">
+            <table class="table table-sm mb-0">
+              <tr><td class="text-muted" style="width:45%">Größe (KI)</td>
+                  <td>{{ ai.wundgroesse_schätzung or '—' }}</td></tr>
+              <tr><td class="text-muted">Stadium (KI)</td>
+                  <td>{{ ai.wundstadium_ki or '—' }}</td></tr>
+              <tr><td class="text-muted">Wundgrund (KI)</td>
+                  <td>{{ ai.wundgrund_ki or '—' }}</td></tr>
+              <tr><td class="text-muted">Exsudat (KI)</td>
+                  <td>{{ ai.exsudat_ki or '—' }}</td></tr>
+              <tr><td class="text-muted">Tendenz (KI)</td>
+                  <td>{{ ai.tendenz_ki or '—' }}</td></tr>
+            </table>
+          </div>
+          <div class="col-sm-6">
+            {% if ai.infektion_hinweise %}
+            <div class="alert alert-danger py-1 px-2 small mb-2">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <strong>Infektionshinweise:</strong> {{ ai.infektion_merkmale or 'Siehe Foto' }}
+            </div>
+            {% endif %}
+            {% if ai.arzt_informieren %}
+            <div class="alert alert-warning py-1 px-2 small mb-2">
+              <i class="bi bi-telephone-fill"></i>
+              <strong>Arzt informieren:</strong> {{ ai.arzt_grund or 'Empfohlen' }}
+            </div>
+            {% endif %}
+            {% if ai.empfehlungen %}
+            <div class="mb-1 fw-semibold text-muted" style="font-size:.75rem">Empfehlungen:</div>
+            <ul class="mb-0 ps-3" style="font-size:.8rem">
+              {% for e in ai.empfehlungen %}<li>{{ e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+          </div>
+        </div>
+        {% if ai.hinweis %}
+        <div class="mt-2 text-muted" style="font-size:.75rem">
+          <i class="bi bi-info-circle"></i> {{ ai.hinweis }}
+        </div>
+        {% endif %}
+        <div class="mt-2 d-flex justify-content-end">
+          <button class="btn btn-outline-secondary btn-sm py-0"
+                  style="font-size:.72rem"
+                  onclick="rerunAI('{{ a.id }}', this)">
+            <i class="bi bi-arrow-clockwise"></i> Neu analysieren
+          </button>
+        </div>
+      </div>
+    {% else %}
+      <div class="d-flex align-items-center gap-2 text-muted small"
+           id="ai-pending-{{ a.id }}">
+        <span class="spinner-border spinner-border-sm" role="status"></span>
+        KI-Analyse läuft…
+        <button class="btn btn-outline-primary btn-sm py-0 ms-auto"
+                style="font-size:.72rem"
+                onclick="rerunAI('{{ a.id }}', this)">
+          <i class="bi bi-robot"></i> Analyse starten
+        </button>
+      </div>
+    {% endif %}
+    {% endif %}
   </div>
 </div>
 {% else %}
@@ -78,4 +161,39 @@
   <a href="{{ url_for('wounds.new_assessment', wound_id=wound.id) }}" class="btn btn-danger">Ersten Befund erfassen</a>
 </div>
 {% endfor %}
+
+{% block extra_js %}
+<script>
+function rerunAI(assessmentId, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  fetch('/wounds/assessment/' + assessmentId + '/ai-analyse', {
+    method: 'POST',
+    headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') ?
+              document.querySelector('meta[name="csrf-token"]').content : ''}
+  })
+  .then(r => r.json())
+  .then(() => { setTimeout(() => pollAI(assessmentId), 4000); })
+  .catch(() => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Neu analysieren'; });
+}
+
+function pollAI(assessmentId) {
+  fetch('/wounds/assessment/' + assessmentId + '/ai-result')
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'ready') {
+      location.reload();
+    } else if (data.status === 'pending') {
+      setTimeout(() => pollAI(assessmentId), 5000);
+    }
+  });
+}
+
+// Automatisch pollen für ausstehende Analysen
+document.querySelectorAll('[id^="ai-pending-"]').forEach(function(el) {
+  var id = el.id.replace('ai-pending-', '');
+  setTimeout(function() { pollAI(id); }, 6000);
+});
+</script>
+{% endblock %}
 {% endblock %}

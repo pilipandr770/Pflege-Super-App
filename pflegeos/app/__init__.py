@@ -105,6 +105,16 @@ def create_app(config_name=None):
             return '—'
         return value.strftime(fmt)
 
+    @app.template_filter('from_json')
+    def from_json_filter(value):
+        import json
+        if not value:
+            return {}
+        try:
+            return json.loads(value)
+        except Exception:
+            return {}
+
     # Globale Context-Variablen für alle Templates
     from datetime import datetime as _dt
     @app.context_processor
