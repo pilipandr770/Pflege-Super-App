@@ -138,8 +138,19 @@
         {% if patient.portal_enabled and patient.portal_token %}
         <div class="mt-3 p-2 rounded border border-success bg-success bg-opacity-10">
           <div class="d-flex align-items-center justify-content-between mb-1">
-            <small class="fw-semibold text-success">🔗 Angehörigen-Portal aktiv</small>
+            <small class="fw-semibold text-success"><i class="bi bi-link-45deg"></i> Angehörigen-Portal aktiv</small>
+            {% if current_user.is_admin %}
+            <form method="POST"
+                  action="{{ url_for('patients.toggle_portal', patient_id=patient.id) }}"
+                  onsubmit="return confirm('Portal wirklich deaktivieren?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-danger btn-sm py-0" style="font-size:.75rem">
+                <i class="bi bi-toggle-on"></i> Deaktivieren
+              </button>
+            </form>
+            {% else %}
             <span class="badge bg-success">Online</span>
+            {% endif %}
           </div>
           <div class="input-group input-group-sm">
             <input type="text" class="form-control form-control-sm"
@@ -158,21 +169,40 @@
             </a>
           </div>
         </div>
-        {% elif not patient.portal_enabled %}
-        <div class="mt-3">
+        {% else %}
+        <div class="mt-3 p-2 rounded border bg-light d-flex align-items-center justify-content-between">
           <small class="text-muted">
-            <i class="bi bi-lock"></i> Angehörigen-Portal nicht aktiviert.
-            <a href="{{ url_for('patients.edit', patient_id=patient.id) }}">Einstellungen</a>
+            <i class="bi bi-lock"></i> Angehörigen-Portal inaktiv
           </small>
+          {% if current_user.is_admin %}
+          <form method="POST"
+                action="{{ url_for('patients.toggle_portal', patient_id=patient.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-outline-success btn-sm py-0" style="font-size:.75rem">
+              <i class="bi bi-toggle-off"></i> Aktivieren
+            </button>
+          </form>
+          {% endif %}
         </div>
         {% endif %}
 
         {# ── Hausarzt-Portal ── #}
         {% if patient.arzt_portal_enabled and patient.arzt_token %}
-        <div class="mt-3 p-2 rounded border border-primary bg-primary bg-opacity-10">
+        <div class="mt-2 p-2 rounded border border-primary bg-primary bg-opacity-10">
           <div class="d-flex align-items-center justify-content-between mb-1">
-            <small class="fw-semibold text-primary">🩺 Hausarzt-Portal aktiv</small>
+            <small class="fw-semibold text-primary"><i class="bi bi-heart-pulse"></i> Hausarzt-Portal aktiv</small>
+            {% if current_user.is_admin %}
+            <form method="POST"
+                  action="{{ url_for('patients.toggle_arzt_portal', patient_id=patient.id) }}"
+                  onsubmit="return confirm('Arzt-Portal wirklich deaktivieren?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-danger btn-sm py-0" style="font-size:.75rem">
+                <i class="bi bi-toggle-on"></i> Deaktivieren
+              </button>
+            </form>
+            {% else %}
             <span class="badge bg-primary">Online</span>
+            {% endif %}
           </div>
           {% if patient.arzt_last_update %}
           <div class="small text-muted mb-1">
@@ -196,12 +226,20 @@
             </a>
           </div>
         </div>
-        {% elif not patient.arzt_portal_enabled %}
-        <div class="mt-3">
+        {% else %}
+        <div class="mt-2 p-2 rounded border bg-light d-flex align-items-center justify-content-between">
           <small class="text-muted">
-            <i class="bi bi-lock"></i> Hausarzt-Portal nicht aktiviert.
-            <a href="{{ url_for('patients.edit', patient_id=patient.id) }}">Einstellungen</a>
+            <i class="bi bi-lock"></i> Hausarzt-Portal inaktiv
           </small>
+          {% if current_user.is_admin %}
+          <form method="POST"
+                action="{{ url_for('patients.toggle_arzt_portal', patient_id=patient.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-outline-primary btn-sm py-0" style="font-size:.75rem">
+              <i class="bi bi-toggle-off"></i> Aktivieren
+            </button>
+          </form>
+          {% endif %}
         </div>
         {% endif %}
 

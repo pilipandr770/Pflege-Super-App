@@ -212,3 +212,36 @@ def _parse_date(value):
         return datetime.strptime(value, '%Y-%m-%d').date()
     except (ValueError, TypeError):
         return None
+
+
+# ── Portal-Toggles ────────────────────────────────────────────────────────────
+
+@patients_bp.route('/<patient_id>/toggle-portal', methods=['POST'])
+@login_required
+def toggle_portal(patient_id):
+    from app.utils.auth import admin_required as _ar
+    if not current_user.is_admin:
+        abort(403)
+    p = _get_patient(patient_id)
+    p.portal_enabled = not p.portal_enabled
+    db.session.commit()
+    action = 'PORTAL_ENABLED' if p.portal_enabled else 'PORTAL_DISABLED'
+    log_action(action, 'Patient', patient_id)
+    state = 'aktiviert' if p.portal_enabled else 'deaktiviert'
+    flash(f'Angehörigen-Portal {state}.', 'success')
+    return redirect(url_for('patients.show', patient_id=patient_id))
+
+
+@patients_bp.route('/<patient_id>/toggle-arzt-portal', methods=['POST'])
+@login_required
+def toggle_arzt_portal(patient_id):
+    if not current_user.is_admin:
+        abort(403)
+    p = _get_patient(patient_id)
+    p.arzt_portal_enabled = not p.arzt_portal_enabled
+    db.session.commit()
+    action = 'ARZT_PORTAL_ENABLED' if p.arzt_portal_enabled else 'ARZT_PORTAL_DISABLED'
+    log_action(action, 'Patient', patient_id)
+    state = 'aktiviert' if p.arzt_portal_enabled else 'deaktiviert'
+    flash(f'Hausarzt-Portal {state}.', 'success')
+    return redirect(url_for('patients.show', patient_id=patient_id))
