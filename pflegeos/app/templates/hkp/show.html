@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+{% block title %}HKP – {{ v.patient.full_name }}{% endblock %}
+
+{% block content %}
+{% set label, color = status_labels.get(v.status, (v.status, 'secondary')) %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <a href="{{ url_for('hkp.index') }}" class="text-decoration-none text-muted small">
+      <i class="bi bi-arrow-left me-1"></i>Zurück
+    </a>
+    <h2 class="mb-1 mt-1">{{ v.patient.full_name }}</h2>
+    <span class="text-muted">{{ v.gueltig_von.strftime('%d.%m.%Y') }} – {{ v.gueltig_bis.strftime('%d.%m.%Y') }}</span>
+    &nbsp;<span class="badge bg-{{ color }} fs-6">{{ label }}</span>
+    {% if v.status == 'GENEHMIGT' and v.is_expired %}
+    <span class="badge bg-danger ms-1">Abgelaufen</span>
+    {% endif %}
+  </div>
+
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('hkp.pdf', verordnung_id=v.id) }}"
+       class="btn btn-outline-secondary" target="_blank">
+      <i class="bi bi-printer me-1"></i>PDF drucken
+    </a>
+    <a href="{{ url_for('exports.leistungsnachweis_pdf', patient_id=v.patient_id) }}"
+       class="btn btn-outline-info" target="_blank">
+      <i class="bi bi-file-earmark-pdf me-1"></i>Leistungsnachweis
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  {# Details #}
+  <div class="col-lg-8">
+
+    {# Arzt #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Verordnender Arzt</h6></div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ v.arzt_name }}</dd>
+          <dt class="col-sm-4">LANR</dt><dd class="col-sm-8 font-monospace">{{ v.arzt_lanr or '—' }}</dd>
+          <dt class="col-sm-4">BSNR</dt><dd class="col-sm-8 font-monospace">{{ v.arzt_bsnr or '—' }}</dd>
+          <dt class="col-sm-4">Adresse</dt>
+          <dd class="col-sm-8">{{ v.arzt_adresse | replace('\n', '<br>') | safe if v.arzt_adresse else '—' }}</dd>
+          <dt class="col-sm-4">Telefon</dt><dd class="col-sm-8">{{ v.arzt_telefon or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {# Diagnosen #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Diagnosen (ICD-10)</h6></div>
+      <div class="card-body p-0">
+        {% if v.diagnosen_list %}
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr><th style="width:120px">ICD-Code</th><th>Diagnosetext</th></tr>
+          </thead>
+          <tbody>
+            {% for d in v.diagnosen_list %}
+            <tr>
+              <td class="font-monospace fw-semibold">{{ d.icd }}</td>
+              <td>{{ d.text }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-3 text-muted small">Keine Diagnosen eingetragen.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Leistungen #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Verordnete Leistungen</h6></div>
+      <div class="card-body p-0">
+        {% if v.leistungen_list %}
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr><th>Typ</th><th>Leistung</th><th>Häufigkeit</th></tr>
+          </thead>
+          <tbody>
+            {% for l in v.leistungen_list %}
+            <tr>
+              <td>
+                <span class="badge bg-{% if l.typ == 'BEHANDLUNGSPFLEGE' %}primary{% elif l.typ == 'GRUNDPFLEGE' %}info text-dark{% else %}secondary{% endif %}">
+                  {{ l.typ }}
+                </span>
+              </td>
+              <td>{{ l.bezeichnung }}</td>
+              <td class="text-muted small">{{ l.haeufigkeit }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-3 text-muted small">Keine Leistungen eingetragen.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if v.begruendung_langzeit %}
+    <div class="alert alert-info small">
+      <strong>Begründung Langzeitverordnung:</strong> {{ v.begruendung_langzeit }}
+    </div>
+    {% endif %}
+
+    {% if v.notizen %}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Interne Notizen</h6></div>
+      <div class="card-body small text-muted">{{ v.notizen }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {# Statusverwaltung #}
+  <div class="col-lg-4">
+
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Statusverlauf</h6></div>
+      <div class="card-body">
+
+        {% if v.status == 'ENTWURF' %}
+        <p class="small text-muted mb-3">Verordnung prüfen, dann bei Krankenkasse einreichen.</p>
+        <form method="post" action="{{ url_for('hkp.update_status', verordnung_id=v.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="EINGEREICHT">
+          <button class="btn btn-primary w-100">
+            <i class="bi bi-send me-1"></i>Bei Kasse einreichen
+          </button>
+        </form>
+
+        {% elif v.status == 'EINGEREICHT' %}
+        <p class="small text-muted mb-3">Einreichung: {{ v.eingereicht_am.strftime('%d.%m.%Y') if v.eingereicht_am else '—' }}</p>
+
+        <form method="post" action="{{ url_for('hkp.update_status', verordnung_id=v.id) }}"
+              class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="GENEHMIGT">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Genehmigungsnummer</label>
+            <input type="text" name="genehmigungsnummer" class="form-control form-control-sm"
+                   placeholder="z.B. 2024-GEN-12345">
+          </div>
+          <button class="btn btn-success w-100">
+            <i class="bi bi-check-circle me-1"></i>Genehmigt
+          </button>
+        </form>
+
+        <form method="post" action="{{ url_for('hkp.update_status', verordnung_id=v.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="ABGELEHNT">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Ablehnungsgrund</label>
+            <textarea name="ablehnungsgrund" class="form-control form-control-sm" rows="2"
+                      placeholder="Begründung der Kasse"></textarea>
+          </div>
+          <button class="btn btn-outline-danger w-100">
+            <i class="bi bi-x-circle me-1"></i>Abgelehnt
+          </button>
+        </form>
+
+        {% elif v.status == 'GENEHMIGT' %}
+        <div class="alert alert-success small">
+          <i class="bi bi-check-circle me-1"></i>
+          Genehmigt am {{ v.genehmigt_am.strftime('%d.%m.%Y') if v.genehmigt_am else '—' }}<br>
+          Nr.: <strong>{{ v.genehmigungsnummer or '—' }}</strong>
+        </div>
+        {% if not v.is_expired %}
+        <div class="text-center text-muted small">
+          Noch {{ (v.gueltig_bis - today).days }} Tage gültig
+        </div>
+        {% endif %}
+
+        {% elif v.status == 'ABGELEHNT' %}
+        <div class="alert alert-danger small">
+          <i class="bi bi-x-circle me-1"></i>
+          Abgelehnt<br>
+          {% if v.ablehnungsgrund %}
+          <strong>Grund:</strong> {{ v.ablehnungsgrund }}
+          {% endif %}
+        </div>
+        <a href="{{ url_for('hkp.new', patient_id=v.patient_id) }}"
+           class="btn btn-outline-primary w-100">
+          <i class="bi bi-arrow-repeat me-1"></i>Neue Verordnung
+        </a>
+        {% endif %}
+
+      </div>
+    </div>
+
+    {# Patienteninfo #}
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0">Patient</h6></div>
+      <div class="card-body small">
+        <table class="table table-sm mb-0">
+          <tr><th class="text-muted fw-normal w-50">Name</th>
+              <td>{{ v.patient.full_name }}</td></tr>
+          <tr><th class="text-muted fw-normal">Geburtsdatum</th>
+              <td>{{ v.patient.geburtsdatum.strftime('%d.%m.%Y') if v.patient.geburtsdatum else '—' }}</td></tr>
+          <tr><th class="text-muted fw-normal">Pflegegrad</th>
+              <td>{{ v.patient.pflegegrad or '—' }}</td></tr>
+          <tr><th class="text-muted fw-normal">Krankenkasse</th>
+              <td>{{ v.patient.krankenversicherung or '—' }}</td></tr>
+          <tr><th class="text-muted fw-normal">Vers.-Nr.</th>
+              <td class="font-monospace">{{ v.patient.versicherungsnummer or '—' }}</td></tr>
+        </table>
+        <div class="mt-2 d-flex gap-1">
+          <a href="{{ url_for('patients.show', patient_id=v.patient_id) }}"
+             class="btn btn-sm btn-outline-secondary flex-fill">Patientenakte</a>
+          <a href="{{ url_for('hkp.new', patient_id=v.patient_id) }}"
+             class="btn btn-sm btn-outline-primary flex-fill">Neue Verordnung</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

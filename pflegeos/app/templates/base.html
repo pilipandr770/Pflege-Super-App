@@ -182,6 +182,12 @@
           </a>
         </li>
         <li class="nav-item">
+          <a href="{{ url_for('hkp.index') }}"
+             class="nav-link {% if request.endpoint and 'hkp.' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-file-medical"></i> HKP-Verordnungen
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('gkv.index') }}"
              class="nav-link {% if request.endpoint and 'gkv.' in request.endpoint %}active{% endif %}">
             <i class="bi bi-receipt"></i> GKV-Abrechnung

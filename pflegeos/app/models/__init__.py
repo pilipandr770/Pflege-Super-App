@@ -1715,6 +1715,88 @@ class QmPruefungItem(db.Model):
 # STANDORT (Filiale / Wohnbereich)
 # ============================================================
 
+# ============================================================
+# HKP — HÄUSLICHE KRANKENPFLEGE (§37 SGB V, Muster 12)
+# ============================================================
+
+class HkpVerordnung(db.Model):
+    """Ärztliche Verordnung zur häuslichen Krankenpflege (Muster 12)."""
+    __tablename__ = 'hkp_verordnungen'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    verordnungs_nr = db.Column(db.String(50))   # interne lfd. Nummer
+
+    # Verordnender Arzt
+    arzt_name    = db.Column(db.String(255), nullable=False)
+    arzt_lanr    = db.Column(db.String(9))    # Lebenslange Arztnummer
+    arzt_bsnr    = db.Column(db.String(9))    # Betriebsstättennummer
+    arzt_adresse = db.Column(db.Text)
+    arzt_telefon = db.Column(db.String(50))
+
+    # Diagnosen (JSON: [{"icd": "I50.0", "text": "Herzinsuffizienz"}])
+    diagnosen = db.Column(db.Text)
+
+    # Verordnete Leistungen
+    # JSON: [{"typ": "BEHANDLUNGSPFLEGE", "bezeichnung": "Wundversorgung", "haeufigkeit": "1x täglich"}]
+    leistungen = db.Column(db.Text)
+
+    # Zeitraum
+    gueltig_von          = db.Column(db.Date, nullable=False)
+    gueltig_bis          = db.Column(db.Date, nullable=False)
+    dauer_wochen         = db.Column(db.Integer)
+    begruendung_langzeit = db.Column(db.Text)   # Pflicht bei > 4 Wochen
+
+    # Status: ENTWURF | EINGEREICHT | GENEHMIGT | ABGELEHNT
+    status             = db.Column(db.String(20), default='ENTWURF')
+    eingereicht_am     = db.Column(db.DateTime)
+    genehmigt_am       = db.Column(db.DateTime)
+    genehmigungsnummer = db.Column(db.String(100))
+    ablehnungsgrund    = db.Column(db.Text)
+
+    notizen    = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    patient  = db.relationship('Patient',  backref='hkp_verordnungen')
+    ersteller = db.relationship('Employee', foreign_keys=[created_by], backref='hkp_verordnungen')
+    company  = db.relationship('Company',  backref='hkp_verordnungen')
+
+    __table_args__ = (
+        db.Index('ix_hkp_company_id',  'company_id'),
+        db.Index('ix_hkp_patient_id',  'patient_id'),
+        db.Index('ix_hkp_gueltig_von', 'gueltig_von'),
+    )
+
+    @property
+    def diagnosen_list(self):
+        import json
+        if not self.diagnosen:
+            return []
+        try:
+            return json.loads(self.diagnosen)
+        except Exception:
+            return []
+
+    @property
+    def leistungen_list(self):
+        import json
+        if not self.leistungen:
+            return []
+        try:
+            return json.loads(self.leistungen)
+        except Exception:
+            return []
+
+    @property
+    def is_expired(self):
+        from datetime import date
+        return self.gueltig_bis < date.today()
+
+
 class Standort(db.Model):
     """Filiale oder Wohnbereich eines Pflegedienstes."""
     __tablename__ = 'standorte'

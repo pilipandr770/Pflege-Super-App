@@ -60,6 +60,7 @@ def create_app(config_name=None):
     from app.routes.gkv import gkv_bp
     from app.routes.onboarding import onboarding_bp
     from app.routes.standorte import standorte_bp
+    from app.routes.hkp import hkp_bp
 
     app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -90,6 +91,7 @@ def create_app(config_name=None):
     app.register_blueprint(gkv_bp, url_prefix='/gkv')
     app.register_blueprint(onboarding_bp)
     app.register_blueprint(standorte_bp)
+    app.register_blueprint(hkp_bp)
 
     # Stripe Webhook muss CSRF-exempt sein (Stripe sendet kein CSRF-Token)
     _csrf.exempt(billing_bp)

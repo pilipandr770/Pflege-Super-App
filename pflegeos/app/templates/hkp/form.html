@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% block title %}Neue HKP-Verordnung{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('hkp.index') }}" class="text-decoration-none text-muted">
+    <i class="bi bi-arrow-left me-1"></i>Zurück zur Übersicht
+  </a>
+</div>
+
+<h2 class="mb-4"><i class="bi bi-file-medical me-2"></i>Neue Verordnung (§37 SGB V)</h2>
+
+<form method="post" id="hkpForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-4">
+
+    {# Linke Spalte #}
+    <div class="col-lg-7">
+
+      {# Patient #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Patient/in</h6></div>
+        <div class="card-body">
+          <select name="patient_id" class="form-select" required>
+            <option value="">— Patienten auswählen —</option>
+            {% for p in patients %}
+            <option value="{{ p.id }}"
+                    {{ 'selected' if preselected and preselected.id == p.id }}>
+              {{ p.full_name }}
+              {% if p.geburtsdatum %}(geb. {{ p.geburtsdatum.strftime('%d.%m.%Y') }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      {# Arztdaten #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Verordnender Arzt</h6></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+              <input type="text" name="arzt_name" class="form-control" required
+                     placeholder="Dr. med. Max Mustermann">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">LANR <span class="text-muted small">(9-stellig)</span></label>
+              <input type="text" name="arzt_lanr" class="form-control font-monospace"
+                     maxlength="9" placeholder="000000000">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">BSNR <span class="text-muted small">(9-stellig)</span></label>
+              <input type="text" name="arzt_bsnr" class="form-control font-monospace"
+                     maxlength="9" placeholder="000000000">
+            </div>
+            <div class="col-sm-8">
+              <label class="form-label">Praxisadresse</label>
+              <textarea name="arzt_adresse" class="form-control" rows="2"
+                        placeholder="Musterstraße 1&#10;12345 Musterstadt"></textarea>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label">Telefon</label>
+              <input type="tel" name="arzt_telefon" class="form-control"
+                     placeholder="+49 89 ...">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Zeitraum #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Verordnungszeitraum</h6></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-5">
+              <label class="form-label fw-semibold">Von <span class="text-danger">*</span></label>
+              <input type="date" name="gueltig_von" class="form-control"
+                     value="{{ today.isoformat() }}" required id="vonDate">
+            </div>
+            <div class="col-sm-5">
+              <label class="form-label fw-semibold">Bis <span class="text-danger">*</span></label>
+              <input type="date" name="gueltig_bis" class="form-control" required id="bisDate">
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label">Wochen</label>
+              <input type="number" id="dauerAnzeige" class="form-control" disabled
+                     placeholder="Auto">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">Begründung bei Verordnung über 4 Wochen</label>
+            <textarea name="begruendung_langzeit" class="form-control" rows="2"
+                      placeholder="Medizinische Begründung (Pflicht bei > 28 Tage)"></textarea>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    {# Rechte Spalte #}
+    <div class="col-lg-5">
+
+      {# Diagnosen #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Diagnosen (ICD-10)</h6></div>
+        <div class="card-body">
+          {% for i in range(1, 4) %}
+          <div class="row g-2 mb-2">
+            <div class="col-4">
+              <input type="text" name="icd_{{ i }}" class="form-control font-monospace"
+                     placeholder="ICD z.B. I50.0" maxlength="10">
+            </div>
+            <div class="col-8">
+              <input type="text" name="diag_{{ i }}" class="form-control"
+                     placeholder="Diagnosetext">
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Verordnete Leistungen #}
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">Verordnete Leistungen</h6>
+          <button type="button" class="btn btn-sm btn-outline-primary"
+                  onclick="addLeistung()">
+            <i class="bi bi-plus"></i>
+          </button>
+        </div>
+        <div class="card-body" id="leistungenContainer">
+          {# Erste Zeile vorbefüllt #}
+          <div class="leistung-row mb-2">
+            <div class="row g-1">
+              <div class="col-12 mb-1">
+                <select name="l_typ" class="form-select form-select-sm">
+                  <option value="BEHANDLUNGSPFLEGE">Behandlungspflege</option>
+                  <option value="GRUNDPFLEGE">Grundpflege</option>
+                  <option value="HAUSWIRTSCHAFT">Hauswirtschaft</option>
+                </select>
+              </div>
+              <div class="col-8">
+                <select name="l_bezeichnung" class="form-select form-select-sm">
+                  <option value="">— Leistung wählen —</option>
+                  {% for l in bp_leistungen %}
+                  <option value="{{ l }}">{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-4">
+                <input type="text" name="l_haeufigkeit" class="form-control form-control-sm"
+                       placeholder="z.B. 1x tägl.">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Notizen #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Interne Notizen</h6></div>
+        <div class="card-body">
+          <textarea name="notizen" class="form-control" rows="3"></textarea>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 mt-2">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-save me-1"></i>Verordnung speichern
+    </button>
+    <a href="{{ url_for('hkp.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+</form>
+
+<script>
+const BP_LEISTUNGEN = {{ bp_leistungen | tojson }};
+
+function addLeistung() {
+  const container = document.getElementById('leistungenContainer');
+  const div = document.createElement('div');
+  div.className = 'leistung-row mb-2';
+  div.innerHTML = `
+    <div class="row g-1">
+      <div class="col-12 mb-1">
+        <select name="l_typ" class="form-select form-select-sm">
+          <option value="BEHANDLUNGSPFLEGE">Behandlungspflege</option>
+          <option value="GRUNDPFLEGE">Grundpflege</option>
+          <option value="HAUSWIRTSCHAFT">Hauswirtschaft</option>
+        </select>
+      </div>
+      <div class="col-8">
+        <select name="l_bezeichnung" class="form-select form-select-sm">
+          <option value="">— Leistung wählen —</option>
+          ${BP_LEISTUNGEN.map(l => `<option value="${l}">${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="col-3">
+        <input type="text" name="l_haeufigkeit" class="form-control form-control-sm"
+               placeholder="z.B. 1x tägl.">
+      </div>
+      <div class="col-1">
+        <button type="button" class="btn btn-sm btn-outline-danger"
+                onclick="this.closest('.leistung-row').remove()">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+    </div>`;
+  container.appendChild(div);
+}
+
+// Wochendauer berechnen
+const vonEl = document.getElementById('vonDate');
+const bisEl = document.getElementById('bisDate');
+const dauerEl = document.getElementById('dauerAnzeige');
+
+function updateDauer() {
+  if (vonEl.value && bisEl.value) {
+    const diff = (new Date(bisEl.value) - new Date(vonEl.value)) / 86400000;
+    dauerEl.value = Math.ceil(diff / 7);
+  }
+}
+vonEl.addEventListener('change', () => {
+  // Standardmäßig 4 Wochen
+  if (!bisEl.value) {
+    const d = new Date(vonEl.value);
+    d.setDate(d.getDate() + 27);
+    bisEl.value = d.toISOString().slice(0, 10);
+  }
+  updateDauer();
+});
+bisEl.addEventListener('change', updateDauer);
+</script>
+{% endblock %}
