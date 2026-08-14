@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}{{ pruefung.titel }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('qm.index') }}">QM-Prüfungen</a></li>
+<li class="breadcrumb-item active">{{ pruefung.titel }}</li>
+{% endblock %}
+
+{% block content %}
+{# ── Header ── #}
+<div class="d-flex align-items-start justify-content-between mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">{{ pruefung.titel }}</h4>
+    <div class="text-muted small mt-1">
+      <span class="badge
+        {% if pruefung.typ == 'MDK' %}bg-danger
+        {% elif pruefung.typ == 'HEIMAUFSICHT' %}bg-warning text-dark
+        {% else %}bg-secondary{% endif %} me-1">{{ pruefung.typ }}</span>
+      {{ pruefung.datum.strftime('%d.%m.%Y') }}
+      {% if pruefung.pruefer %} · {{ pruefung.pruefer }}{% endif %}
+    </div>
+  </div>
+  <span class="badge fs-6
+    {% if pruefung.status == 'ABGESCHLOSSEN' %}bg-success
+    {% elif pruefung.status == 'IN_BEARBEITUNG' %}bg-primary
+    {% else %}bg-light text-dark border{% endif %}">
+    {{ pruefung.status.replace('_', ' ') }}
+  </span>
+</div>
+
+{# ── Fortschritts-Übersicht ── #}
+{% if pruefung.anzahl_items %}
+<div class="card mb-3 shadow-sm">
+  <div class="card-body py-2">
+    <div class="row align-items-center g-2">
+      <div class="col-md-6">
+        <div class="progress" style="height:10px">
+          {% set grad = pruefung.erfuellungsgrad %}
+          <div class="progress-bar
+            {% if grad >= 90 %}bg-success
+            {% elif grad >= 70 %}bg-warning
+            {% else %}bg-danger{% endif %}"
+            style="width:{{ grad }}%"></div>
+        </div>
+        <div class="small text-muted mt-1">Erfüllungsgrad: <strong>{{ grad }}%</strong></div>
+      </div>
+      <div class="col-md-6 d-flex gap-3 small">
+        <span class="text-success"><i class="bi bi-check-circle-fill"></i> {{ pruefung.anzahl_ok }} OK</span>
+        <span class="text-warning"><i class="bi bi-exclamation-triangle-fill"></i> {{ pruefung.anzahl_mangel }} Mängel</span>
+        <span class="text-danger"><i class="bi bi-x-circle-fill"></i> {{ pruefung.anzahl_kritisch }} Kritisch</span>
+        <span class="text-muted">{{ pruefung.anzahl_items }} gesamt</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Prüfpunkte nach Kategorie ── #}
+{% for kat, items in kategorien.items() %}
+<div class="card mb-3 shadow-sm">
+  <div class="card-header fw-semibold py-2 bg-light">
+    <i class="bi bi-folder2-open me-1"></i>{{ kat }}
+    <span class="badge bg-secondary ms-1 fw-normal">{{ items|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light" style="font-size:.8rem">
+        <tr>
+          <th style="width:40%">Kriterium</th>
+          <th style="width:130px">Ergebnis</th>
+          <th>Bemerkung</th>
+          <th>Maßnahme</th>
+          <th style="width:60px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr id="row-{{ item.id }}"
+            class="{% if item.ergebnis == 'KRITISCH' %}table-danger
+                   {% elif item.ergebnis == 'MANGEL' %}table-warning
+                   {% elif item.ergebnis == 'NICHT_ANWENDBAR' %}table-secondary{% endif %}">
+          <td class="small">{{ item.kriterium }}</td>
+          <td>
+            <select class="form-select form-select-sm ergebnis-sel" data-id="{{ item.id }}"
+                    {% if pruefung.status == 'ABGESCHLOSSEN' %}disabled{% endif %}>
+              <option value="OK"                {% if item.ergebnis == 'OK' %}selected{% endif %}>✓ OK</option>
+              <option value="MANGEL"            {% if item.ergebnis == 'MANGEL' %}selected{% endif %}>⚠ Mangel</option>
+              <option value="KRITISCH"          {% if item.ergebnis == 'KRITISCH' %}selected{% endif %}>✗ Kritisch</option>
+              <option value="NICHT_ANWENDBAR"   {% if item.ergebnis == 'NICHT_ANWENDBAR' %}selected{% endif %}>— N/A</option>
+            </select>
+          </td>
+          <td>
+            <input type="text" class="form-control form-control-sm bem-inp" data-id="{{ item.id }}"
+                   value="{{ item.bemerkung or '' }}" placeholder="Bemerkung…"
+                   {% if pruefung.status == 'ABGESCHLOSSEN' %}disabled{% endif %}>
+          </td>
+          <td>
+            <input type="text" class="form-control form-control-sm mas-inp" data-id="{{ item.id }}"
+                   value="{{ item.massnahme or '' }}" placeholder="Maßnahme…"
+                   {% if pruefung.status == 'ABGESCHLOSSEN' %}disabled{% endif %}>
+          </td>
+          <td class="text-center">
+            <button class="btn btn-outline-primary btn-sm save-item-btn py-0"
+                    data-id="{{ item.id }}" title="Speichern"
+                    {% if pruefung.status == 'ABGESCHLOSSEN' %}disabled{% endif %}>
+              <i class="bi bi-floppy"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">Noch keine Prüfpunkte vorhanden.</div>
+{% endfor %}
+
+{# ── Neuen Prüfpunkt hinzufügen ── #}
+{% if pruefung.status != 'ABGESCHLOSSEN' %}
+<div class="card mb-3 shadow-sm">
+  <div class="card-header fw-semibold py-2">
+    <i class="bi bi-plus-circle me-1"></i> Prüfpunkt hinzufügen
+  </div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('qm.add_item', pruefung_id=pruefung.id) }}"
+          class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-3">
+        <input type="text" name="kategorie" class="form-control form-control-sm"
+               placeholder="Kategorie" list="kat-list">
+        <datalist id="kat-list">
+          <option value="Pflege"><option value="Dokumentation">
+          <option value="Hygiene"><option value="Kommunikation">
+          <option value="Personal"><option value="Sonstiges">
+        </datalist>
+      </div>
+      <div class="col-md-7">
+        <input type="text" name="kriterium" class="form-control form-control-sm"
+               placeholder="Prüfkriterium…" required>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-plus-lg"></i> Hinzufügen
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Prüfung abschließen ── #}
+<div class="card mb-3 shadow-sm border-success">
+  <div class="card-header fw-semibold text-success py-2 bg-success bg-opacity-10">
+    <i class="bi bi-check2-all me-1"></i> Prüfung abschließen
+  </div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('qm.abschliessen', pruefung_id=pruefung.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Gesamtergebnis / Fazit</label>
+        <textarea name="gesamtergebnis" rows="3" class="form-control form-control-sm"
+                  placeholder="Gesamtbewertung der Prüfung…">{{ pruefung.gesamtergebnis or '' }}</textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Maßnahmenplan</label>
+        <textarea name="massnahmen" rows="3" class="form-control form-control-sm"
+                  placeholder="Welche Maßnahmen werden eingeleitet?">{{ pruefung.massnahmen or '' }}</textarea>
+      </div>
+      <button type="submit" class="btn btn-success fw-semibold"
+              onclick="return confirm('Prüfung endgültig abschließen? Danach können keine Änderungen mehr vorgenommen werden.')">
+        <i class="bi bi-check2-all"></i> Prüfung abschließen
+      </button>
+    </form>
+  </div>
+</div>
+{% else %}
+{# ── Abgeschlossene Prüfung: Ergebnis anzeigen ── #}
+{% if pruefung.gesamtergebnis or pruefung.massnahmen %}
+<div class="card mb-3 shadow-sm border-success">
+  <div class="card-header fw-semibold text-success py-2 bg-success bg-opacity-10">
+    <i class="bi bi-check2-all me-1"></i> Prüfungsergebnis
+  </div>
+  <div class="card-body small">
+    {% if pruefung.gesamtergebnis %}
+    <p class="mb-1 fw-semibold">Gesamtergebnis:</p>
+    <p class="text-muted mb-3">{{ pruefung.gesamtergebnis }}</p>
+    {% endif %}
+    {% if pruefung.massnahmen %}
+    <p class="mb-1 fw-semibold">Maßnahmenplan:</p>
+    <p class="text-muted mb-0">{{ pruefung.massnahmen }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+function saveItem(itemId) {
+  const ergebnis  = document.querySelector(`.ergebnis-sel[data-id="${itemId}"]`).value;
+  const bemerkung = document.querySelector(`.bem-inp[data-id="${itemId}"]`).value;
+  const massnahme = document.querySelector(`.mas-inp[data-id="${itemId}"]`).value;
+
+  const body = new FormData();
+  body.append('ergebnis',  ergebnis);
+  body.append('bemerkung', bemerkung);
+  body.append('massnahme', massnahme);
+
+  fetch(`/qm/item/${itemId}/update`, {
+    method: 'POST', body,
+    headers: {'X-CSRFToken': CSRF}
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      const row = document.getElementById('row-' + itemId);
+      row.classList.remove('table-danger','table-warning','table-secondary');
+      if (ergebnis === 'KRITISCH')        row.classList.add('table-danger');
+      else if (ergebnis === 'MANGEL')     row.classList.add('table-warning');
+      else if (ergebnis === 'NICHT_ANWENDBAR') row.classList.add('table-secondary');
+    }
+  });
+}
+
+// Automatisch speichern wenn Ergebnis wechselt
+document.querySelectorAll('.ergebnis-sel').forEach(el => {
+  el.addEventListener('change', () => saveItem(el.dataset.id));
+});
+
+// Manuell speichern per Button
+document.querySelectorAll('.save-item-btn').forEach(btn => {
+  btn.addEventListener('click', () => saveItem(btn.dataset.id));
+});
+</script>
+{% endblock %}

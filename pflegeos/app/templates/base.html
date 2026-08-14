@@ -169,6 +169,12 @@
           </a>
         </li>
         <li class="nav-item">
+          <a href="{{ url_for('qm.index') }}"
+             class="nav-link {% if request.endpoint and 'qm.' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-clipboard2-check"></i> QM-Prüfungen
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('admin.auditlog') }}"
              class="nav-link {% if request.endpoint == 'admin.auditlog' %}active{% endif %}">
             <i class="bi bi-journal-text"></i> Audit-Log

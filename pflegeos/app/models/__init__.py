@@ -1571,3 +1571,88 @@ class Dienstschicht(db.Model):
 
     def __repr__(self):
         return f"<Dienstschicht {self.employee_id} {self.datum} {self.schicht_typ}>"
+
+
+# ============================================================
+# QM — QUALITÄTSMANAGEMENT (MDK-Checklisten)
+# ============================================================
+
+class QmPruefung(db.Model):
+    """MDK-Prüfung oder interne QM-Prüfung."""
+    __tablename__ = 'qm_pruefungen'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    # MDK | INTERN | HEIMAUFSICHT
+    typ        = db.Column(db.String(30), nullable=False, default='INTERN')
+    titel      = db.Column(db.String(255), nullable=False)
+    datum      = db.Column(db.Date, nullable=False, default=date.today)
+    pruefer    = db.Column(db.String(255))   # Name des externen Prüfers (bei MDK)
+
+    # OFFEN | IN_BEARBEITUNG | ABGESCHLOSSEN
+    status     = db.Column(db.String(20), default='OFFEN')
+
+    gesamtergebnis = db.Column(db.Text)  # Freitext-Zusammenfassung
+    massnahmen     = db.Column(db.Text)  # Maßnahmen nach der Prüfung
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    company  = db.relationship('Company',  backref='qm_pruefungen')
+    ersteller = db.relationship('Employee', backref='qm_pruefungen')
+    items    = db.relationship('QmPruefungItem', backref='pruefung',
+                               lazy='dynamic', cascade='all, delete-orphan')
+
+    __table_args__ = (
+        db.Index('ix_qm_pruefungen_company_id', 'company_id'),
+        db.Index('ix_qm_pruefungen_datum', 'datum'),
+    )
+
+    @property
+    def anzahl_items(self):
+        return self.items.count()
+
+    @property
+    def anzahl_ok(self):
+        return self.items.filter_by(ergebnis='OK').count()
+
+    @property
+    def anzahl_mangel(self):
+        return self.items.filter_by(ergebnis='MANGEL').count()
+
+    @property
+    def anzahl_kritisch(self):
+        return self.items.filter_by(ergebnis='KRITISCH').count()
+
+    @property
+    def erfuellungsgrad(self):
+        total = self.anzahl_items
+        if not total:
+            return None
+        ok = self.anzahl_ok
+        return round(ok / total * 100)
+
+
+class QmPruefungItem(db.Model):
+    """Einzelner Prüfpunkt einer QM-Prüfung."""
+    __tablename__ = 'qm_pruefung_items'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    pruefung_id = db.Column(db.String(36), db.ForeignKey('qm_pruefungen.id'), nullable=False)
+
+    # Kategorie des Prüfpunkts (z.B. "Pflege", "Dokumentation", "Hygiene")
+    kategorie  = db.Column(db.String(100), nullable=False)
+    kriterium  = db.Column(db.Text, nullable=False)   # Was wird geprüft?
+    # OK | MANGEL | KRITISCH | NICHT_ANWENDBAR
+    ergebnis   = db.Column(db.String(20), default='OK')
+    bemerkung  = db.Column(db.Text)
+    massnahme  = db.Column(db.Text)   # Konkrete Maßnahme bei MANGEL/KRITISCH
+
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('ix_qm_items_pruefung_id', 'pruefung_id'),
+    )

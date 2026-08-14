@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Qualitätsmanagement{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Home</a></li>
+<li class="breadcrumb-item active">QM-Prüfungen</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="fw-bold mb-0"><i class="bi bi-clipboard2-check me-2"></i>Qualitätsmanagement</h4>
+  <a href="{{ url_for('qm.neu') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> Neue Prüfung
+  </a>
+</div>
+
+{% if pruefungen %}
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Titel</th>
+          <th>Typ</th>
+          <th>Prüfer</th>
+          <th>Erfüllungsgrad</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in pruefungen %}
+        <tr>
+          <td class="text-nowrap small">{{ p.datum.strftime('%d.%m.%Y') }}</td>
+          <td class="fw-semibold">{{ p.titel }}</td>
+          <td>
+            <span class="badge
+              {% if p.typ == 'MDK' %}bg-danger
+              {% elif p.typ == 'HEIMAUFSICHT' %}bg-warning text-dark
+              {% else %}bg-secondary{% endif %}">
+              {{ p.typ }}
+            </span>
+          </td>
+          <td class="small text-muted">{{ p.pruefer or '—' }}</td>
+          <td>
+            {% if p.anzahl_items %}
+              {% set grad = p.erfuellungsgrad %}
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:6px;min-width:80px">
+                  <div class="progress-bar
+                    {% if grad >= 90 %}bg-success
+                    {% elif grad >= 70 %}bg-warning
+                    {% else %}bg-danger{% endif %}"
+                    style="width:{{ grad }}%"></div>
+                </div>
+                <small class="text-muted">{{ grad }}%</small>
+              </div>
+              <small class="text-muted">
+                {{ p.anzahl_ok }} OK ·
+                {% if p.anzahl_mangel %}<span class="text-warning">{{ p.anzahl_mangel }} Mängel</span> ·{% endif %}
+                {% if p.anzahl_kritisch %}<span class="text-danger">{{ p.anzahl_kritisch }} Kritisch</span> ·{% endif %}
+                {{ p.anzahl_items }} gesamt
+              </small>
+            {% else %}
+              <span class="text-muted small">keine Punkte</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge
+              {% if p.status == 'ABGESCHLOSSEN' %}bg-success
+              {% elif p.status == 'IN_BEARBEITUNG' %}bg-primary
+              {% else %}bg-light text-dark border{% endif %}">
+              {{ p.status.replace('_', ' ') }}
+            </span>
+          </td>
+          <td>
+            <a href="{{ url_for('qm.show', pruefung_id=p.id) }}"
+               class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card shadow-sm">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-clipboard2-check text-muted" style="font-size:3rem"></i>
+    <h5 class="mt-3 fw-semibold">Noch keine Prüfungen</h5>
+    <p class="text-muted mb-3">Legen Sie eine interne oder MDK-Prüfung an.</p>
+    <a href="{{ url_for('qm.neu') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Erste Prüfung anlegen
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

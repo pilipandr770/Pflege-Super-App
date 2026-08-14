@@ -482,26 +482,77 @@ def _build_schedule_prompt(employees, patients, schedule_start_date, schedule_en
     Returns (prompt_str, employee_map, patient_map)
     где employee_map: {'NURSE_1': real_emp_id, ...}
     """
+    from app.models import Dienstschicht
+    from datetime import timedelta as _td
+
     employee_map = {}   # NURSE_N → real employee.id
     patient_map  = {}   # PATIENT_N → real patient.id
 
+    # ── Schichtplan-Daten für den Planungszeitraum laden ──
+    # Welche Schichten sind für die Pflegekräfte im Zeitraum eingetragen?
+    emp_ids = [e.id for e in employees]
+    schichten = Dienstschicht.query.filter(
+        Dienstschicht.employee_id.in_(emp_ids),
+        Dienstschicht.datum >= schedule_start_date,
+        Dienstschicht.datum <= schedule_end_date,
+    ).all()
+
+    # Strukturieren: {employee_id: {date_str: schicht_info}}
+    schicht_map: dict = {}
+    for s in schichten:
+        schicht_map.setdefault(s.employee_id, {})[s.datum.isoformat()] = {
+            'typ': s.schicht_typ,
+            'ist_arbeitstag': s.ist_arbeitstag,
+            'beginn': s.beginn.strftime('%H:%M') if s.beginn else None,
+            'ende':   s.ende.strftime('%H:%M')   if s.ende   else None,
+        }
+
+    # ── Mitarbeiterdaten aufbauen ──
     employee_data = []
     for i, emp in enumerate(employees, start=1):
         anon_id = f'NURSE_{i}'
         employee_map[anon_id] = emp.id
+
+        # Verfügbarkeit aus Schichtplan
+        availability = {}
+        cur = schedule_start_date
+        while cur <= schedule_end_date:
+            ds = schicht_map.get(emp.id, {}).get(cur.isoformat())
+            if ds:
+                if not ds['ist_arbeitstag']:
+                    availability[cur.isoformat()] = 'FREI'
+                else:
+                    avail = ds['typ']
+                    if ds['beginn']:
+                        avail += f" ({ds['beginn']}–{ds['ende'] or '?'})"
+                    availability[cur.isoformat()] = avail
+            else:
+                availability[cur.isoformat()] = 'KEINE_SCHICHT_GEPLANT'
+            cur += _td(days=1)
+
         emp_info = {
             'id':   emp.id   if not anonymize else anon_id,
             'name': emp.full_name if not anonymize else f'Nurse {i}',
             'role': emp.role,
             'qualifications': [q for q in [emp.qualification] if q],
             'max_patients_per_day': 8,
+            'schichtplan': availability,   # NEU: Verfügbarkeit je Tag
         }
         employee_data.append(emp_info)
 
+    # ── Patientendaten aufbauen ──
     patient_data = []
     for i, pat in enumerate(patients, start=1):
         anon_id = f'PATIENT_{i}'
         patient_map[anon_id] = pat.id
+
+        # Letzte Leistungen für Besuchsfrequenz schätzen
+        from app.models import Leistungsnachweis
+        letzte_ln = Leistungsnachweis.query.filter_by(
+            patient_id=pat.id
+        ).order_by(Leistungsnachweis.datum.desc()).limit(7).all()
+        besuche_letzte_7_tage = len(letzte_ln)
+
         pat_info = {
             'id':   pat.id   if not anonymize else anon_id,
             'name': pat.full_name if not anonymize else f'Patient {i}',
@@ -517,26 +568,37 @@ def _build_schedule_prompt(employees, patients, schedule_start_date, schedule_en
                 'fall_risk':           bool(pat.sturzrisiko),
                 'pressure_ulcer_risk': bool(pat.dekubitusrisiko),
             },
-            'visit_frequency_per_week': 3,
+            'visit_frequency_per_week': max(besuche_letzte_7_tage, 3),
         }
         patient_data.append(pat_info)
 
+    # ── Prompts zusammenstellen ──
+    schicht_hinweis = (
+        "WICHTIG: Im Feld 'schichtplan' jeder Pflegekraft steht die geplante Schicht pro Tag. "
+        "Plane Patientenbesuche NUR an Tagen mit Früh- (FRUEH), Spät- (SPAET) oder "
+        "Sonstiger Schicht (SONSTIGES/NACHT). "
+        "An Tagen mit 'FREI' oder 'KEINE_SCHICHT_GEPLANT' dürfen KEINE Besuche eingeplant werden. "
+        "Passe die Besuchszeiten an die Schichtzeiten an (FRUEH → 07:00–14:00, SPAET → 13:00–20:00)."
+    )
+
     prompt = f"""Sie sind ein erfahrener Pflegedienstplaner in Deutschland.
-Erstellen Sie einen optimierten Wochendienstplan (Heimbesuchsplan) für das Pflegepersonal.
+Erstellen Sie einen optimierten Heimbesuchsplan für das Pflegepersonal.
 
 PLANUNGSZEITRAUM: {schedule_start_date} bis {schedule_end_date}
 PFLEGEKRÄFTE: {len(employees)}
 PATIENTEN: {len(patients)}
 
-ANFORDERUNGEN:
-1. Routenoptimierung: geografisch nahe Patienten zum selben Pflegekraft zuweisen
-2. Qualifikationen beachten (PFLEGEFACHKRAFT für Behandlungspflege, PFLEGEHILFSKRAFT für Grundpflege)
-3. Gleichmäßige Auslastung — max. 8 Patienten pro Pflegekraft pro Tag
-4. Risikomarkierungen beachten (fall_risk / pressure_ulcer_risk → mehr Zeit einplanen)
-5. Jeden Tag des Zeitraums planen
-6. Uhrzeiten zwischen 07:00 und 18:00, realistisch gestaffelt
+{schicht_hinweis}
 
-PFLEGEKRÄFTE-DATEN:
+PLANUNGSREGELN:
+1. Routenoptimierung: geografisch nahe Patienten derselben Pflegekraft zuweisen
+2. Qualifikationen beachten (PFLEGEFACHKRAFT → Behandlungspflege; PFLEGEHILFSKRAFT → Grundpflege)
+3. Gleichmäßige Auslastung — max. 8 Patienten pro Pflegekraft pro Arbeitstag
+4. Risikomarkierungen beachten (fall_risk / pressure_ulcer_risk → +15 Min. Aufwand)
+5. Besuchsfrequenz laut 'visit_frequency_per_week' einhalten
+6. Uhrzeiten innerhalb des Schichtfensters, realistisch gestaffelt
+
+PFLEGEKRÄFTE-DATEN (inkl. Schichtplan):
 {json.dumps(employee_data, ensure_ascii=False, indent=2)}
 
 PATIENTEN-DATEN:
@@ -558,7 +620,7 @@ ANTWORTFORMAT — nur gültiges JSON, keine Erklärungen davor/danach:
       ]
     }}
   ],
-  "notes": "Empfehlungen und Hinweise auf Deutsch"
+  "notes": "Gesamthinweise und Optimierungsbemerkungen auf Deutsch"
 }}
 """
     return prompt, employee_map, patient_map
