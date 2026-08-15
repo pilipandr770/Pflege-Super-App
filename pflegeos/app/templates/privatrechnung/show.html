@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+{% block title %}Rechnung {{ r.rechnung_nr }}{% endblock %}
+
+{% block content %}
+{% set label, color = status_labels.get(r.status, (r.status, 'secondary')) %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <a href="{{ url_for('privatrechnung.index') }}" class="text-decoration-none text-muted small">
+      <i class="bi bi-arrow-left me-1"></i>Zurück
+    </a>
+    <h2 class="mb-1 mt-1 font-monospace">{{ r.rechnung_nr }}</h2>
+    <span class="text-muted">{{ r.patient.full_name }}</span>
+    &nbsp;<span class="badge bg-{{ color }} fs-6">{{ label }}</span>
+    {% if r.ist_ueberfaellig %}
+    <span class="badge bg-danger ms-1">+{{ r.tage_ueberfaellig }} Tage überfällig</span>
+    {% endif %}
+  </div>
+  <a href="{{ url_for('privatrechnung.pdf', rechnung_id=r.id) }}"
+     class="btn btn-outline-secondary" target="_blank">
+    <i class="bi bi-printer me-1"></i>PDF drucken
+  </a>
+</div>
+
+<div class="row g-4">
+
+  <div class="col-lg-8">
+
+    {# Rechnungsangaben #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Rechnungsangaben</h6></div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4">Rechnungsnummer</dt>
+          <dd class="col-sm-8 font-monospace">{{ r.rechnung_nr }}</dd>
+          <dt class="col-sm-4">Datum</dt>
+          <dd class="col-sm-8">{{ r.rechnungsdatum.strftime('%d.%m.%Y') }}</dd>
+          {% if r.leistungsmonat %}
+          <dt class="col-sm-4">Leistungsmonat</dt>
+          <dd class="col-sm-8">{{ r.leistungsmonat }}</dd>
+          {% endif %}
+          <dt class="col-sm-4">Zahlungsziel</dt>
+          <dd class="col-sm-8">{{ r.zahlungsziel_tage }} Tage
+            {% if r.faellig_am %}(bis {{ r.faellig_am.strftime('%d.%m.%Y') }}){% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {# Positionen #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Rechnungspositionen</h6></div>
+      {% if r.positionen_list %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Bezeichnung</th>
+              <th class="text-end">Menge</th>
+              <th>Einheit</th>
+              <th class="text-end">Einzelpreis</th>
+              <th class="text-end">MwSt.</th>
+              <th class="text-end">Gesamt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in r.positionen_list %}
+            <tr>
+              <td>{{ p.bezeichnung }}</td>
+              <td class="text-end">{{ p.menge }}</td>
+              <td class="text-muted">{{ p.einheit }}</td>
+              <td class="text-end">{{ '%.2f' % p.einzelpreis }} €</td>
+              <td class="text-end text-muted">{{ p.mwst_satz }} %</td>
+              <td class="text-end fw-semibold">{{ '%.2f' % p.gesamtpreis }} €</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td colspan="5" class="text-end fw-semibold">Netto:</td>
+              <td class="text-end">{{ '%.2f' % (r.betrag_netto or 0) }} €</td>
+            </tr>
+            {% if (r.mwst_betrag or 0) > 0 %}
+            <tr>
+              <td colspan="5" class="text-end text-muted">MwSt.:</td>
+              <td class="text-end text-muted">{{ '%.2f' % (r.mwst_betrag or 0) }} €</td>
+            </tr>
+            {% endif %}
+            <tr>
+              <td colspan="5" class="text-end fw-bold">Brutto:</td>
+              <td class="text-end fw-bold fs-5">{{ '%.2f' % (r.betrag_brutto or 0) }} €</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted small">Keine Positionen.</div>
+      {% endif %}
+    </div>
+
+    {% if r.notizen %}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Notizen</h6></div>
+      <div class="card-body small text-muted">{{ r.notizen }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="col-lg-4">
+
+    {# Statusverwaltung #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Status</h6></div>
+      <div class="card-body">
+
+        {% if r.status == 'ENTWURF' %}
+        <form method="post" action="{{ url_for('privatrechnung.update_status', rechnung_id=r.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="VERSENDET">
+          <button class="btn btn-primary w-100 mb-2">
+            <i class="bi bi-send me-1"></i>Als versendet markieren
+          </button>
+        </form>
+
+        {% elif r.status == 'VERSENDET' %}
+        <form method="post" action="{{ url_for('privatrechnung.update_status', rechnung_id=r.id) }}"
+              class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="BEZAHLT">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Zahlungseingang</label>
+            <input type="date" name="bezahlt_am" class="form-control form-control-sm"
+                   value="{{ today.isoformat() }}">
+          </div>
+          <div class="mb-2">
+            <select name="zahlungsart" class="form-select form-select-sm">
+              <option value="UEBERWEISUNG">Überweisung</option>
+              <option value="LASTSCHRIFT">Lastschrift</option>
+              <option value="BAR">Barzahlung</option>
+              <option value="SEPA">SEPA</option>
+            </select>
+          </div>
+          <button class="btn btn-success w-100">
+            <i class="bi bi-check-circle me-1"></i>Bezahlt
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('privatrechnung.update_status', rechnung_id=r.id) }}"
+              class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="MAHNUNG1">
+          <button class="btn btn-outline-warning w-100">
+            <i class="bi bi-exclamation-triangle me-1"></i>1. Mahnung
+          </button>
+        </form>
+
+        {% elif r.status == 'MAHNUNG1' %}
+        <form method="post" action="{{ url_for('privatrechnung.update_status', rechnung_id=r.id) }}"
+              class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="BEZAHLT">
+          <input type="date" name="bezahlt_am" class="form-control form-control-sm mb-2"
+                 value="{{ today.isoformat() }}">
+          <button class="btn btn-success w-100 mb-2">
+            <i class="bi bi-check-circle me-1"></i>Bezahlt
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('privatrechnung.update_status', rechnung_id=r.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="MAHNUNG2">
+          <button class="btn btn-outline-danger w-100">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>2. Mahnung
+          </button>
+        </form>
+
+        {% elif r.status in ('MAHNUNG2',) %}
+        <form method="post" action="{{ url_for('privatrechnung.update_status', rechnung_id=r.id) }}"
+              class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="BEZAHLT">
+          <input type="date" name="bezahlt_am" class="form-control form-control-sm mb-2"
+                 value="{{ today.isoformat() }}">
+          <button class="btn btn-success w-100 mb-2">Bezahlt</button>
+        </form>
+        <form method="post" action="{{ url_for('privatrechnung.update_status', rechnung_id=r.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="ABGESCHRIEBEN">
+          <button class="btn btn-outline-dark w-100">Abschreiben</button>
+        </form>
+
+        {% elif r.status == 'BEZAHLT' %}
+        <div class="alert alert-success small mb-0">
+          <i class="bi bi-check-circle-fill me-1"></i>
+          Bezahlt am {{ r.bezahlt_am.strftime('%d.%m.%Y') if r.bezahlt_am else '—' }}<br>
+          Zahlungsart: {{ r.zahlungsart or '—' }}
+        </div>
+
+        {% elif r.status == 'ABGESCHRIEBEN' %}
+        <div class="alert alert-dark small mb-0">
+          <i class="bi bi-x-circle me-1"></i>Abgeschrieben
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    {# Patient #}
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0">Patient</h6></div>
+      <div class="card-body small">
+        <p class="fw-semibold mb-1">{{ r.patient.full_name }}</p>
+        {% if r.patient.geburtsdatum %}
+        <p class="text-muted mb-1">geb. {{ r.patient.geburtsdatum.strftime('%d.%m.%Y') }}</p>
+        {% endif %}
+        <p class="text-muted mb-1">PG {{ r.patient.pflegegrad or '—' }}</p>
+        <div class="d-flex gap-1 mt-2">
+          <a href="{{ url_for('patients.show', patient_id=r.patient_id) }}"
+             class="btn btn-sm btn-outline-secondary flex-fill">Akte</a>
+          <a href="{{ url_for('privatrechnung.new', patient_id=r.patient_id) }}"
+             class="btn btn-sm btn-outline-primary flex-fill">Neue Rechnung</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

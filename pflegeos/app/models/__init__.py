@@ -1797,6 +1797,162 @@ class HkpVerordnung(db.Model):
         return self.gueltig_bis < date.today()
 
 
+# ============================================================
+# PFLEGEVERTRAG (§ 120 SGB XI)
+# ============================================================
+
+class Pflegevertrag(db.Model):
+    """Pflegevertrag zwischen Patient und Pflegedienst (§ 120 SGB XI)."""
+    __tablename__ = 'pflegevertraege'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    vertrag_nr     = db.Column(db.String(50))          # z.B. PV-2024-001
+    abschluss_datum = db.Column(db.Date, nullable=False, default=date.today)
+    beginn_datum   = db.Column(db.Date, nullable=False, default=date.today)
+    ende_datum     = db.Column(db.Date)                 # null = unbefristet
+
+    # Vereinbarte Leistungsbereiche (JSON):
+    # [{"bereich": "Grundpflege", "beschreibung": "...", "stundensatz": 25.00}]
+    leistungen = db.Column(db.Text)
+
+    # Vergütung (JSON): {"grundpflege": 25.00, "behandlungspflege": 35.00, ...}
+    verguetung = db.Column(db.Text)
+
+    # Kündigungsfristen
+    kuendigungsfrist_patient = db.Column(db.String(100), default='zum Ende des Kalendermonats')
+    kuendigungsfrist_dienst  = db.Column(db.String(100), default='4 Wochen zum Monatsende')
+
+    # Unterschriften
+    unterschrift_patient  = db.Column(db.Boolean, default=False)
+    unterschrift_vertreter = db.Column(db.Boolean, default=False)  # gesetzl. Vertreter
+    vertreter_name        = db.Column(db.String(255))
+    unterschrift_pdl      = db.Column(db.Boolean, default=False)
+    unterzeichnet_am      = db.Column(db.Date)
+
+    # ENTWURF | AKTIV | GEKUENDIGT | ABGELAUFEN
+    status          = db.Column(db.String(20), default='ENTWURF')
+    kuendigung_datum = db.Column(db.Date)
+    kuendigung_durch = db.Column(db.String(50))   # PATIENT | DIENST
+    kuendigung_grund = db.Column(db.Text)
+
+    notizen    = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    patient   = db.relationship('Patient',  backref='pflegevertraege')
+    company   = db.relationship('Company',  backref='pflegevertraege')
+    ersteller = db.relationship('Employee', foreign_keys=[created_by], backref='pflegevertraege')
+
+    __table_args__ = (
+        db.Index('ix_pflegevertraege_company_id', 'company_id'),
+        db.Index('ix_pflegevertraege_patient_id', 'patient_id'),
+        db.Index('ix_pflegevertraege_status',     'status'),
+    )
+
+    @property
+    def leistungen_list(self):
+        import json
+        if not self.leistungen:
+            return []
+        try:
+            return json.loads(self.leistungen)
+        except Exception:
+            return []
+
+    @property
+    def verguetung_dict(self):
+        import json
+        if not self.verguetung:
+            return {}
+        try:
+            return json.loads(self.verguetung)
+        except Exception:
+            return {}
+
+    @property
+    def is_active(self):
+        return self.status == 'AKTIV'
+
+
+# ============================================================
+# PRIVATRECHNUNG
+# ============================================================
+
+class Privatrechnung(db.Model):
+    """Privatrechnung für Selbstzahler / Patienten ohne GKV-Deckung."""
+    __tablename__ = 'privatrechnungen'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    rechnung_nr    = db.Column(db.String(50), nullable=False)   # PRIV-2024-001
+    rechnungsdatum = db.Column(db.Date, nullable=False, default=date.today)
+    leistungsmonat = db.Column(db.String(7))                    # YYYY-MM (optional)
+
+    # Rechnungspositionen (JSON):
+    # [{"bezeichnung": "Grundpflege", "menge": 12, "einheit": "Eins.",
+    #   "einzelpreis": 25.00, "gesamtpreis": 300.00, "mwst_satz": 0}]
+    positionen = db.Column(db.Text)
+
+    betrag_netto  = db.Column(db.Numeric(10, 2), default=0)
+    mwst_betrag   = db.Column(db.Numeric(10, 2), default=0)
+    betrag_brutto = db.Column(db.Numeric(10, 2), default=0)
+
+    # Zahlungsziel
+    zahlungsziel_tage = db.Column(db.Integer, default=14)
+    faellig_am        = db.Column(db.Date)
+
+    # ENTWURF | VERSENDET | BEZAHLT | MAHNUNG1 | MAHNUNG2 | ABGESCHRIEBEN
+    status      = db.Column(db.String(20), default='ENTWURF')
+    bezahlt_am  = db.Column(db.Date)
+    zahlungsart = db.Column(db.String(30))   # UEBERWEISUNG | LASTSCHRIFT | BAR | SEPA
+
+    notizen    = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    patient   = db.relationship('Patient',  backref='privatrechnungen')
+    company   = db.relationship('Company',  backref='privatrechnungen')
+    ersteller = db.relationship('Employee', foreign_keys=[created_by], backref='privatrechnungen')
+
+    __table_args__ = (
+        db.Index('ix_privatrechnungen_company_id',    'company_id'),
+        db.Index('ix_privatrechnungen_patient_id',    'patient_id'),
+        db.Index('ix_privatrechnungen_status',        'status'),
+        db.Index('ix_privatrechnungen_rechnungsdatum','rechnungsdatum'),
+    )
+
+    @property
+    def positionen_list(self):
+        import json
+        if not self.positionen:
+            return []
+        try:
+            return json.loads(self.positionen)
+        except Exception:
+            return []
+
+    @property
+    def ist_ueberfaellig(self):
+        if self.status in ('BEZAHLT', 'ABGESCHRIEBEN'):
+            return False
+        if not self.faellig_am:
+            return False
+        return self.faellig_am < date.today()
+
+    @property
+    def tage_ueberfaellig(self):
+        if not self.ist_ueberfaellig:
+            return 0
+        return (date.today() - self.faellig_am).days
+
+
 class Standort(db.Model):
     """Filiale oder Wohnbereich eines Pflegedienstes."""
     __tablename__ = 'standorte'

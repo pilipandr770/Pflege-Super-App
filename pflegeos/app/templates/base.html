@@ -188,6 +188,18 @@
           </a>
         </li>
         <li class="nav-item">
+          <a href="{{ url_for('pflegevertrag.index') }}"
+             class="nav-link {% if request.endpoint and 'pflegevertrag.' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-file-text"></i> Pflegeverträge
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ url_for('privatrechnung.index') }}"
+             class="nav-link {% if request.endpoint and 'privatrechnung.' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-receipt"></i> Privatrechnungen
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('gkv.index') }}"
              class="nav-link {% if request.endpoint and 'gkv.' in request.endpoint %}active{% endif %}">
             <i class="bi bi-receipt"></i> GKV-Abrechnung

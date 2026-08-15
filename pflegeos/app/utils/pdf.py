@@ -506,3 +506,265 @@ def generate_leistungsnachweis_pdf(patient, lns, monat_str, company):
     doc.build(el)
     buffer.seek(0)
     return buffer
+
+
+# ── Pflegevertrag ─────────────────────────────────────────────────────────────
+
+def generate_pflegevertrag_pdf(v, company):
+    """Pflegevertrag (§ 120 SGB XI) als PDF."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm,
+                            leftMargin=2*cm, rightMargin=2*cm)
+    styles = getSampleStyleSheet()
+    el = []
+
+    def _s(name, **kw):
+        return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+    head  = _s('PVHead', fontSize=14, textColor=PFLEGEOS_BLUE,
+               fontName='Helvetica-Bold', spaceAfter=4)
+    sub   = _s('PVSub',  fontSize=11, textColor=PFLEGEOS_BLUE,
+               fontName='Helvetica-Bold', spaceAfter=6, spaceBefore=12)
+    bold  = _s('PVBold', fontName='Helvetica-Bold', fontSize=9)
+    norm  = _s('PVNorm', fontSize=9, spaceAfter=3)
+    small = _s('PVSmall',fontSize=8, textColor=colors.grey)
+    para  = _s('PVPara', fontSize=9, spaceAfter=4, leading=13)
+
+    c_addr = (f'{company.strasse} {company.hausnummer}, '
+              f'{company.plz} {company.ort}')
+    p_name = v.patient.full_name
+    p_geb  = (v.patient.geburtsdatum.strftime('%d.%m.%Y')
+              if v.patient.geburtsdatum else '—')
+
+    logo_row = Table([[
+        Paragraph(f'<b>{company.name}</b><br/>'
+                  f'<font size="8">{c_addr}<br/>'
+                  f'Tel.: {company.telefon or "—"}  •  IK: {company.ik_nummer or "—"}</font>',
+                  norm),
+        Paragraph(f'<b>Pflegevertrag</b><br/>'
+                  f'<font size="8">Nr. {v.vertrag_nr}</font>', head),
+    ]], colWidths=[10*cm, 7*cm])
+    logo_row.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',  (1, 0), (1, 0),   'RIGHT'),
+    ]))
+    el.append(logo_row)
+    el.append(HRFlowable(width='100%', thickness=1.5, color=PFLEGEOS_BLUE, spaceAfter=8))
+
+    el.append(Paragraph('Vertragsparteien', sub))
+    parteien = Table([
+        [Paragraph('<b>Pflegedienst</b>', bold),
+         Paragraph('<b>Patient / Vertragspartner</b>', bold)],
+        [Paragraph(f'{company.name}<br/>{c_addr}', norm),
+         Paragraph(f'{p_name}<br/>geb. {p_geb}', norm)],
+    ], colWidths=[8.5*cm, 8.5*cm])
+    parteien.setStyle(TableStyle([
+        ('BOX',       (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('GRID',      (0, 0), (-1, -1), 0.3, colors.lightgrey),
+        ('BACKGROUND',(0, 0), (-1, 0),  PFLEGEOS_LIGHT),
+        ('PADDING',   (0, 0), (-1, -1), 5),
+        ('VALIGN',    (0, 0), (-1, -1), 'TOP'),
+    ]))
+    el.append(parteien)
+
+    el.append(Paragraph('Vertragslaufzeit', sub))
+    beginn = v.beginn_datum.strftime('%d.%m.%Y')
+    ende   = v.ende_datum.strftime('%d.%m.%Y') if v.ende_datum else 'unbefristet'
+    el.append(Paragraph(
+        f'Der Vertrag beginnt am <b>{beginn}</b> und gilt <b>{ende}</b>.', para))
+
+    el.append(Paragraph('Vertragsgegenstand (§ 120 SGB XI)', sub))
+    el.append(Paragraph(
+        'Der Pflegedienst erbringt ambulante Pflegeleistungen gemäß dem jeweils gültigen '
+        'Leistungskatalog nach SGB XI und SGB V. Die vereinbarten Leistungen und '
+        'Vergütungssätze sind in der beigefügten Leistungs- und Preisvereinbarung festgelegt.',
+        para))
+
+    if v.leistungen_list:
+        el.append(Paragraph('Vereinbarte Leistungsbereiche:', bold))
+        el.append(Spacer(1, 0.2*cm))
+        rows = [['Leistungsbereich', 'Beschreibung', 'Stundensatz']]
+        for l in v.leistungen_list:
+            rows.append([
+                l.get('bereich', ''),
+                l.get('beschreibung', '—'),
+                (l.get('stundensatz', '') + ' €/h') if l.get('stundensatz') else '—',
+            ])
+        lt = Table(rows, colWidths=[7*cm, 7*cm, 3*cm])
+        lt.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), PFLEGEOS_LIGHT),
+            ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE',   (0, 0), (-1, -1), 8),
+            ('GRID',       (0, 0), (-1, -1), 0.3, colors.lightgrey),
+            ('PADDING',    (0, 0), (-1, -1), 5),
+        ]))
+        el.append(lt)
+
+    el.append(Paragraph('Kündigung', sub))
+    el.append(Paragraph(
+        f'<b>Patient:</b> {v.kuendigungsfrist_patient}<br/>'
+        f'<b>Pflegedienst:</b> {v.kuendigungsfrist_dienst}', para))
+    el.append(Paragraph(
+        'Die Kündigung bedarf der Schriftform. Bei Tod des Pflegebedürftigen endet '
+        'der Vertrag automatisch.', para))
+
+    el.append(Paragraph('Datenschutz', sub))
+    el.append(Paragraph(
+        'Der Pflegedienst verarbeitet personenbezogene Daten ausschließlich zum Zweck der '
+        'Pflege und Abrechnung gemäß Art. 9 DSGVO i.V.m. § 35 SGB I.', para))
+
+    el.append(Spacer(1, 0.8*cm))
+    el.append(HRFlowable(width='100%', thickness=0.5, color=colors.grey))
+    el.append(Paragraph('Unterschriften', sub))
+    datum_ort = (f'Ort, {v.unterzeichnet_am.strftime("%d.%m.%Y")}  '
+                 if v.unterzeichnet_am else 'Ort, Datum  ')
+    sig = Table([
+        [datum_ort + '________________________',
+         datum_ort + '________________________'],
+        [f'Patient/Vertreter{" (" + v.vertreter_name + ")" if v.vertreter_name else ""}',
+         'PDL / Einrichtungsleitung'],
+    ], colWidths=[8.5*cm, 8.5*cm])
+    sig.setStyle(TableStyle([
+        ('FONTSIZE',    (0, 0), (-1, -1), 8),
+        ('TOPPADDING',  (0, 0), (-1, 0),  16),
+    ]))
+    el.append(sig)
+    el.append(Spacer(1, 0.5*cm))
+    el.append(Paragraph(
+        f'Erstellt: {datetime.now().strftime("%d.%m.%Y %H:%M")}  •  PflegeOS',
+        _s('PVFoot', fontSize=7, textColor=colors.grey)))
+
+    doc.build(el)
+    buffer.seek(0)
+    return buffer
+
+
+# ── Privatrechnung ────────────────────────────────────────────────────────────
+
+def generate_privatrechnung_pdf(r, company):
+    """Professionelle Privatrechnung als PDF."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm,
+                            leftMargin=2*cm, rightMargin=2*cm)
+    styles = getSampleStyleSheet()
+    el = []
+
+    def _s(name, **kw):
+        return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+    head  = _s('RHead', fontSize=16, textColor=PFLEGEOS_BLUE,
+               fontName='Helvetica-Bold', spaceAfter=4)
+    sub   = _s('RSub',  fontSize=10, textColor=PFLEGEOS_BLUE,
+               fontName='Helvetica-Bold', spaceAfter=4, spaceBefore=10)
+    norm  = _s('RNorm', fontSize=9, spaceAfter=2)
+    small = _s('RSmall',fontSize=8, textColor=colors.grey)
+
+    patient = r.patient
+    c_addr  = (f'{company.strasse} {company.hausnummer}, '
+               f'{company.plz} {company.ort}')
+
+    header = Table([[
+        Paragraph(
+            f'<b>{company.name}</b><br/>'
+            f'<font size="8">{c_addr}<br/>'
+            f'Tel.: {company.telefon or "—"}</font>', norm),
+        Paragraph(
+            f'<b>RECHNUNG</b><br/>'
+            f'<font size="9">Nr. {r.rechnung_nr}</font>', head),
+    ]], colWidths=[10*cm, 7*cm])
+    header.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',  (1, 0), (1, 0),   'RIGHT'),
+    ]))
+    el.append(header)
+    el.append(HRFlowable(width='100%', thickness=2, color=PFLEGEOS_BLUE, spaceAfter=10))
+
+    p_geb = (patient.geburtsdatum.strftime('%d.%m.%Y')
+             if patient.geburtsdatum else '')
+    meta = Table([[
+        Paragraph(
+            f'<b>Rechnungsempfänger:</b><br/>'
+            f'{patient.full_name}<br/>'
+            f'{("geb. " + p_geb + "<br/>") if p_geb else ""}', norm),
+        Paragraph(
+            f'Datum: <b>{r.rechnungsdatum.strftime("%d.%m.%Y")}</b><br/>'
+            f'Zahlungsziel: <b>{r.faellig_am.strftime("%d.%m.%Y") if r.faellig_am else "—"}</b><br/>'
+            f'{("Leistungsmonat: " + r.leistungsmonat) if r.leistungsmonat else ""}', norm),
+    ]], colWidths=[10*cm, 7*cm])
+    meta.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',  (1, 0), (1, 0),   'RIGHT'),
+    ]))
+    el.append(meta)
+    el.append(Spacer(1, 0.5*cm))
+
+    el.append(Paragraph('Rechnungspositionen', sub))
+    rows = [['Bezeichnung', 'Menge', 'Einheit', 'Einzelpreis', 'MwSt.', 'Betrag']]
+    for p in r.positionen_list:
+        rows.append([
+            p.get('bezeichnung', ''),
+            str(p.get('menge', '')),
+            p.get('einheit', ''),
+            f'{float(p.get("einzelpreis", 0)):.2f} €',
+            f'{p.get("mwst_satz", 0)} %',
+            f'{float(p.get("gesamtpreis", 0)):.2f} €',
+        ])
+    col_w = [7.5*cm, 1.5*cm, 1.5*cm, 2.5*cm, 1.5*cm, 2.5*cm]
+    tbl = Table(rows, colWidths=col_w)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0),  PFLEGEOS_LIGHT),
+        ('FONTNAME',   (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+        ('GRID',       (0, 0), (-1, -1), 0.3, colors.lightgrey),
+        ('ALIGN',      (1, 0), (-1, -1), 'RIGHT'),
+        ('PADDING',    (0, 0), (-1, -1), 5),
+    ]))
+    el.append(tbl)
+
+    el.append(Spacer(1, 0.3*cm))
+    netto  = float(r.betrag_netto  or 0)
+    mwst   = float(r.mwst_betrag   or 0)
+    brutto = float(r.betrag_brutto or 0)
+    summen_rows = [[f'Nettobetrag:', f'{netto:.2f} €']]
+    if mwst > 0:
+        summen_rows.append(['Umsatzsteuer:', f'{mwst:.2f} €'])
+    summen_rows.append(['Gesamtbetrag:', f'{brutto:.2f} €'])
+    summen = Table(summen_rows, colWidths=[14*cm, 3*cm])
+    summen.setStyle(TableStyle([
+        ('ALIGN',     (1, 0),  (1, -1),  'RIGHT'),
+        ('FONTSIZE',  (0, 0),  (-1, -1), 9),
+        ('FONTNAME',  (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE',  (0, -1), (-1, -1), 11),
+        ('LINEABOVE', (0, -1), (-1, -1), 1, PFLEGEOS_BLUE),
+        ('TOPPADDING',(0, -1), (-1, -1), 6),
+    ]))
+    el.append(summen)
+
+    if mwst == 0:
+        el.append(Spacer(1, 0.4*cm))
+        el.append(Paragraph(
+            'Gemäß § 4 Nr. 16 UStG sind die aufgeführten '
+            'Pflegeleistungen von der Umsatzsteuer befreit.', small))
+
+    el.append(Spacer(1, 0.6*cm))
+    el.append(HRFlowable(width='100%', thickness=0.5, color=colors.grey))
+    el.append(Paragraph('Zahlungshinweise', sub))
+    el.append(Paragraph(
+        f'Bitte überweisen Sie den Betrag von <b>{brutto:.2f} €</b> bis zum '
+        f'<b>{r.faellig_am.strftime("%d.%m.%Y") if r.faellig_am else "—"}</b> '
+        f'unter Angabe der Rechnungsnummer <b>{r.rechnung_nr}</b>.', norm))
+
+    if r.notizen:
+        el.append(Spacer(1, 0.3*cm))
+        el.append(Paragraph(r.notizen, norm))
+
+    el.append(Spacer(1, 0.8*cm))
+    el.append(Paragraph(
+        f'Erstellt: {datetime.now().strftime("%d.%m.%Y %H:%M")}  •  PflegeOS',
+        _s('RFoot', fontSize=7, textColor=colors.grey)))
+
+    doc.build(el)
+    buffer.seek(0)
+    return buffer

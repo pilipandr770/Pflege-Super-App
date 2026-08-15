@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% block title %}Neuer Pflegevertrag{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('pflegevertrag.index') }}" class="text-decoration-none text-muted">
+    <i class="bi bi-arrow-left me-1"></i>Zurück
+  </a>
+</div>
+<h2 class="mb-4"><i class="bi bi-file-text me-2"></i>Neuer Pflegevertrag (§ 120 SGB XI)</h2>
+
+<form method="post" id="vertragForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-4">
+
+    <div class="col-lg-7">
+
+      {# Patient #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Patient / Vertragspartner</h6></div>
+        <div class="card-body">
+          <select name="patient_id" class="form-select" required>
+            <option value="">— Patienten wählen —</option>
+            {% for p in patients %}
+            <option value="{{ p.id }}"
+                    {{ 'selected' if preselected and preselected.id == p.id }}>
+              {{ p.full_name }}
+              {% if p.geburtsdatum %}({{ p.geburtsdatum.strftime('%d.%m.%Y') }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="mt-3">
+            <div class="form-check">
+              <input type="checkbox" name="unterschrift_vertreter"
+                     class="form-check-input" id="ckVertreter"
+                     onchange="document.getElementById('vertreterRow').style.display=this.checked?'block':'none'">
+              <label class="form-check-label" for="ckVertreter">
+                Gesetzlicher Vertreter / Bevollmächtigter unterzeichnet
+              </label>
+            </div>
+            <div id="vertreterRow" style="display:none" class="mt-2">
+              <input type="text" name="vertreter_name" class="form-control"
+                     placeholder="Name des gesetzlichen Vertreters">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Zeitraum #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Vertragslaufzeit</h6></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Beginn <span class="text-danger">*</span></label>
+              <input type="date" name="beginn_datum" class="form-control"
+                     value="{{ today.isoformat() }}" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Ende <span class="text-muted small">(leer = unbefristet)</span></label>
+              <input type="date" name="ende_datum" class="form-control">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Kündigungsfristen #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Kündigungsfristen</h6></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">Für Patient</label>
+              <input type="text" name="kuendigungsfrist_patient" class="form-control"
+                     value="zum Ende des Kalendermonats">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Für Pflegedienst</label>
+              <input type="text" name="kuendigungsfrist_dienst" class="form-control"
+                     value="4 Wochen zum Monatsende">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Unterschriften #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Unterschriften</h6></div>
+        <div class="card-body">
+          <div class="form-check mb-2">
+            <input type="checkbox" name="unterschrift_patient"
+                   class="form-check-input" id="ckPatient">
+            <label class="form-check-label" for="ckPatient">
+              Patient / Vertreter hat unterschrieben
+            </label>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" name="unterschrift_pdl"
+                   class="form-check-input" id="ckPdl">
+            <label class="form-check-label" for="ckPdl">
+              PDL / Einrichtungsleitung hat unterschrieben
+            </label>
+          </div>
+          <div class="alert alert-info small mt-3 mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Sind beide Unterschriften gesetzt, wird der Vertrag direkt auf <strong>AKTIV</strong> gesetzt.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-lg-5">
+
+      {# Leistungen #}
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">Vereinbarte Leistungen</h6>
+          <button type="button" class="btn btn-sm btn-outline-primary"
+                  onclick="addLeistung()">
+            <i class="bi bi-plus"></i>
+          </button>
+        </div>
+        <div class="card-body" id="leistungenContainer">
+          <div class="leistung-row mb-3">
+            <div class="row g-2">
+              <div class="col-12">
+                <select name="l_bereich" class="form-select form-select-sm">
+                  <option value="">— Leistungsbereich wählen —</option>
+                  {% for lb in leistungsbereiche %}
+                  <option value="{{ lb }}">{{ lb }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-8">
+                <input type="text" name="l_beschreibung" class="form-control form-control-sm"
+                       placeholder="Ergänzende Beschreibung">
+              </div>
+              <div class="col-4">
+                <div class="input-group input-group-sm">
+                  <input type="text" name="l_stundensatz" class="form-control"
+                         placeholder="Satz">
+                  <span class="input-group-text">€/h</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Notizen #}
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Interne Notizen</h6></div>
+        <div class="card-body">
+          <textarea name="notizen" class="form-control" rows="3"
+                    placeholder="Besonderheiten, Absprachen…"></textarea>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-save me-1"></i>Vertrag speichern
+    </button>
+    <a href="{{ url_for('pflegevertrag.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+</form>
+
+<script>
+const BEREICHE = {{ leistungsbereiche | tojson }};
+
+function addLeistung() {
+  const c = document.getElementById('leistungenContainer');
+  const d = document.createElement('div');
+  d.className = 'leistung-row mb-3';
+  d.innerHTML = `
+    <div class="row g-2">
+      <div class="col-12">
+        <select name="l_bereich" class="form-select form-select-sm">
+          <option value="">— Leistungsbereich wählen —</option>
+          ${BEREICHE.map(b => `<option value="${b}">${b}</option>`).join('')}
+        </select>
+      </div>
+      <div class="col-7">
+        <input type="text" name="l_beschreibung" class="form-control form-control-sm"
+               placeholder="Ergänzende Beschreibung">
+      </div>
+      <div class="col-4">
+        <div class="input-group input-group-sm">
+          <input type="text" name="l_stundensatz" class="form-control" placeholder="Satz">
+          <span class="input-group-text">€/h</span>
+        </div>
+      </div>
+      <div class="col-1">
+        <button type="button" class="btn btn-sm btn-outline-danger w-100"
+                onclick="this.closest('.leistung-row').remove()">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+    </div>`;
+  c.appendChild(d);
+}
+</script>
+{% endblock %}

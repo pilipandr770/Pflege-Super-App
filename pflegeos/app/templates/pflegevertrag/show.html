@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+{% block title %}Vertrag {{ v.vertrag_nr }}{% endblock %}
+
+{% block content %}
+{% set label, color = status_labels.get(v.status, (v.status, 'secondary')) %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <a href="{{ url_for('pflegevertrag.index') }}" class="text-decoration-none text-muted small">
+      <i class="bi bi-arrow-left me-1"></i>Zurück
+    </a>
+    <h2 class="mb-1 mt-1 font-monospace">{{ v.vertrag_nr }}</h2>
+    <span class="text-muted">{{ v.patient.full_name }}</span>
+    &nbsp;<span class="badge bg-{{ color }} fs-6">{{ label }}</span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('pflegevertrag.pdf', vertrag_id=v.id) }}"
+       class="btn btn-outline-secondary" target="_blank">
+      <i class="bi bi-printer me-1"></i>PDF drucken
+    </a>
+    <a href="{{ url_for('privatrechnung.new', patient_id=v.patient_id) }}"
+       class="btn btn-outline-info">
+      <i class="bi bi-receipt me-1"></i>Rechnung erstellen
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <div class="col-lg-8">
+
+    {# Vertragsdaten #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Vertragsdaten</h6></div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4">Vertragsnummer</dt>
+          <dd class="col-sm-8 font-monospace">{{ v.vertrag_nr }}</dd>
+          <dt class="col-sm-4">Abschluss</dt>
+          <dd class="col-sm-8">{{ v.abschluss_datum.strftime('%d.%m.%Y') }}</dd>
+          <dt class="col-sm-4">Beginn</dt>
+          <dd class="col-sm-8">{{ v.beginn_datum.strftime('%d.%m.%Y') }}</dd>
+          <dt class="col-sm-4">Ende</dt>
+          <dd class="col-sm-8">{{ v.ende_datum.strftime('%d.%m.%Y') if v.ende_datum else 'Unbefristet' }}</dd>
+          <dt class="col-sm-4">Kündigung (Patient)</dt>
+          <dd class="col-sm-8">{{ v.kuendigungsfrist_patient }}</dd>
+          <dt class="col-sm-4">Kündigung (Dienst)</dt>
+          <dd class="col-sm-8">{{ v.kuendigungsfrist_dienst }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {# Leistungen #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Vereinbarte Leistungen</h6></div>
+      {% if v.leistungen_list %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr><th>Leistungsbereich</th><th>Beschreibung</th><th>Stundensatz</th></tr>
+          </thead>
+          <tbody>
+            {% for l in v.leistungen_list %}
+            <tr>
+              <td class="fw-semibold small">{{ l.bereich }}</td>
+              <td class="text-muted small">{{ l.beschreibung or '—' }}</td>
+              <td class="text-muted small">{{ l.stundensatz ~ ' €/h' if l.stundensatz else '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted small">Keine Leistungen eingetragen.</div>
+      {% endif %}
+    </div>
+
+    {% if v.notizen %}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Interne Notizen</h6></div>
+      <div class="card-body small text-muted">{{ v.notizen }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="col-lg-4">
+
+    {# Unterschriften #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Unterschriften</h6></div>
+      <div class="card-body">
+        <ul class="list-unstyled small mb-3">
+          <li class="mb-1">
+            <i class="bi bi-{{ 'check-circle-fill text-success' if v.unterschrift_patient else 'circle text-muted' }}"></i>
+            Patient
+          </li>
+          {% if v.vertreter_name %}
+          <li class="mb-1">
+            <i class="bi bi-{{ 'check-circle-fill text-success' if v.unterschrift_vertreter else 'circle text-muted' }}"></i>
+            Vertreter: {{ v.vertreter_name }}
+          </li>
+          {% endif %}
+          <li class="mb-1">
+            <i class="bi bi-{{ 'check-circle-fill text-success' if v.unterschrift_pdl else 'circle text-muted' }}"></i>
+            PDL / Leitung
+          </li>
+          {% if v.unterzeichnet_am %}
+          <li class="text-success mt-2 small">
+            <i class="bi bi-pen-fill"></i> Unterzeichnet: {{ v.unterzeichnet_am.strftime('%d.%m.%Y') }}
+          </li>
+          {% endif %}
+        </ul>
+
+        {% if v.status == 'ENTWURF' %}
+        <button class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="modal"
+                data-bs-target="#aktivierenModal">
+          <i class="bi bi-pen me-1"></i>Unterschriften eintragen
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Kündigung #}
+    {% if v.status == 'AKTIV' %}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Kündigung</h6></div>
+      <div class="card-body">
+        <button class="btn btn-sm btn-outline-danger w-100" data-bs-toggle="modal"
+                data-bs-target="#kuendigenModal">
+          <i class="bi bi-x-circle me-1"></i>Vertrag kündigen
+        </button>
+      </div>
+    </div>
+    {% elif v.status == 'GEKUENDIGT' %}
+    <div class="card mb-3 border-danger">
+      <div class="card-header bg-danger-subtle"><h6 class="mb-0 text-danger">Gekündigt</h6></div>
+      <div class="card-body small">
+        <p class="mb-1"><strong>Am:</strong> {{ v.kuendigung_datum.strftime('%d.%m.%Y') if v.kuendigung_datum else '—' }}</p>
+        <p class="mb-1"><strong>Durch:</strong> {{ v.kuendigung_durch or '—' }}</p>
+        {% if v.kuendigung_grund %}
+        <p class="mb-0"><strong>Grund:</strong> {{ v.kuendigung_grund }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Patient #}
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0">Patient</h6></div>
+      <div class="card-body small">
+        <p class="fw-semibold mb-1">{{ v.patient.full_name }}</p>
+        {% if v.patient.geburtsdatum %}
+        <p class="text-muted mb-1">geb. {{ v.patient.geburtsdatum.strftime('%d.%m.%Y') }}</p>
+        {% endif %}
+        <p class="text-muted mb-1">PG {{ v.patient.pflegegrad or '—' }}</p>
+        <div class="d-flex gap-1 mt-2">
+          <a href="{{ url_for('patients.show', patient_id=v.patient_id) }}"
+             class="btn btn-sm btn-outline-secondary flex-fill">Akte</a>
+          <a href="{{ url_for('pflegevertrag.new', patient_id=v.patient_id) }}"
+             class="btn btn-sm btn-outline-primary flex-fill">Neuer Vertrag</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# Modal: Unterschriften #}
+{% if v.status == 'ENTWURF' %}
+<div class="modal fade" id="aktivierenModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('pflegevertrag.aktivieren', vertrag_id=v.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Unterschriften eintragen</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-check mb-2">
+            <input type="checkbox" name="unterschrift_patient" class="form-check-input"
+                   id="m_patient" {{ 'checked' if v.unterschrift_patient }}>
+            <label for="m_patient" class="form-check-label">Patient hat unterschrieben</label>
+          </div>
+          <div class="form-check mb-3">
+            <input type="checkbox" name="unterschrift_vertreter" class="form-check-input"
+                   id="m_vertr" {{ 'checked' if v.unterschrift_vertreter }}
+                   onchange="document.getElementById('m_vertrName').style.display=this.checked?'block':'none'">
+            <label for="m_vertr" class="form-check-label">Gesetzlicher Vertreter</label>
+          </div>
+          <div id="m_vertrName" style="display:{{ 'block' if v.unterschrift_vertreter else 'none' }}"
+               class="ms-4 mb-3">
+            <input type="text" name="vertreter_name" class="form-control form-control-sm"
+                   value="{{ v.vertreter_name or '' }}" placeholder="Name des Vertreters">
+          </div>
+          <div class="form-check">
+            <input type="checkbox" name="unterschrift_pdl" class="form-check-input"
+                   id="m_pdl" {{ 'checked' if v.unterschrift_pdl }}>
+            <label for="m_pdl" class="form-check-label">PDL / Leitung hat unterschrieben</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" type="submit">Speichern</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# Modal: Kündigen #}
+{% if v.status == 'AKTIV' %}
+<div class="modal fade" id="kuendigenModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('pflegevertrag.kuendigen', vertrag_id=v.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title text-danger">Vertrag kündigen</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Gekündigt durch</label>
+            <select name="kuendigung_durch" class="form-select">
+              <option value="PATIENT">Patient / Vertreter</option>
+              <option value="DIENST">Pflegedienst</option>
+            </select>
+          </div>
+          <div class="mb-0">
+            <label class="form-label">Kündigungsgrund</label>
+            <textarea name="kuendigung_grund" class="form-control" rows="3"
+                      placeholder="Optionale Begründung…"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-danger" type="submit">Kündigen</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
