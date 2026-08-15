@@ -413,6 +413,9 @@
         </ol>
       </nav>
       <div class="d-flex align-items-center gap-3">
+        <button id="tourStartBtn" class="btn btn-outline-info btn-sm" title="Interaktive Tour durch alle Funktionen">
+          <i class="bi bi-map me-1"></i>Tour
+        </button>
         <span class="badge bg-{% if current_user.company.plan == 'TRIAL' %}warning text-dark{% else %}success{% endif %}">
           {{ current_user.company.plan }}
         </span>
