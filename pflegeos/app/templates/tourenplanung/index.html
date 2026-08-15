@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Tourenplanung{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0"><i class="bi bi-map me-2"></i>Tourenplanung</h2>
+  <a href="{{ url_for('tourenplanung.new', datum=tag.isoformat()) }}"
+     class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Neue Tour
+  </a>
+</div>
+
+{# Wochenkalender #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+          <a href="{{ url_for('tourenplanung.index', datum=prev_week, employee_id=employee_filter) }}"
+         class="btn btn-sm btn-outline-secondary">&laquo;</a>
+      {% for d in woche %}
+      <a href="{{ url_for('tourenplanung.index', datum=d.isoformat(), employee_id=employee_filter) }}"
+         class="btn btn-sm {{ 'btn-primary' if d == tag else 'btn-outline-secondary' }}">
+        <small class="d-block text-uppercase" style="font-size:.65rem">
+          {{ ['Mo','Di','Mi','Do','Fr','Sa','So'][d.weekday()] }}
+        </small>
+        {{ d.strftime('%d.%m') }}
+      </a>
+      {% endfor %}
+      <a href="{{ url_for('tourenplanung.index', datum=next_week, employee_id=employee_filter) }}"
+         class="btn btn-sm btn-outline-secondary">&raquo;</a>
+
+      <div class="ms-3">
+        <select class="form-select form-select-sm" onchange="location.href=this.value">
+          <option value="{{ url_for('tourenplanung.index', datum=tag.isoformat()) }}">
+            Alle Mitarbeiter
+          </option>
+          {% for e in employees %}
+          <option value="{{ url_for('tourenplanung.index', datum=tag.isoformat(), employee_id=e.id) }}"
+                  {{ 'selected' if employee_filter == e.id }}>
+            {{ e.full_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if touren %}
+<div class="row g-3">
+  {% for t in touren %}
+  {% set tlabel, tcolor = status_labels.get(t.status, (t.status, 'secondary')) %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100 border-{{ tcolor }}">
+      <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <div>
+          <span class="fw-bold small">{{ t.tour_nr }}</span>
+          <span class="badge bg-{{ tcolor }} ms-1">{{ tlabel }}</span>
+        </div>
+        <a href="{{ url_for('tourenplanung.show', tour_id=t.id) }}"
+           class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-eye"></i>
+        </a>
+      </div>
+      <div class="card-body py-2">
+        <div class="fw-semibold mb-1">
+          <i class="bi bi-person me-1 text-muted"></i>{{ t.employee.full_name }}
+        </div>
+        {% if t.start_zeit %}
+        <div class="small text-muted mb-1">
+          <i class="bi bi-clock me-1"></i>
+          {{ t.start_zeit.strftime('%H:%M') }}
+          {% if t.end_zeit %}– {{ t.end_zeit.strftime('%H:%M') }}{% endif %}
+          {% if t.kfz_nr %}&nbsp;·&nbsp;<i class="bi bi-car-front"></i> {{ t.kfz_nr }}{% endif %}
+        </div>
+        {% endif %}
+        <div class="d-flex align-items-center gap-2 mt-1">
+          <span class="small text-muted">{{ t.stops|length }} Besuche</span>
+          {% if t.stops %}
+          <div class="progress flex-grow-1" style="height:6px">
+            <div class="progress-bar bg-success" style="width:{{ (t.erledigt_count / t.stops|length * 100)|int }}%"></div>
+          </div>
+          <span class="small text-muted">{{ t.erledigt_count }}/{{ t.stops|length }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-footer py-1 small text-muted">
+        {% for s in t.stops[:4] %}
+        {{ s.patient.full_name }}{% if not loop.last %}, {% endif %}
+        {% endfor %}
+        {% if t.stops|length > 4 %}
+        +{{ t.stops|length - 4 }} weitere
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-map fs-1 d-block mb-3 opacity-25"></i>
+  <p>Keine Touren für {{ tag.strftime('%d.%m.%Y') }}.</p>
+  <a href="{{ url_for('tourenplanung.new', datum=tag.isoformat()) }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Tour anlegen
+  </a>
+</div>
+{% endif %}
+
+<script>
+// Macros für Jinja in Flask-Templates (timedelta ist nicht direkt verfügbar)
+// Die Links werden server-seitig generiert — JS nur für UX.
+</script>
+{% endblock %}

@@ -206,6 +206,12 @@
           </a>
         </li>
         <li class="nav-item">
+          <a href="{{ url_for('tourenplanung.index') }}"
+             class="nav-link {% if request.endpoint and 'tourenplanung.' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-map"></i> Tourenplanung
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="{{ url_for('gkv.index') }}"
              class="nav-link {% if request.endpoint and 'gkv.' in request.endpoint %}active{% endif %}">
             <i class="bi bi-receipt"></i> GKV-Abrechnung

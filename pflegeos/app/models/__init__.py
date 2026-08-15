@@ -2059,3 +2059,80 @@ class Standort(db.Model):
         db.Index('ix_standorte_company_id', 'company_id'),
         db.UniqueConstraint('company_id', 'kuerzel', name='uq_standort_kuerzel'),
     )
+
+
+# ============================================================
+# TOURENPLANUNG
+# ============================================================
+
+class Tour(db.Model):
+    """Tagesroute für einen Mitarbeiter (ambulante Pflege)."""
+    __tablename__ = 'touren'
+
+    id          = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id  = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+    created_by  = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    tour_nr    = db.Column(db.String(50))   # T-YYYY-NNN
+    datum      = db.Column(db.Date, nullable=False)
+    start_zeit = db.Column(db.Time)         # geplanter Dienstbeginn
+    end_zeit   = db.Column(db.Time)         # geplantes Dienstende
+    kfz_nr     = db.Column(db.String(50))   # Fahrzeug-Kennzeichen optional
+
+    status  = db.Column(db.String(20), default='GEPLANT')
+    # GEPLANT | AKTIV | ABGESCHLOSSEN | ABGEBROCHEN
+
+    notizen    = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    employee = db.relationship('Employee', foreign_keys=[employee_id], backref='touren')
+    stops    = db.relationship('TourStop', backref='tour',
+                               order_by='TourStop.reihenfolge',
+                               cascade='all, delete-orphan')
+
+    __table_args__ = (
+        db.Index('ix_touren_company_datum', 'company_id', 'datum'),
+        db.Index('ix_touren_employee_datum', 'employee_id', 'datum'),
+    )
+
+    @property
+    def total_minuten(self):
+        return sum(s.geplante_dauer or 0 for s in self.stops)
+
+    @property
+    def erledigt_count(self):
+        return sum(1 for s in self.stops if s.status == 'ERLEDIGT')
+
+
+class TourStop(db.Model):
+    """Einzelner Patientenbesuch innerhalb einer Tour."""
+    __tablename__ = 'tour_stops'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    tour_id    = db.Column(db.String(36), db.ForeignKey('touren.id'), nullable=False)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False)
+
+    reihenfolge       = db.Column(db.Integer, default=0)
+    geplante_ankunft  = db.Column(db.Time)
+    geplante_dauer    = db.Column(db.Integer, default=30)   # Minuten
+
+    tatsaechliche_ankunft = db.Column(db.Time)
+    tatsaechliche_dauer   = db.Column(db.Integer)
+
+    status  = db.Column(db.String(20), default='GEPLANT')
+    # GEPLANT | ERLEDIGT | UEBERSPRUNGEN
+
+    notizen = db.Column(db.Text)
+
+    patient = db.relationship('Patient', foreign_keys=[patient_id])
+
+    @property
+    def geplante_abfahrt(self):
+        """Geplante Abfahrtszeit (Ankunft + Dauer)."""
+        if not self.geplante_ankunft or not self.geplante_dauer:
+            return None
+        from datetime import datetime as _dt, timedelta
+        base = _dt.combine(_dt.today(), self.geplante_ankunft)
+        return (base + timedelta(minutes=self.geplante_dauer)).time()

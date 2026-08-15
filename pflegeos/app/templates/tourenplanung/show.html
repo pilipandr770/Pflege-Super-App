@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% block title %}Tour {{ tour.tour_nr }}{% endblock %}
+
+{% block content %}
+{% set tlabel, tcolor = status_labels.get(tour.status, (tour.status, 'secondary')) %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <a href="{{ url_for('tourenplanung.index', datum=tour.datum.isoformat()) }}"
+       class="text-decoration-none text-muted small">
+      <i class="bi bi-arrow-left me-1"></i>Zurück
+    </a>
+    <h2 class="mb-1 mt-1">Tour {{ tour.tour_nr }}</h2>
+    <div>
+      <span class="badge bg-{{ tcolor }}">{{ tlabel }}</span>
+      <span class="text-muted ms-2">{{ tour.datum.strftime('%A, %d.%m.%Y') }}</span>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('tourenplanung.tourenzettel_pdf', tour_id=tour.id) }}"
+       class="btn btn-outline-secondary" target="_blank">
+      <i class="bi bi-printer me-1"></i>Tourenzettel
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  {# Linke Spalte: Stops #}
+  <div class="col-lg-8">
+
+    {# Kopfinfo #}
+    <div class="card mb-3">
+      <div class="card-body py-2">
+        <div class="row g-2 small">
+          <div class="col-sm-4">
+            <span class="text-muted">Mitarbeiter</span><br>
+            <strong>{{ tour.employee.full_name }}</strong>
+          </div>
+          <div class="col-sm-4">
+            <span class="text-muted">Dienstzeit</span><br>
+            {% if tour.start_zeit %}
+            <strong>{{ tour.start_zeit.strftime('%H:%M') }}
+            {% if tour.end_zeit %}– {{ tour.end_zeit.strftime('%H:%M') }}{% endif %}</strong>
+            {% else %}—{% endif %}
+          </div>
+          <div class="col-sm-4">
+            <span class="text-muted">Fahrzeug</span><br>
+            <strong>{{ tour.kfz_nr or '—' }}</strong>
+          </div>
+        </div>
+        {% if tour.notizen %}
+        <div class="mt-2 text-muted small">{{ tour.notizen }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Fortschrittsleiste #}
+    {% if tour.stops %}
+    <div class="mb-3">
+      <div class="d-flex justify-content-between small mb-1">
+        <span>Fortschritt</span>
+        <span>{{ tour.erledigt_count }}/{{ tour.stops|length }} erledigt</span>
+      </div>
+      <div class="progress" style="height:8px">
+        <div class="progress-bar bg-success"
+             style="width:{{ (tour.erledigt_count / tour.stops|length * 100)|int }}%"></div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Stops-Liste #}
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Besuche</h6>
+        <span class="text-muted small">{{ tour.stops|length }} Besuche · {{ tour.total_minuten }} min</span>
+      </div>
+      <div id="sortable-stops">
+        {% for s in tour.stops %}
+        {% set slabel, scolor = stop_status.get(s.status, (s.status, 'secondary')) %}
+        <div class="p-3 border-bottom d-flex align-items-start gap-3 stop-item
+            {{ 'bg-success bg-opacity-10' if s.status == 'ERLEDIGT' else
+               'bg-warning bg-opacity-10' if s.status == 'UEBERSPRUNGEN' else '' }}"
+             data-stop-id="{{ s.id }}">
+          <div class="text-muted fs-5 drag-handle" style="cursor:grab">
+            <i class="bi bi-grip-vertical"></i>
+          </div>
+          <div class="rounded-circle bg-{{ tcolor }} text-white d-flex align-items-center justify-content-center flex-shrink-0"
+               style="width:2rem;height:2rem;font-size:.85rem;font-weight:700">
+            {{ loop.index }}
+          </div>
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between">
+              <div>
+                <strong>{{ s.patient.full_name }}</strong>
+                <span class="badge bg-{{ scolor }} ms-1 small">{{ slabel }}</span>
+              </div>
+              <div class="text-muted small">
+                {% if s.geplante_ankunft %}
+                <i class="bi bi-clock me-1"></i>{{ s.geplante_ankunft.strftime('%H:%M') }}
+                {% endif %}
+                {% if s.geplante_dauer %}· {{ s.geplante_dauer }} min{% endif %}
+              </div>
+            </div>
+            {% if s.patient.strasse %}
+            <div class="text-muted small mt-1">
+              <i class="bi bi-geo-alt me-1"></i>
+              {{ s.patient.strasse }} {{ s.patient.hausnummer or '' }},
+              {{ s.patient.plz or '' }} {{ s.patient.ort or '' }}
+              <a href="https://www.google.com/maps/search/?api=1&query={{ s.patient.strasse|urlencode }}+{{ (s.patient.hausnummer or '')|urlencode }}+{{ (s.patient.plz or '')|urlencode }}+{{ (s.patient.ort or '')|urlencode }}"
+                 target="_blank" class="ms-1 text-muted" title="In Google Maps öffnen">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
+            </div>
+            {% endif %}
+            {% if s.status == 'ERLEDIGT' and s.tatsaechliche_ankunft %}
+            <div class="text-success small mt-1">
+              <i class="bi bi-check-circle me-1"></i>
+              Angekommen: {{ s.tatsaechliche_ankunft.strftime('%H:%M') }}
+              {% if s.tatsaechliche_dauer %}· {{ s.tatsaechliche_dauer }} min{% endif %}
+            </div>
+            {% endif %}
+            {% if s.notizen %}<div class="text-muted small mt-1">{{ s.notizen }}</div>{% endif %}
+          </div>
+
+          {# Stop-Aktionen #}
+          <div class="d-flex gap-1 flex-shrink-0">
+            {% if s.status == 'GEPLANT' %}
+            <button type="button" class="btn btn-sm btn-success"
+                    onclick="openErledigt('{{ s.id }}')">
+              <i class="bi bi-check"></i>
+            </button>
+            <form method="post"
+                  action="{{ url_for('tourenplanung.stop_status', stop_id=s.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="status" value="UEBERSPRUNGEN">
+              <button class="btn btn-sm btn-outline-warning" title="Überspringen">
+                <i class="bi bi-skip-forward"></i>
+              </button>
+            </form>
+            {% endif %}
+            <form method="post"
+                  action="{{ url_for('tourenplanung.delete_stop', stop_id=s.id) }}"
+                  onsubmit="return confirm('Besuch entfernen?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" title="Entfernen">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Besuch hinzufügen #}
+      <div class="p-3 bg-light border-top">
+        <form method="post"
+              action="{{ url_for('tourenplanung.add_stop', tour_id=tour.id) }}"
+              class="row g-2 align-items-end">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-md-5">
+            <label class="form-label small fw-semibold mb-1">Patient</label>
+            <select name="patient_id" class="form-select form-select-sm" required>
+              <option value="">— Patient wählen —</option>
+              {% for p in patients %}
+              <option value="{{ p.id }}">{{ p.full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Ankunft</label>
+            <input type="time" name="geplante_ankunft" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Dauer (min)</label>
+            <input type="number" name="geplante_dauer" class="form-control form-control-sm"
+                   value="30" min="5" max="240">
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              <i class="bi bi-plus"></i> Hinzufügen
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  {# Rechte Spalte: Aktionen #}
+  <div class="col-lg-4">
+
+    {# Status setzen #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Tour-Status</h6></div>
+      <div class="card-body d-flex flex-column gap-2">
+        {% if tour.status == 'GEPLANT' %}
+        <form method="post" action="{{ url_for('tourenplanung.set_status', tour_id=tour.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="AKTIV">
+          <button class="btn btn-primary w-100">
+            <i class="bi bi-play-circle me-1"></i>Tour starten
+          </button>
+        </form>
+        {% elif tour.status == 'AKTIV' %}
+        <form method="post" action="{{ url_for('tourenplanung.set_status', tour_id=tour.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="ABGESCHLOSSEN">
+          <button class="btn btn-success w-100">
+            <i class="bi bi-check-circle me-1"></i>Tour abschließen
+          </button>
+        </form>
+        {% endif %}
+        {% if tour.status in ('GEPLANT', 'AKTIV') %}
+        <form method="post" action="{{ url_for('tourenplanung.set_status', tour_id=tour.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="ABGEBROCHEN">
+          <button class="btn btn-outline-danger w-100">Abbrechen</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Statistik #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Zusammenfassung</h6></div>
+      <div class="card-body small">
+        <dl class="row mb-0">
+          <dt class="col-7">Geplante Besuche</dt>
+          <dd class="col-5">{{ tour.stops|length }}</dd>
+          <dt class="col-7">Erledigt</dt>
+          <dd class="col-5 text-success">{{ tour.erledigt_count }}</dd>
+          <dt class="col-7">Übersprungen</dt>
+          <dd class="col-5 text-warning">
+            {{ tour.stops|selectattr('status','eq','UEBERSPRUNGEN')|list|length }}
+          </dd>
+          <dt class="col-7">Geplante Zeit</dt>
+          <dd class="col-5">{{ tour.total_minuten }} min</dd>
+        </dl>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# Modal: Besuch als erledigt markieren #}
+<div class="modal fade" id="erledigtModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Besuch abschließen</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="erledigtForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="status" value="ERLEDIGT">
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="form-label small">Tatsächliche Ankunft</label>
+            <input type="time" name="tatsaechliche_ankunft" class="form-control form-control-sm">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Tatsächliche Dauer (min)</label>
+            <input type="number" name="tatsaechliche_dauer" class="form-control form-control-sm"
+                   value="30" min="1">
+          </div>
+          <div>
+            <label class="form-label small">Notiz</label>
+            <textarea name="notizen" class="form-control form-control-sm" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Erledigt</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+function openErledigt(stopId) {
+  const form = document.getElementById('erledigtForm');
+  form.action = '/touren/stop/' + stopId + '/status';
+  new bootstrap.Modal(document.getElementById('erledigtModal')).show();
+}
+
+// Drag & Drop Sortierung
+const sortable = document.getElementById('sortable-stops');
+if (sortable) {
+  Sortable.create(sortable, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: function() {
+      const items = sortable.querySelectorAll('.stop-item');
+      const order = Array.from(items).map(el => el.dataset.stopId);
+      fetch('{{ url_for("tourenplanung.reorder", tour_id=tour.id) }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({order: order})
+      });
+    }
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}Neue Tour anlegen{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('tourenplanung.index') }}" class="text-decoration-none text-muted">
+    <i class="bi bi-arrow-left me-1"></i>Zurück zur Übersicht
+  </a>
+</div>
+<h2 class="mb-4"><i class="bi bi-map me-2"></i>Neue Tour anlegen</h2>
+
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-4">
+
+    <div class="col-lg-5">
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Tour-Grunddaten</h6></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Mitarbeiter <span class="text-danger">*</span></label>
+              <select name="employee_id" class="form-select" required>
+                <option value="">— Mitarbeiter wählen —</option>
+                {% for e in employees %}
+                <option value="{{ e.id }}">{{ e.full_name }} ({{ e.role_label }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Datum <span class="text-danger">*</span></label>
+              <input type="date" name="datum" class="form-control" required
+                     value="{{ initial_datum }}">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Dienstbeginn</label>
+              <input type="time" name="start_zeit" class="form-control" value="07:00">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Dienstende</label>
+              <input type="time" name="end_zeit" class="form-control" value="14:00">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Fahrzeug-Kennzeichen</label>
+              <input type="text" name="kfz_nr" class="form-control" placeholder="z.B. B-PF-123">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notizen</label>
+              <textarea name="notizen" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">Patientenbesuche</h6>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addStop()">
+            <i class="bi bi-plus"></i> Besuch hinzufügen
+          </button>
+        </div>
+        <div class="card-body" id="stopsContainer">
+          <div class="text-muted small text-center py-3" id="emptyHint">
+            Noch keine Besuche hinzugefügt.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-save me-1"></i>Tour anlegen
+    </button>
+    <a href="{{ url_for('tourenplanung.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+</form>
+
+<template id="stopTpl">
+  <div class="stop-row border rounded p-2 mb-2 bg-light">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-5">
+        <select name="stop_patient_id" class="form-select form-select-sm" required>
+          <option value="">— Patient wählen —</option>
+          {% for p in patients %}
+          <option value="{{ p.id }}">{{ p.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-clock"></i></span>
+          <input type="time" name="stop_ankunft" class="form-control" placeholder="Ankunft">
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="input-group input-group-sm">
+          <input type="number" name="stop_dauer" class="form-control" value="30" min="5" max="240">
+          <span class="input-group-text">min</span>
+        </div>
+      </div>
+      <div class="col-md-1 text-end">
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.stop-row').remove(); toggleEmpty()">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+function addStop() {
+  const tpl = document.getElementById('stopTpl');
+  const clone = tpl.content.cloneNode(true);
+  document.getElementById('stopsContainer').appendChild(clone);
+  document.getElementById('emptyHint').style.display = 'none';
+}
+
+function toggleEmpty() {
+  const cont = document.getElementById('stopsContainer');
+  const rows = cont.querySelectorAll('.stop-row');
+  document.getElementById('emptyHint').style.display = rows.length ? 'none' : 'block';
+}
+</script>
+{% endblock %}

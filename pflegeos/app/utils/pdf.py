@@ -918,3 +918,124 @@ def generate_fortbildungsnachweis_pdf(emp, fbs, year, company):
     doc.build(el)
     buffer.seek(0)
     return buffer
+
+
+# ── Tourenzettel ──────────────────────────────────────────────────────────────
+
+def generate_tourenzettel_pdf(tour, company):
+    """Tages-Tourenzettel für den Mitarbeiter (zum Ausdrucken / Handy)."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm,
+                            leftMargin=1.8*cm, rightMargin=1.8*cm)
+    styles = getSampleStyleSheet()
+    el = []
+
+    def _s(name, **kw):
+        return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+    head = _s('TZHead', fontSize=13, textColor=PFLEGEOS_BLUE,
+              fontName='Helvetica-Bold', spaceAfter=2)
+    sub  = _s('TZSub',  fontSize=9,  textColor=PFLEGEOS_BLUE,
+              fontName='Helvetica-Bold', spaceAfter=3, spaceBefore=8)
+    norm = _s('TZNorm', fontSize=9,  spaceAfter=2)
+    bold = _s('TZBold', fontSize=9,  fontName='Helvetica-Bold')
+    tiny = _s('TZTiny', fontSize=7,  textColor=colors.grey)
+
+    c_addr = f'{company.strasse} {company.hausnummer}, {company.plz} {company.ort}'
+
+    # ── Kopf ─────────────────────────────────────────────────
+    hdr = Table([[
+        Paragraph(f'<b>{company.name}</b><br/>'
+                  f'<font size="7">{c_addr}</font>', norm),
+        Paragraph(f'<b>Tourenzettel</b><br/>'
+                  f'<font size="8">{tour.tour_nr}</font>', head),
+    ]], colWidths=[10*cm, 7*cm])
+    hdr.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',  (1, 0), (1, 0),   'RIGHT'),
+    ]))
+    el.append(hdr)
+    el.append(HRFlowable(width='100%', thickness=1.5, color=PFLEGEOS_BLUE, spaceAfter=6))
+
+    # ── Kopfinfo Mitarbeiter ──────────────────────────────────
+    start = tour.start_zeit.strftime('%H:%M') if tour.start_zeit else '—'
+    end   = tour.end_zeit.strftime('%H:%M')   if tour.end_zeit   else '—'
+    info_tbl = Table([[
+        Paragraph(f'<b>Mitarbeiter:</b> {tour.employee.full_name}', bold),
+        Paragraph(f'<b>Datum:</b> {tour.datum.strftime("%A, %d.%m.%Y")}', bold),
+        Paragraph(f'<b>Dienst:</b> {start}–{end}', bold),
+        Paragraph(f'<b>Fahrzeug:</b> {tour.kfz_nr or "—"}', bold),
+    ]], colWidths=[4.5*cm, 4.5*cm, 3.5*cm, 4.5*cm])
+    info_tbl.setStyle(TableStyle([
+        ('BOX',       (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('BACKGROUND',(0, 0), (-1, -1), PFLEGEOS_LIGHT),
+        ('PADDING',   (0, 0), (-1, -1), 5),
+        ('VALIGN',    (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    el.append(info_tbl)
+    el.append(Spacer(1, 0.4*cm))
+
+    # ── Besuchsliste ─────────────────────────────────────────
+    el.append(Paragraph('Besuchsliste', sub))
+    tbl_data = [['#', 'Patient / Adresse', 'geplant', 'Dauer', 'Ankft.', 'HZ']]
+    for i, s in enumerate(tour.stops, 1):
+        pat = s.patient
+        addr = ''
+        if pat.strasse:
+            addr = f'{pat.strasse} {pat.hausnummer or ""}, {pat.plz or ""} {pat.ort or ""}'
+        ankunft = s.geplante_ankunft.strftime('%H:%M') if s.geplante_ankunft else '—'
+        dauer   = f'{s.geplante_dauer} min' if s.geplante_dauer else '—'
+        tbl_data.append([
+            str(i),
+            Paragraph(f'<b>{pat.full_name}</b><br/>'
+                      f'<font size="7" color="grey">{addr}</font>', norm),
+            ankunft,
+            dauer,
+            '',   # tatsächliche Ankunft (handschriftlich)
+            '',   # Handzeichen
+        ])
+
+    tbl = Table(tbl_data,
+                colWidths=[0.6*cm, 8.5*cm, 1.6*cm, 1.6*cm, 2*cm, 1.7*cm],
+                repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND',   (0, 0), (-1, 0), PFLEGEOS_BLUE),
+        ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',     (0, 0), (-1, -1), 8),
+        ('GRID',         (0, 0), (-1, -1), 0.3, colors.lightgrey),
+        ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, PFLEGEOS_LIGHT]),
+        ('VALIGN',       (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING',   (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING',(0, 0), (-1, -1), 5),
+        ('ALIGN',        (0, 0), (0, -1), 'CENTER'),
+        ('ALIGN',        (2, 0), (-1, -1), 'CENTER'),
+    ]))
+    el.append(tbl)
+
+    # ── Unterschrift ─────────────────────────────────────────
+    el.append(Spacer(1, 0.8*cm))
+    el.append(Paragraph('Gesamt: ' + str(len(tour.stops)) + ' Besuche · ' +
+                        str(tour.total_minuten) + ' geplante Minuten', tiny))
+    el.append(Spacer(1, 1*cm))
+    sig = Table([
+        ['Datum, Unterschrift Mitarbeiter/in', ''],
+        ['\n\n_______________________________', ''],
+    ], colWidths=[9*cm, 8*cm])
+    sig.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    el.append(sig)
+
+    el.append(Spacer(1, 0.4*cm))
+    el.append(HRFlowable(width='100%', thickness=0.5, color=colors.grey))
+    el.append(Paragraph(
+        f'Erstellt: {datetime.now().strftime("%d.%m.%Y %H:%M")}  •  PflegeOS  •  '
+        f'Tour {tour.tour_nr}  •  {tour.employee.full_name}',
+        tiny))
+
+    doc.build(el)
+    buffer.seek(0)
+    return buffer

@@ -64,6 +64,7 @@ def create_app(config_name=None):
     from app.routes.pflegevertrag import pflegevertrag_bp
     from app.routes.privatrechnung import privatrechnung_bp
     from app.routes.fortbildung import fortbildung_bp
+    from app.routes.tourenplanung import tourenplanung_bp
 
     app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -98,6 +99,7 @@ def create_app(config_name=None):
     app.register_blueprint(pflegevertrag_bp)
     app.register_blueprint(privatrechnung_bp)
     app.register_blueprint(fortbildung_bp)
+    app.register_blueprint(tourenplanung_bp)
 
     # Stripe Webhook muss CSRF-exempt sein (Stripe sendet kein CSRF-Token)
     _csrf.exempt(billing_bp)
