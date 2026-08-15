@@ -1953,6 +1953,81 @@ class Privatrechnung(db.Model):
         return (date.today() - self.faellig_am).days
 
 
+# ============================================================
+# FORTBILDUNGSNACHWEIS (MDK-Dokumentation)
+# ============================================================
+
+class Fortbildung(db.Model):
+    """Fortbildungseintrag für einen Mitarbeiter (Dokumentation für MDK-Audit)."""
+    __tablename__ = 'fortbildungen'
+
+    id         = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=False)
+    employee_id = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey('employees.id'), nullable=False)
+
+    titel      = db.Column(db.String(255), nullable=False)
+    anbieter   = db.Column(db.String(255))   # Veranstalter / Bildungsträger
+    ort        = db.Column(db.String(255))
+
+    datum_von  = db.Column(db.Date, nullable=False)
+    datum_bis  = db.Column(db.Date)             # null = eintägig (= datum_von)
+    stunden    = db.Column(db.Numeric(5, 1), default=8)   # Unterrichtsstunden
+
+    # PFLEGE | HYGIENE | ERSTE_HILFE | RECHT | KOMMUNIKATION | IT | FUEHRUNG | WUNDEN | SONSTIGES
+    themenbereich = db.Column(db.String(30), default='PFLEGE')
+
+    pflicht_fortbildung = db.Column(db.Boolean, default=False)  # Pflicht lt. MDK/Arbeitsvertrag
+    zertifikat_pfad     = db.Column(db.String(500))             # relativer Pfad zur Zertifikatsdatei
+    kosten              = db.Column(db.Numeric(8, 2))
+
+    # GEPLANT | ABSOLVIERT | ABGEBROCHEN
+    status     = db.Column(db.String(20), default='GEPLANT')
+    notizen    = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    employee  = db.relationship('Employee', foreign_keys=[employee_id], backref='fortbildungen')
+    ersteller = db.relationship('Employee', foreign_keys=[created_by],  backref='erfasste_fortbildungen')
+    company   = db.relationship('Company',  backref='fortbildungen')
+
+    __table_args__ = (
+        db.Index('ix_fortbildungen_company_id',  'company_id'),
+        db.Index('ix_fortbildungen_employee_id', 'employee_id'),
+        db.Index('ix_fortbildungen_datum_von',   'datum_von'),
+        db.Index('ix_fortbildungen_status',      'status'),
+    )
+
+    THEMEN = {
+        'PFLEGE':        ('Pflege & Betreuung',   'primary'),
+        'HYGIENE':       ('Hygiene',               'info'),
+        'ERSTE_HILFE':   ('Erste Hilfe',           'danger'),
+        'RECHT':         ('Recht & Compliance',    'warning'),
+        'KOMMUNIKATION': ('Kommunikation',         'success'),
+        'WUNDEN':        ('Wundmanagement',        'secondary'),
+        'IT':            ('IT & Digitalisierung',  'dark'),
+        'FUEHRUNG':      ('Führung & Management',  'primary'),
+        'SONSTIGES':     ('Sonstiges',             'secondary'),
+    }
+
+    @property
+    def thema_label(self):
+        return self.THEMEN.get(self.themenbereich, (self.themenbereich, 'secondary'))[0]
+
+    @property
+    def thema_farbe(self):
+        return self.THEMEN.get(self.themenbereich, ('', 'secondary'))[1]
+
+    @property
+    def datum_bis_eff(self):
+        return self.datum_bis or self.datum_von
+
+    @property
+    def tage(self):
+        return (self.datum_bis_eff - self.datum_von).days + 1
+
+
 class Standort(db.Model):
     """Filiale oder Wohnbereich eines Pflegedienstes."""
     __tablename__ = 'standorte'

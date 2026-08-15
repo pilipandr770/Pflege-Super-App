@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block title %}Fortbildungen{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0"><i class="bi bi-mortarboard me-2"></i>Fortbildungsnachweis</h2>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('fortbildung.export_csv', year=year_filter) }}"
+       class="btn btn-outline-secondary">
+      <i class="bi bi-download me-1"></i>CSV Export
+    </a>
+    <a href="{{ url_for('fortbildung.new') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>Neue Fortbildung
+    </a>
+  </div>
+</div>
+
+{# KPIs #}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Gesamt {{ year_filter }}</div>
+        <div class="fs-3 fw-bold">{{ kpi_gesamt }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Absolviert</div>
+        <div class="fs-3 fw-bold text-success">{{ kpi_absolviert }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Pflichtfortb. erledigt</div>
+        <div class="fs-3 fw-bold text-primary">{{ kpi_pflicht }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Gesamt-Stunden</div>
+        <div class="fs-3 fw-bold text-info">{{ '%.1f' % kpi_stunden }} h</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Filter #}
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <form class="row g-2 align-items-center" method="get">
+      <div class="col-auto">
+        <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+          {% for y in years %}
+          <option value="{{ y }}" {{ 'selected' if year_filter|int == y }}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <select name="employee_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Alle Mitarbeiter</option>
+          {% for e in employees %}
+          <option value="{{ e.id }}" {{ 'selected' if employee_filter == e.id }}>
+            {{ e.full_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <select name="themenbereich" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Alle Themen</option>
+          {% for key, (label, color) in themen.items() %}
+          <option value="{{ key }}" {{ 'selected' if thema_filter == key }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Alle Status</option>
+          {% for key, (label, color) in status_labels.items() %}
+          <option value="{{ key }}" {{ 'selected' if status_filter == key }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if fortbildungen %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Mitarbeiter</th>
+          <th>Fortbildung</th>
+          <th>Thema</th>
+          <th>Datum</th>
+          <th class="text-end">Stunden</th>
+          <th>Pflicht</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fb in fortbildungen %}
+        {% set slabel, scolor = status_labels.get(fb.status, (fb.status, 'secondary')) %}
+        <tr>
+          <td class="fw-semibold small">{{ fb.employee.full_name }}</td>
+          <td>
+            {{ fb.titel }}
+            {% if fb.anbieter %}
+            <small class="text-muted d-block">{{ fb.anbieter }}</small>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge bg-{{ fb.thema_farbe }}">{{ fb.thema_label }}</span>
+          </td>
+          <td class="small">
+            {{ fb.datum_von.strftime('%d.%m.%Y') }}
+            {% if fb.datum_bis and fb.datum_bis != fb.datum_von %}
+            –&nbsp;{{ fb.datum_bis.strftime('%d.%m.%Y') }}
+            {% endif %}
+          </td>
+          <td class="text-end">{{ fb.stunden or '—' }}</td>
+          <td>
+            {% if fb.pflicht_fortbildung %}
+            <span class="badge bg-warning text-dark">Pflicht</span>
+            {% else %}
+            <span class="text-muted small">freiwillig</span>
+            {% endif %}
+          </td>
+          <td><span class="badge bg-{{ scolor }}">{{ slabel }}</span></td>
+          <td class="text-end">
+            <a href="{{ url_for('fortbildung.show', fb_id=fb.id) }}"
+               class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-mortarboard fs-1 d-block mb-3 opacity-25"></i>
+  <p>Keine Fortbildungen für diesen Zeitraum gefunden.</p>
+  <a href="{{ url_for('fortbildung.new') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Erste Fortbildung erfassen
+  </a>
+</div>
+{% endif %}
+{% endblock %}

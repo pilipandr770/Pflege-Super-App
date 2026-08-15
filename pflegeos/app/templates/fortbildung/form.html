@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Fortbildung bearbeiten' if fb else 'Neue Fortbildung' }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('fortbildung.index') }}" class="text-decoration-none text-muted">
+    <i class="bi bi-arrow-left me-1"></i>Zurück zur Übersicht
+  </a>
+</div>
+<h2 class="mb-4">
+  <i class="bi bi-mortarboard me-2"></i>
+  {{ 'Fortbildung bearbeiten' if fb else 'Neue Fortbildung erfassen' }}
+</h2>
+
+<form method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-4">
+
+    <div class="col-lg-7">
+
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Grunddaten</h6></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Mitarbeiter <span class="text-danger">*</span></label>
+              <select name="employee_id" class="form-select" required
+                      {{ 'disabled' if fb }}>
+                <option value="">— Mitarbeiter wählen —</option>
+                {% for e in employees %}
+                <option value="{{ e.id }}"
+                        {{ 'selected' if (fb and fb.employee_id == e.id) or (preselected and preselected.id == e.id) }}>
+                  {{ e.full_name }} ({{ e.role_label }})
+                </option>
+                {% endfor %}
+              </select>
+              {% if fb %}
+              <input type="hidden" name="employee_id" value="{{ fb.employee_id }}">
+              {% endif %}
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Titel / Bezeichnung <span class="text-danger">*</span></label>
+              <input type="text" name="titel" class="form-control" required
+                     value="{{ fb.titel if fb else '' }}"
+                     placeholder="z.B. Grundkurs Wundmanagement">
+            </div>
+            <div class="col-sm-8">
+              <label class="form-label">Anbieter / Veranstalter</label>
+              <input type="text" name="anbieter" class="form-control"
+                     value="{{ fb.anbieter or '' if fb else '' }}"
+                     placeholder="z.B. DRK, Pflegekammer, AWO">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label">Ort</label>
+              <input type="text" name="ort" class="form-control"
+                     value="{{ fb.ort or '' if fb else '' }}"
+                     placeholder="Online / Berlin">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Zeitraum & Umfang</h6></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">Datum (von) <span class="text-danger">*</span></label>
+              <input type="date" name="datum_von" class="form-control" required
+                     value="{{ fb.datum_von.isoformat() if fb else today.isoformat() }}">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label">Datum (bis)</label>
+              <input type="date" name="datum_bis" class="form-control"
+                     value="{{ fb.datum_bis.isoformat() if fb and fb.datum_bis else '' }}">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label">Stunden (UE)</label>
+              <input type="number" name="stunden" class="form-control"
+                     value="{{ fb.stunden or 8 if fb else 8 }}"
+                     min="0.5" max="200" step="0.5">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-lg-5">
+
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Klassifizierung</h6></div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Themenbereich</label>
+            <select name="themenbereich" class="form-select">
+              {% for key, (label, color) in themen.items() %}
+              <option value="{{ key }}"
+                      {{ 'selected' if fb and fb.themenbereich == key }}>
+                {{ label }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Status</label>
+            <select name="status" class="form-select">
+              <option value="GEPLANT"    {{ 'selected' if fb and fb.status == 'GEPLANT' }}>Geplant</option>
+              <option value="ABSOLVIERT" {{ 'selected' if not fb or fb.status == 'ABSOLVIERT' }}>Absolviert</option>
+              <option value="ABGEBROCHEN"{{ 'selected' if fb and fb.status == 'ABGEBROCHEN' }}>Abgebrochen</option>
+            </select>
+          </div>
+          <div class="form-check mb-3">
+            <input type="checkbox" name="pflicht_fortbildung" class="form-check-input"
+                   id="ckPflicht"
+                   {{ 'checked' if fb and fb.pflicht_fortbildung }}>
+            <label for="ckPflicht" class="form-check-label fw-semibold">
+              Pflichtfortbildung
+              <small class="text-muted fw-normal">(MDK/Arbeitsvertrag)</small>
+            </label>
+          </div>
+          <div class="mb-0">
+            <label class="form-label">Kosten (€)</label>
+            <input type="text" name="kosten" class="form-control"
+                   value="{{ fb.kosten or '' if fb else '' }}"
+                   placeholder="0,00">
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Zertifikat</h6></div>
+        <div class="card-body">
+          {% if fb and fb.zertifikat_pfad %}
+          <div class="alert alert-success small mb-2 py-2">
+            <i class="bi bi-file-check me-1"></i>Zertifikat vorhanden
+          </div>
+          {% endif %}
+          <input type="file" name="zertifikat" class="form-control"
+                 accept=".pdf,.jpg,.jpeg,.png">
+          <small class="text-muted">PDF, JPG oder PNG</small>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Notizen</h6></div>
+        <div class="card-body">
+          <textarea name="notizen" class="form-control" rows="3">{{ fb.notizen or '' if fb else '' }}</textarea>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-save me-1"></i>Speichern
+    </button>
+    <a href="{{ url_for('fortbildung.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

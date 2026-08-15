@@ -768,3 +768,153 @@ def generate_privatrechnung_pdf(r, company):
     doc.build(el)
     buffer.seek(0)
     return buffer
+
+
+# ── Fortbildungsnachweis ──────────────────────────────────────────────────────
+
+def generate_fortbildungsnachweis_pdf(emp, fbs, year, company):
+    """MDK-konformer Jahresnachweis der Fortbildungen eines Mitarbeiters."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm,
+                            leftMargin=2*cm, rightMargin=2*cm)
+    styles = getSampleStyleSheet()
+    el = []
+
+    def _s(name, **kw):
+        return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+    head  = _s('FBHead', fontSize=14, textColor=PFLEGEOS_BLUE,
+               fontName='Helvetica-Bold', spaceAfter=2)
+    sub   = _s('FBSub',  fontSize=10, textColor=PFLEGEOS_BLUE,
+               fontName='Helvetica-Bold', spaceAfter=4, spaceBefore=10)
+    bold  = _s('FBBold', fontName='Helvetica-Bold', fontSize=9)
+    norm  = _s('FBNorm', fontSize=9, spaceAfter=2)
+
+    c_addr = f'{company.strasse} {company.hausnummer}, {company.plz} {company.ort}'
+
+    hdr = Table([[
+        Paragraph(f'<b>{company.name}</b><br/>'
+                  f'<font size="8">{c_addr}<br/>'
+                  f'Tel.: {company.telefon or "—"}  •  IK: {company.ik_nummer or "—"}</font>',
+                  norm),
+        Paragraph(f'<b>Fortbildungsnachweis {year}</b>', head),
+    ]], colWidths=[10*cm, 7*cm])
+    hdr.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',  (1, 0), (1, 0),   'RIGHT'),
+    ]))
+    el.append(hdr)
+    el.append(HRFlowable(width='100%', thickness=1.5, color=PFLEGEOS_BLUE, spaceAfter=8))
+
+    el.append(Paragraph('Mitarbeiter', sub))
+    ma_info = Table([[
+        Paragraph(f'<b>Name:</b> {emp.full_name}', norm),
+        Paragraph(f'<b>Funktion:</b> {emp.role_label}', norm),
+        Paragraph(f'<b>Zeitraum:</b> 01.01.{year} – 31.12.{year}', norm),
+    ]], colWidths=[5.5*cm, 5.5*cm, 6*cm])
+    ma_info.setStyle(TableStyle([
+        ('BOX',       (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('BACKGROUND',(0, 0), (-1, -1), PFLEGEOS_LIGHT),
+        ('PADDING',   (0, 0), (-1, -1), 6),
+        ('VALIGN',    (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    el.append(ma_info)
+    el.append(Spacer(1, 0.4*cm))
+
+    el.append(Paragraph('Absolvierte Fortbildungen', sub))
+    tbl_data = [['Datum', 'Fortbildung / Thema', 'Anbieter', 'Std.', 'Pflicht', 'Zert.']]
+
+    absolviert = [f for f in fbs if f.status == 'ABSOLVIERT']
+    for f in absolviert:
+        datum_str = f.datum_von.strftime('%d.%m.%Y')
+        if f.datum_bis and f.datum_bis != f.datum_von:
+            datum_str += f'–{f.datum_bis.strftime("%d.%m.")}'
+        tbl_data.append([
+            datum_str,
+            Paragraph(f'<b>{f.titel}</b><br/>'
+                      f'<font size="7">{f.thema_label}</font>', norm),
+            f.anbieter or '—',
+            str(f.stunden or '—'),
+            'Ja' if f.pflicht_fortbildung else 'Nein',
+            'Ja' if f.zertifikat_pfad else 'Nein',
+        ])
+
+    if not absolviert:
+        tbl_data.append(['—', 'Keine abgeschlossenen Fortbildungen', '', '', '', ''])
+
+    tbl = Table(tbl_data,
+                colWidths=[2.4*cm, 7.6*cm, 3.5*cm, 1.2*cm, 1.4*cm, 1.4*cm],
+                repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), PFLEGEOS_BLUE),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 8),
+        ('GRID',       (0, 0), (-1, -1), 0.3, colors.lightgrey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, PFLEGEOS_LIGHT]),
+        ('VALIGN',     (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    el.append(tbl)
+
+    gesamt_std = sum(float(f.stunden or 0) for f in absolviert)
+    pflicht_abs = sum(1 for f in absolviert if f.pflicht_fortbildung)
+    el.append(Spacer(1, 0.4*cm))
+    summ = Table([[
+        Paragraph(f'<b>Gesamt absolviert:</b> {len(absolviert)} Fortbildungen', bold),
+        Paragraph(f'<b>Gesamtstunden:</b> {gesamt_std:.1f} h', bold),
+        Paragraph(f'<b>Davon Pflicht:</b> {pflicht_abs}', bold),
+    ]], colWidths=[6*cm, 5*cm, 6*cm])
+    summ.setStyle(TableStyle([
+        ('BOX',       (0, 0), (-1, -1), 0.5, PFLEGEOS_BLUE),
+        ('BACKGROUND',(0, 0), (-1, -1), PFLEGEOS_LIGHT),
+        ('PADDING',   (0, 0), (-1, -1), 6),
+    ]))
+    el.append(summ)
+
+    other = [f for f in fbs if f.status != 'ABSOLVIERT']
+    if other:
+        el.append(Paragraph('Geplante / abgebrochene Fortbildungen', sub))
+        o_data = [['Datum', 'Fortbildung', 'Status']]
+        for f in other:
+            o_data.append([
+                f.datum_von.strftime('%d.%m.%Y'),
+                f.titel,
+                f.status,
+            ])
+        o_tbl = Table(o_data, colWidths=[2.4*cm, 12.6*cm, 2*cm])
+        o_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE',   (0, 0), (-1, -1), 8),
+            ('GRID',       (0, 0), (-1, -1), 0.3, colors.lightgrey),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        el.append(o_tbl)
+
+    el.append(Spacer(1, 1.2*cm))
+    el.append(HRFlowable(width='100%', thickness=0.5, color=colors.grey))
+    sig = Table([
+        ['Datum, Unterschrift Mitarbeiter/in', '', 'Datum, Unterschrift Leitung'],
+        ['\n\n_______________________________', '',
+         '\n\n_______________________________'],
+    ], colWidths=[7.5*cm, 2*cm, 7.5*cm])
+    sig.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ALIGN',    (0, 0), (-1, -1), 'CENTER'),
+    ]))
+    el.append(sig)
+
+    el.append(Spacer(1, 0.5*cm))
+    el.append(Paragraph(
+        f'Erstellt: {datetime.now().strftime("%d.%m.%Y %H:%M")}  •  PflegeOS  •  '
+        f'Fortbildungsnachweis {year}  •  {emp.full_name}',
+        _s('FBFoot', fontSize=7, textColor=colors.grey)))
+
+    doc.build(el)
+    buffer.seek(0)
+    return buffer

@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}{{ fb.titel }}{% endblock %}
+
+{% block content %}
+{% set slabel, scolor = status_labels.get(fb.status, (fb.status, 'secondary')) %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <a href="{{ url_for('fortbildung.index') }}" class="text-decoration-none text-muted small">
+      <i class="bi bi-arrow-left me-1"></i>Zurück
+    </a>
+    <h2 class="mb-1 mt-1">{{ fb.titel }}</h2>
+    <span class="text-muted">{{ fb.employee.full_name }}</span>
+    &nbsp;<span class="badge bg-{{ fb.thema_farbe }}">{{ fb.thema_label }}</span>
+    &nbsp;<span class="badge bg-{{ scolor }}">{{ slabel }}</span>
+    {% if fb.pflicht_fortbildung %}
+    <span class="badge bg-warning text-dark ms-1">Pflicht</span>
+    {% endif %}
+  </div>
+
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('fortbildung.nachweis_pdf', employee_id=fb.employee_id) }}"
+       class="btn btn-outline-secondary" target="_blank" title="Jahresnachweis PDF">
+      <i class="bi bi-printer me-1"></i>PDF-Nachweis
+    </a>
+    <a href="{{ url_for('fortbildung.edit', fb_id=fb.id) }}"
+       class="btn btn-outline-primary">
+      <i class="bi bi-pencil me-1"></i>Bearbeiten
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Details</h6></div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4">Mitarbeiter</dt>
+          <dd class="col-sm-8">{{ fb.employee.full_name }}
+            <span class="text-muted">({{ fb.employee.role_label }})</span></dd>
+          <dt class="col-sm-4">Anbieter</dt>
+          <dd class="col-sm-8">{{ fb.anbieter or '—' }}</dd>
+          <dt class="col-sm-4">Ort</dt>
+          <dd class="col-sm-8">{{ fb.ort or '—' }}</dd>
+          <dt class="col-sm-4">Datum</dt>
+          <dd class="col-sm-8">
+            {{ fb.datum_von.strftime('%d.%m.%Y') }}
+            {% if fb.datum_bis and fb.datum_bis != fb.datum_von %}
+            &nbsp;–&nbsp;{{ fb.datum_bis.strftime('%d.%m.%Y') }}
+            ({{ fb.tage }} Tage)
+            {% endif %}
+          </dd>
+          <dt class="col-sm-4">Stunden</dt>
+          <dd class="col-sm-8">{{ fb.stunden or '—' }} h</dd>
+          <dt class="col-sm-4">Kosten</dt>
+          <dd class="col-sm-8">{{ '%.2f €' % fb.kosten if fb.kosten else '—' }}</dd>
+          <dt class="col-sm-4">Pflichtfortb.</dt>
+          <dd class="col-sm-8">{{ 'Ja' if fb.pflicht_fortbildung else 'Nein' }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {% if fb.notizen %}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Notizen</h6></div>
+      <div class="card-body small text-muted">{{ fb.notizen }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+
+    {# Status ändern #}
+    {% if fb.status != 'ABSOLVIERT' %}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Status setzen</h6></div>
+      <div class="card-body d-flex flex-column gap-2">
+        {% if fb.status == 'GEPLANT' %}
+        <form method="post" action="{{ url_for('fortbildung.update_status', fb_id=fb.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="ABSOLVIERT">
+          <button class="btn btn-success w-100">
+            <i class="bi bi-check-circle me-1"></i>Als absolviert markieren
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('fortbildung.update_status', fb_id=fb.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="ABGEBROCHEN">
+          <button class="btn btn-outline-danger w-100">Abgebrochen</button>
+        </form>
+        {% elif fb.status == 'ABGEBROCHEN' %}
+        <form method="post" action="{{ url_for('fortbildung.update_status', fb_id=fb.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="GEPLANT">
+          <button class="btn btn-outline-secondary w-100">Auf Geplant setzen</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Zertifikat #}
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0">Zertifikat</h6></div>
+      <div class="card-body">
+        {% if fb.zertifikat_pfad %}
+        <div class="alert alert-success small mb-2 py-2">
+          <i class="bi bi-file-check me-1"></i>Zertifikat hochgeladen
+        </div>
+        {% else %}
+        <p class="text-muted small mb-2">Noch kein Zertifikat vorhanden.</p>
+        {% endif %}
+        <a href="{{ url_for('fortbildung.edit', fb_id=fb.id) }}"
+           class="btn btn-sm btn-outline-primary w-100">
+          <i class="bi bi-upload me-1"></i>Zertifikat hochladen
+        </a>
+      </div>
+    </div>
+
+    {# Mitarbeiter-Links #}
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0">Mitarbeiter</h6></div>
+      <div class="card-body small">
+        <p class="fw-semibold mb-1">{{ fb.employee.full_name }}</p>
+        <p class="text-muted mb-2">{{ fb.employee.role_label }}</p>
+        <div class="d-flex gap-1">
+          <a href="{{ url_for('fortbildung.new', employee_id=fb.employee_id) }}"
+             class="btn btn-sm btn-outline-primary flex-fill">Neue Fortb.</a>
+          <a href="{{ url_for('fortbildung.nachweis_pdf', employee_id=fb.employee_id) }}"
+             class="btn btn-sm btn-outline-secondary flex-fill" target="_blank">PDF</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
