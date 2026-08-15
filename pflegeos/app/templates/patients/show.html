@@ -24,6 +24,11 @@
        title="PDF-Export der Patientenübersicht" data-bs-toggle="tooltip">
       <i class="bi bi-download"></i> PDF
     </a>
+    <a href="{{ url_for('exports.pflegedoku_paket', patient_id=patient.id) }}"
+       class="btn btn-outline-warning btn-sm"
+       title="MDK-Prüfungspaket generieren" data-bs-toggle="tooltip">
+      <i class="bi bi-file-earmark-zip"></i> MDK-Paket
+    </a>
     <a href="{{ url_for('patients.edit', patient_id=patient.id) }}" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-pencil"></i> Bearbeiten
     </a>

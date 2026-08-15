@@ -1039,3 +1039,361 @@ def generate_tourenzettel_pdf(tour, company):
     doc.build(el)
     buffer.seek(0)
     return buffer
+
+
+# ── MDK-Prüfungspaket ────────────────────────────────────────────────────────
+
+def generate_pflegedoku_paket_pdf(patient, company, include,
+                                  sis=None, medplan=None, wounds=None,
+                                  leistungen=None, leistung_monat=None,
+                                  stuerze=None):
+    """
+    Kombiniertes MDK-Prüfungspaket — alle Dokumentenabschnitte in einer PDF.
+    include: dict {sis, medikamente, wunden, leistungen, stuerze}
+    """
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm,
+                            leftMargin=1.8*cm, rightMargin=1.8*cm)
+    styles = getSampleStyleSheet()
+    el = []
+
+    def _s(name, **kw):
+        return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+    HEAD  = _s('MHead',  fontSize=13, textColor=PFLEGEOS_BLUE, fontName='Helvetica-Bold', spaceAfter=2)
+    SUB   = _s('MSub',   fontSize=10, textColor=PFLEGEOS_BLUE, fontName='Helvetica-Bold', spaceAfter=4, spaceBefore=10)
+    BOLD  = _s('MBold',  fontName='Helvetica-Bold', fontSize=9)
+    NORM  = _s('MNorm',  fontSize=9, spaceAfter=2)
+    SMALL = _s('MSmall', fontSize=8, textColor=colors.grey)
+    RISK  = _s('MRisk',  fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#c0392b'))
+
+    def _hr():
+        return HRFlowable(width='100%', thickness=1, color=PFLEGEOS_BLUE, spaceAfter=6)
+
+    def _section_break(title):
+        el.append(PageBreak())
+        el.append(Paragraph(title, HEAD))
+        el.append(_hr())
+
+    c_addr = f'{company.strasse} {company.hausnummer}, {company.plz} {company.ort}'
+    today_str = datetime.now().strftime('%d.%m.%Y %H:%M')
+
+    # ══════════════════════════════════════════════════════════
+    # DECKBLATT
+    # ══════════════════════════════════════════════════════════
+    hdr = Table([[
+        Paragraph(f'<b>{company.name}</b><br/>'
+                  f'<font size="7">{c_addr}<br/>'
+                  f'IK: {company.ik_nummer or "—"}  ·  Tel.: {company.telefon or "—"}</font>',
+                  NORM),
+        Paragraph('<b>MDK-Prüfungspaket</b>', HEAD),
+    ]], colWidths=[10*cm, 7*cm])
+    hdr.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',  (1, 0), (1, 0),   'RIGHT'),
+    ]))
+    el.append(hdr)
+    el.append(_hr())
+
+    # Patientenstammdaten
+    el.append(Paragraph('Patientenstammdaten', SUB))
+    geb  = patient.geburtsdatum.strftime('%d.%m.%Y') if patient.geburtsdatum else '—'
+    addr = (f'{patient.strasse or ""} {patient.hausnummer or ""}, '
+            f'{patient.plz or ""} {patient.ort or ""}').strip(', ')
+    stamm = Table([
+        [Paragraph('<b>Name</b>', BOLD), Paragraph(patient.full_name, NORM),
+         Paragraph('<b>Pflegegrad</b>', BOLD), Paragraph(f'PG {patient.pflegegrad or "—"}', NORM)],
+        [Paragraph('<b>Geburtsdatum</b>', BOLD), Paragraph(geb, NORM),
+         Paragraph('<b>Alter</b>', BOLD), Paragraph(f'{patient.age or "—"} Jahre', NORM)],
+        [Paragraph('<b>Adresse</b>', BOLD), Paragraph(addr or '—', NORM),
+         Paragraph('<b>Krankenkasse</b>', BOLD), Paragraph(patient.krankenversicherung or '—', NORM)],
+        [Paragraph('<b>Vers.-Nr.</b>', BOLD), Paragraph(patient.versicherungsnummer or '—', NORM),
+         Paragraph('<b>Hausarzt</b>', BOLD), Paragraph(patient.hausarzt_name or '—', NORM)],
+        [Paragraph('<b>Betreuer</b>', BOLD),
+         Paragraph(f'{patient.betreuer_name or "—"} · {patient.betreuer_telefon or ""}', NORM),
+         Paragraph('<b>Aufnahme</b>', BOLD),
+         Paragraph(patient.aufnahmedatum.strftime('%d.%m.%Y') if patient.aufnahmedatum else '—', NORM)],
+    ], colWidths=[3.5*cm, 5.5*cm, 3.5*cm, 5*cm])
+    stamm.setStyle(TableStyle([
+        ('BOX',  (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.lightgrey),
+        ('BACKGROUND', (0, 0), (0, -1), PFLEGEOS_LIGHT),
+        ('BACKGROUND', (2, 0), (2, -1), PFLEGEOS_LIGHT),
+        ('PADDING', (0, 0), (-1, -1), 5),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    el.append(stamm)
+
+    # Risiken
+    el.append(Spacer(1, 0.4*cm))
+    risiken = []
+    if patient.sturzrisiko:       risiken.append('Sturzrisiko')
+    if patient.dekubitusrisiko:   risiken.append('Dekubitusrisiko')
+    if patient.ernaehrungsrisiko: risiken.append('Ernährungsrisiko')
+    if patient.allergien:         risiken.append(f'Allergien: {patient.allergien}')
+    if risiken:
+        el.append(Paragraph(
+            '<b>Risiken: </b>' + '  ·  '.join(risiken), RISK))
+    else:
+        el.append(Paragraph('Keine besonderen Risiken dokumentiert.', SMALL))
+
+    # Inhaltsverzeichnis
+    el.append(Spacer(1, 0.6*cm))
+    el.append(Paragraph('Enthaltene Dokumente', SUB))
+    inhalt = [['#', 'Abschnitt', 'Status']]
+    i = 1
+    inhalt.append([str(i := 1), 'Patientenstammdaten', 'enthalten'])
+    if include.get('sis') and sis:
+        inhalt.append([str(i := i+1), 'SIS-Bericht', f'Stand {sis.assessment_date.strftime("%d.%m.%Y")}'])
+    if include.get('medikamente') and medplan:
+        inhalt.append([str(i := i+1), 'Medikamentenplan',
+                       f'ab {medplan.valid_from.strftime("%d.%m.%Y")}'])
+    if include.get('wunden') and wounds:
+        inhalt.append([str(i := i+1), 'Wundverlauf', f'{len(wounds)} Wunde(n)'])
+    if include.get('leistungen') and leistungen is not None:
+        inhalt.append([str(i := i+1), f'Leistungsnachweis {leistung_monat}',
+                       f'{len(leistungen)} Einträge'])
+    if include.get('stuerze') and stuerze:
+        inhalt.append([str(i := i+1), 'Sturzprotokolle', f'{len(stuerze)} Ereignis(se)'])
+    inhalt_tbl = Table(inhalt, colWidths=[0.8*cm, 13*cm, 3.7*cm])
+    inhalt_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), PFLEGEOS_BLUE),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 8),
+        ('GRID',       (0, 0), (-1, -1), 0.3, colors.lightgrey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, PFLEGEOS_LIGHT]),
+        ('PADDING',    (0, 0), (-1, -1), 5),
+    ]))
+    el.append(inhalt_tbl)
+    el.append(Spacer(1, 0.4*cm))
+    el.append(Paragraph(
+        f'Erstellt am {today_str}  ·  PflegeOS  ·  {company.name}', SMALL))
+
+    # ══════════════════════════════════════════════════════════
+    # SIS-BERICHT
+    # ══════════════════════════════════════════════════════════
+    if include.get('sis') and sis:
+        _section_break('SIS-Bericht — Strukturierte Informationssammlung')
+        el.append(Paragraph(
+            f'Patient: <b>{patient.full_name}</b>  ·  '
+            f'Bewertungsdatum: <b>{sis.assessment_date.strftime("%d.%m.%Y")}</b>  ·  '
+            f'Version: <b>{sis.version}</b>', NORM))
+        el.append(Spacer(1, 0.3*cm))
+
+        def _sis_block(title, rows):
+            el.append(Paragraph(title, SUB))
+            t = Table(rows, colWidths=[7*cm, 3*cm, 7.5*cm])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), PFLEGEOS_LIGHT),
+                ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE',   (0, 0), (-1, -1), 8),
+                ('GRID',       (0, 0), (-1, -1), 0.3, colors.lightgrey),
+                ('PADDING',    (0, 0), (-1, -1), 4),
+            ]))
+            el.append(t)
+
+        GRADE = {0: '0 – selbständig', 1: '1 – überwiegend selbst.',
+                 2: '2 – überwiegend unselbst.', 3: '3 – unselbständig'}
+
+        def _g(val):
+            return GRADE.get(val, f'{val}') if val is not None else '—'
+
+        _sis_block('Block 1: Kognition & Kommunikation', [
+            ['Merkmal', 'Grad', 'Anmerkungen'],
+            ['Orientierung', _g(sis.kb1_orientierung), sis.kb1_freitext or ''],
+            ['Gedächtnis',   _g(sis.kb1_gedaechtnis), ''],
+            ['Verstehen',    _g(sis.kb1_verstehen), ''],
+            ['Kommunikation',_g(sis.kb1_kommunikation), ''],
+        ])
+        _sis_block('Block 2: Mobilität', [
+            ['Merkmal', 'Grad', 'Hilfsmittel'],
+            ['Positionswechsel', _g(sis.kb2_positionswechsel), sis.kb2_hilfsmittel or ''],
+            ['Transfer',         _g(sis.kb2_transfer), ''],
+            ['Gehen',            _g(sis.kb2_gehen), ''],
+            ['Treppensteigen',   _g(sis.kb2_treppensteigen), sis.kb2_freitext or ''],
+        ])
+        _sis_block('Block 4: Selbstversorgung', [
+            ['Merkmal', 'Grad', 'Anmerkungen'],
+            ['Körperpflege',  _g(sis.kb4_koerperpflege), sis.kb4_freitext or ''],
+            ['Ernährung',     _g(sis.kb4_ernaehrung),
+             f'Kostform: {sis.kb4_kostform or "—"}'],
+            ['Trinken',       _g(sis.kb4_trinken), ''],
+            ['Ausscheidung',  _g(sis.kb4_ausscheidung), ''],
+            ['Ankleiden',     _g(sis.kb4_ankleiden), ''],
+        ])
+        if sis.pflegeschwerpunkte or sis.ziele:
+            el.append(Paragraph('Pflegeschwerpunkte &amp; Ziele', SUB))
+            if sis.pflegeschwerpunkte:
+                el.append(Paragraph(f'<b>Schwerpunkte:</b> {sis.pflegeschwerpunkte}', NORM))
+            if sis.ziele:
+                el.append(Paragraph(f'<b>Ziele:</b> {sis.ziele}', NORM))
+
+    # ══════════════════════════════════════════════════════════
+    # MEDIKAMENTENPLAN
+    # ══════════════════════════════════════════════════════════
+    if include.get('medikamente') and medplan:
+        _section_break('Medikamentenplan')
+        el.append(Paragraph(
+            f'Patient: <b>{patient.full_name}</b>  ·  '
+            f'Gültig ab: <b>{medplan.valid_from.strftime("%d.%m.%Y")}</b>'
+            + (f'  ·  bis: {medplan.valid_until.strftime("%d.%m.%Y")}' if medplan.valid_until else ''),
+            NORM))
+        if medplan.prescribed_by:
+            el.append(Paragraph(f'Verordnet durch: {medplan.prescribed_by}', SMALL))
+        el.append(Spacer(1, 0.3*cm))
+        meds = list(medplan.medications.all())
+        if meds:
+            rows = [['Handelsname', 'Wirkstoff/Stärke', 'Mo', 'Mi', 'Ab', 'Nacht', 'Hinweise']]
+            for m in meds:
+                rows.append([
+                    m.handelsname,
+                    f'{m.wirkstoff or ""} {m.staerke or ""}'.strip(),
+                    m.morgens or '—',
+                    m.mittags or '—',
+                    getattr(m, 'abends', None) or '—',
+                    getattr(m, 'nachts', None) or '—',
+                    getattr(m, 'hinweise', None) or '',
+                ])
+            med_tbl = Table(rows, colWidths=[4*cm, 3.5*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 5.2*cm],
+                            repeatRows=1)
+            med_tbl.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), PFLEGEOS_BLUE),
+                ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+                ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE',   (0, 0), (-1, -1), 8),
+                ('GRID',       (0, 0), (-1, -1), 0.3, colors.lightgrey),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, PFLEGEOS_LIGHT]),
+                ('ALIGN',      (2, 0), (5, -1), 'CENTER'),
+                ('PADDING',    (0, 0), (-1, -1), 4),
+            ]))
+            el.append(med_tbl)
+        else:
+            el.append(Paragraph('Keine Medikamente eingetragen.', SMALL))
+
+    # ══════════════════════════════════════════════════════════
+    # WUNDVERLAUF
+    # ══════════════════════════════════════════════════════════
+    if include.get('wunden') and wounds:
+        _section_break('Wundverlauf')
+        el.append(Paragraph(
+            f'Patient: <b>{patient.full_name}</b>  ·  '
+            f'{len(wounds)} aktive Wunde(n)', NORM))
+        el.append(Spacer(1, 0.3*cm))
+        for wound in wounds:
+            el.append(Paragraph(
+                f'<b>{wound.wunde_bezeichnung}</b>  ·  Lok.: {wound.lokalisation}'
+                + (f'  ·  Stadium: {wound.stage}' if wound.stage else '')
+                + f'  ·  Erstfeststellung: {wound.erstfeststellung.strftime("%d.%m.%Y")}',
+                BOLD))
+            recent = (wound.assessments
+                      .order_by('assessment_date desc')
+                      .limit(3).all())
+            if recent:
+                rows = [['Datum', 'Größe (L×B cm)', 'Exsudat', 'Tendenz', 'Auflage', 'Bemerkung']]
+                for a in recent:
+                    size = '—'
+                    if a.groesse_laenge_cm and a.groesse_breite_cm:
+                        size = f'{a.groesse_laenge_cm}×{a.groesse_breite_cm}'
+                    rows.append([
+                        a.assessment_date.strftime('%d.%m.%Y'),
+                        size,
+                        f'{a.exsudat_menge or "—"} / {a.exsudat_art or "—"}',
+                        a.tendenz or '—',
+                        a.wundauflage or '—',
+                        (a.bemerkungen or '')[:60],
+                    ])
+                wt = Table(rows, colWidths=[2*cm, 2.5*cm, 3*cm, 2.2*cm, 3.8*cm, 4*cm])
+                wt.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), PFLEGEOS_LIGHT),
+                    ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE',   (0, 0), (-1, -1), 8),
+                    ('GRID',       (0, 0), (-1, -1), 0.3, colors.lightgrey),
+                    ('PADDING',    (0, 0), (-1, -1), 4),
+                ]))
+                el.append(wt)
+            else:
+                el.append(Paragraph('Keine Assessments vorhanden.', SMALL))
+            el.append(Spacer(1, 0.4*cm))
+
+    # ══════════════════════════════════════════════════════════
+    # LEISTUNGSNACHWEIS
+    # ══════════════════════════════════════════════════════════
+    if include.get('leistungen') and leistungen is not None:
+        _section_break(f'Leistungsnachweis — {leistung_monat}')
+        el.append(Paragraph(
+            f'Patient: <b>{patient.full_name}</b>  ·  '
+            f'Monat: <b>{leistung_monat}</b>  ·  '
+            f'Einträge: <b>{len(leistungen)}</b>', NORM))
+        el.append(Spacer(1, 0.3*cm))
+        if leistungen:
+            rows = [['Datum', 'Uhrzeit', 'Leistung', 'Dauer (min)', 'Mitarbeiter']]
+            for ln in leistungen:
+                leistung_label = (f'{ln.leistung.leistung_nr} {ln.leistung.bezeichnung}'
+                                  if ln.leistung else '—')
+                rows.append([
+                    ln.durchgefuehrt_am.strftime('%d.%m.%Y'),
+                    ln.durchgefuehrt_um.strftime('%H:%M') if ln.durchgefuehrt_um else '—',
+                    leistung_label,
+                    str(ln.dauer_minuten or '—'),
+                    ln.employee.full_name if ln.employee else '—',
+                ])
+            lt = Table(rows, colWidths=[2.2*cm, 1.8*cm, 8.5*cm, 2*cm, 3*cm], repeatRows=1)
+            lt.setStyle(TableStyle([
+                ('BACKGROUND',   (0, 0), (-1, 0), PFLEGEOS_BLUE),
+                ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
+                ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE',     (0, 0), (-1, -1), 8),
+                ('GRID',         (0, 0), (-1, -1), 0.3, colors.lightgrey),
+                ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, PFLEGEOS_LIGHT]),
+                ('PADDING',      (0, 0), (-1, -1), 4),
+            ]))
+            el.append(lt)
+        else:
+            el.append(Paragraph('Keine Leistungen für diesen Monat.', SMALL))
+
+    # ══════════════════════════════════════════════════════════
+    # STURZPROTOKOLLE
+    # ══════════════════════════════════════════════════════════
+    if include.get('stuerze') and stuerze:
+        _section_break('Sturzprotokolle')
+        el.append(Paragraph(
+            f'Patient: <b>{patient.full_name}</b>  ·  '
+            f'{len(stuerze)} Ereignis(se) in den letzten 12 Monaten', NORM))
+        el.append(Spacer(1, 0.3*cm))
+        for sturz in stuerze:
+            datum_s = sturz.sturz_datum.strftime('%d.%m.%Y')
+            uhrzeit = sturz.sturz_uhrzeit.strftime('%H:%M') if hasattr(sturz, 'sturz_uhrzeit') and sturz.sturz_uhrzeit else ''
+            el.append(Paragraph(f'<b>{datum_s} {uhrzeit}</b>', BOLD))
+            infos = []
+            if sturz.fundort:       infos.append(('Fundort',     sturz.fundort))
+            if sturz.sturzursache:  infos.append(('Ursache',     sturz.sturzursache))
+            if sturz.verletzungen:  infos.append(('Verletzungen', sturz.verletzungen))
+            if sturz.massnahmen_sofort: infos.append(('Sofortmaßnahmen', sturz.massnahmen_sofort))
+            if infos:
+                rows = [[k, v] for k, v in infos]
+                st = Table(rows, colWidths=[4*cm, 13.5*cm])
+                st.setStyle(TableStyle([
+                    ('FONTNAME',  (0, 0), (0, -1), 'Helvetica-Bold'),
+                    ('FONTSIZE',  (0, 0), (-1, -1), 8),
+                    ('GRID',      (0, 0), (-1, -1), 0.3, colors.lightgrey),
+                    ('PADDING',   (0, 0), (-1, -1), 4),
+                    ('BACKGROUND',(0, 0), (0, -1),  PFLEGEOS_LIGHT),
+                ]))
+                el.append(st)
+            el.append(Spacer(1, 0.4*cm))
+
+    # ══════════════════════════════════════════════════════════
+    # ABSCHLUSS
+    # ══════════════════════════════════════════════════════════
+    el.append(Spacer(1, 0.5*cm))
+    el.append(HRFlowable(width='100%', thickness=0.5, color=colors.grey))
+    el.append(Paragraph(
+        f'MDK-Prüfungspaket · {patient.full_name} · '
+        f'Erstellt: {today_str} · PflegeOS · {company.name}',
+        _s('MFoot', fontSize=7, textColor=colors.grey)))
+
+    doc.build(el)
+    buffer.seek(0)
+    return buffer
